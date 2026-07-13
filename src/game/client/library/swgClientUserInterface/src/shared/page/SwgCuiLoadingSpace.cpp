@@ -58,17 +58,20 @@ m_defaultBgPage      (NULL)
 	getCodeDataObject (TUIText,     m_text,               "text");
 	getCodeDataObject (TUIPie,      m_pie,                "pie");
 	getCodeDataObject (TUIButton,   m_backButton,         "backbutton");
-	getCodeDataObject (TUIButton,   m_escButton,          "buttonEsc");
+	getCodeDataObject (TUIButton,   m_escButton,          "buttonEsc", true);
 	getCodeDataObject (TUIImage,    m_image,              "screenshot");
 	getCodeDataObject (TUIText,     m_textLoad,           "textprogress");
-	getCodeDataObject (TUIPage,     m_defaultBgPage,      "default");
+	getCodeDataObject (TUIPage,     m_defaultBgPage,      "default", true);
 
+	// Publish 14.1's /SpaceLoading page does not define the later-era
+	// buttonEsc or default widgets.  Keep the authentic page contract while
+	// remaining compatible with later layouts that do provide them.
 	m_textScreenshotName->Clear();
 	m_text->Clear();
 	m_textLoad->Clear();
 	
-	registerMediatorObject (*m_backButton, true);
-	registerMediatorObject (*m_escButton, true);
+	if (m_backButton) registerMediatorObject (*m_backButton, true);
+	if (m_escButton)  registerMediatorObject (*m_escButton, true);
 }
 
 //----------------------------------------------------------------------
@@ -121,7 +124,8 @@ void SwgCuiLoadingSpace::performDeactivate()
 
 void SwgCuiLoadingSpace::setupBackground(std::string const & )
 {
-	m_defaultBgPage->SetVisible(true);
+	if (m_defaultBgPage)
+		m_defaultBgPage->SetVisible(true);
 }
 
 //----------------------------------------------------------------------
