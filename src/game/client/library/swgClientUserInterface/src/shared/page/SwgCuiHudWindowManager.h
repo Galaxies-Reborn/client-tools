@@ -147,6 +147,7 @@ private:
 	SwgCuiChatWindow *         m_chatWindowMediator;
 	SwgCuiMfdStatus *          m_mfdStatusMediator;
 	SwgCuiToolbar *            m_toolbarMediator;
+	SwgCuiCombatQueue *        m_combatQueueMediator;
 	SwgCuiNotifications *      m_notificationsMediator;
 	SwgCuiHighlight *          m_highlightMediator;
 	SwgCuiInventory *          m_inventory;

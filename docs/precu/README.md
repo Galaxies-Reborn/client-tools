@@ -1,8 +1,30 @@
 # Pre-CU client restoration
 
-This branch is an isolated client restoration line based on
-`x64-dx9-vanilla`. It must not absorb the uncommitted DX11 renderer work from
-the primary `client-tools` worktree.
+This is the isolated `x64-dx9` restoration line in
+`swgsais/pre-cu-reborn-tools`, seeded from the `reborn-master` client-tools
+tree. It must not absorb unrelated DX11 renderer work from other worktrees.
+
+## Combat queue baseline
+
+The first queue slice restores the direct HUD-owned `SwgCuiCombatQueue`
+mediator against the retail `/GroundHUD.CombatQueue` contract. It observes
+queue additions/removals and player combat-state changes for the mediator's
+full lifetime, renders only commands marked `addToCombatQueue`, and uses the
+combat target for the target label.
+
+The clear path intentionally enumerates combat entries and removes each by
+sequence ID. `ClientCommandQueue::clear()` remains the legacy broad queue
+operation and is not used by the combat-queue UI, so non-combat commands are
+preserved. Local mutation waits for the server's authoritative removal reply,
+which also preserves the executing front command and its real wait/status
+payload. Removal callbacks copy only the sequence ID and wait time needed by
+the fade timer; they never retain the queue entry pointer after the callback.
+
+Run the source-contract and skill-data tests with:
+
+```powershell
+python -m unittest discover -s scripts/tests -p 'test_*.py' -v
+```
 
 ## Current skills UI baseline
 
