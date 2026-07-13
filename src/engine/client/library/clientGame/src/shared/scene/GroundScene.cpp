@@ -764,13 +764,16 @@ void GroundScene::init (const char* const terrainFilename, CreatureObject* const
 	CameraController* const freeCameraController = NON_NULL (new CameraController (m_freeCamera));
 	m_freeCamera->setController (freeCameraController);
 
-	m_freeCameraInputMap = new InputMap ("input/groundinputmap_freecamera.iff", 0, 0);
+	// Publish 14.1 uses the standard SWG ground input map for all three
+	// auxiliary cameras.  Its retail archive stack does not contain the later
+	// freecamera or debugportalcamera input-map files.
+	m_freeCameraInputMap = new InputMap ("input/groundinputmap_swg.iff", 0, 0);
 	m_freeCameraInputMap->setMessageQueue (freeCameraController->getMessageQueue ());
 
 	CameraController* const debugPortalCameraController = NON_NULL (new CameraController (m_debugPortalCamera));
 	m_debugPortalCamera->setController (debugPortalCameraController);
 
-	m_debugPortalCameraInputMap = new InputMap ("input/groundinputmap_debugportalcamera.iff", 0, 0);
+	m_debugPortalCameraInputMap = new InputMap ("input/groundinputmap_swg.iff", 0, 0);
 	m_debugPortalCameraInputMap->setMessageQueue (debugPortalCameraController->getMessageQueue ());
 
 	CameraController* const structurePlacementCameraController = NON_NULL (new CameraController (m_structurePlacementCamera));
