@@ -176,11 +176,9 @@ m_opacityCallback      (0)
 	getCodeDataObject (TUIPage,       m_menuButtonPage,          "bigMenuPage");
 	getCodeDataObject (TUIPage,       m_mouseoverPage,           "mouseover");
 
-	// Null-guard every registerMediatorObject - the NGE-retail ButtonBar
-	// page omits many of these post-NGE additions (Community/Mail/Journal/
-	// Map/Datapad/Character/Expertise/Options/Commands/Submenu/
-	// MyCollections/Appearance/QuestBuilder/GCW etc.); without guards
-	// the constructor AVs in registerMediatorObject's first member access.
+	// Publish 14 exposes only its effect-managed buttons through CodeData.
+	// Its other command buttons remain direct cmdname children under vs, while
+	// the later flyout fields are absent.  Guard every optional mediator object.
 	if (m_communityButton)      registerMediatorObject (*m_communityButton,      true);
 	if (m_mailButton)           registerMediatorObject (*m_mailButton,           true);
 	if (m_inventoryButton)      registerMediatorObject (*m_inventoryButton,      true);
@@ -319,9 +317,6 @@ void SwgCuiButtonBar::update (float deltaTimeSecs)
 {
 	CuiMediator::update (deltaTimeSecs);
 
-	if (!m_menuButtonPage || !m_buttonsComposite)
-		return;
-
 	updateExpertiseEffector();
 
 	updateJournalEffector();
@@ -339,7 +334,7 @@ void SwgCuiButtonBar::update (float deltaTimeSecs)
 			m_menuButton->Press();
 	}
 
-	if (m_buttonsComposite->IsVisible())
+	if (m_buttonsComposite && m_buttonsComposite->IsVisible())
 	{
 		UIPage * const parent = dynamic_cast<UIPage *>(getPage ().GetParent ());
 
@@ -582,7 +577,7 @@ bool SwgCuiButtonBar::OnMessage (UIWidget * context, const UIMessage & msg)
 			{
 				return true;
 			}
-			if(!m_buttonsComposite->IsVisible())
+			if(!m_buttonsComposite || !m_buttonsComposite->IsVisible())
 				return true;
 			if (msg.Type == UIMessage::LeftMouseDown)
 				return false;
@@ -619,8 +614,7 @@ bool SwgCuiButtonBar::OnMessage (UIWidget * context, const UIMessage & msg)
 
 void SwgCuiButtonBar::toggleMenu()
 {
-	// Bail out entirely if the post-NGE-retail UI doesn't have the
-	// composite/page widgets the SOE menu expects.
+	// Bail out when the Publish 14 direct command bar has no later flyout.
 	if (!m_buttonsComposite || !m_menuButtonPage || !m_mouseoverPage || !m_menuButton)
 		return;
 
@@ -910,7 +904,8 @@ void SwgCuiButtonBarNamespace::onConfirmGoHomeClosed(const CuiMessageBox & box)
 
 void SwgCuiButtonBar::onOpacityCallback()
 {
-	m_menuButtonPage->SetOpacity(CuiPreferences::getCommandButtonOpacity());
+	if (m_menuButtonPage)
+		m_menuButtonPage->SetOpacity(CuiPreferences::getCommandButtonOpacity());
 }
 
 //======================================================================

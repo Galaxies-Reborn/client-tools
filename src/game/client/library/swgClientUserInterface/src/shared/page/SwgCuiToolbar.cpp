@@ -3071,7 +3071,7 @@ void SwgCuiToolbar::update (float deltaTimeSecs)
 						
 						compareCrc = Crc::normalizeAndCalculate(compareString.c_str());			
 
-						if(showNewCurrentActionPages && (compareCrc == m_commandExecutingCrc))
+						if(showNewCurrentActionPages && m_currentActionPage && m_effectorCurrent && (compareCrc == m_commandExecutingCrc))
 						{							
 							UIPage *currentActionPage = getPageFromPool(m_currentActionPage, m_currentActionPages, m_nextCurrentActionPage);
 							bool resetVisiblity = false;
@@ -4558,13 +4558,16 @@ void SwgCuiToolbar::setPetBarVisible(const bool visible)
 	{
 		// reset all of our pet checkboxes to invisible.
 		// TODO: set these correctly.
-		const UIBaseObject::UIObjectList & olist = m_petVolumeHighlightsPage->GetChildrenRef();
-		for (UIBaseObject::UIObjectList::const_iterator it = olist.begin (); it != olist.end (); ++it)
+		if (m_petVolumeHighlightsPage)
 		{
-			UIBaseObject * const obj = *it;
-			NOT_NULL (obj);
-			if (obj->IsA (TUIImage))
-				safe_cast<UIImage *>(obj)->SetOpacity (0.0f);
+			const UIBaseObject::UIObjectList & olist = m_petVolumeHighlightsPage->GetChildrenRef();
+			for (UIBaseObject::UIObjectList::const_iterator it = olist.begin (); it != olist.end (); ++it)
+			{
+				UIBaseObject * const obj = *it;
+				NOT_NULL (obj);
+				if (obj->IsA (TUIImage))
+					safe_cast<UIImage *>(obj)->SetOpacity (0.0f);
+			}
 		}
 
 		repopulateSlots(true);
