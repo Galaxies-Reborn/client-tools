@@ -76,7 +76,7 @@ private:
 	void positionWidgetAroundRadarWithRect(UIWidget *widget, double angle, UIRect & targetRect);
 
 	UIImage *                    m_radarCompass;
-	UIPage *                     m_radarCompassTop;
+	UIWidget *                   m_radarCompassTop;
 	UIImage *                    m_radarCompassTopSmall;
 	UIImage *                    m_radarCompassTopMedium;
 	UIImage *                    m_radarCompassTopLarge;
