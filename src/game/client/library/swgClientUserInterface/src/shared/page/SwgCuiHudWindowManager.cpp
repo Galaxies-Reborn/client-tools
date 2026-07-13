@@ -69,6 +69,7 @@
 #include "swgClientUserInterface/SwgCuiChatWindow.h"
 #include "swgClientUserInterface/SwgCuiColorTest.h"
 #include "swgClientUserInterface/SwgCuiCommunity.h"
+#include "swgClientUserInterface/SwgCuiCombatQueue.h"
 #include "swgClientUserInterface/SwgCuiCustomize.h"
 #include "swgClientUserInterface/SwgCuiDpsMeter.h"
 #include "swgClientUserInterface/SwgCuiHarassmentMessage.h"
@@ -156,6 +157,7 @@ m_callback                  (new MessageDispatch::Callback),
 m_chatWindowMediator        (0),
 m_mfdStatusMediator         (0),
 m_toolbarMediator           (0),
+m_combatQueueMediator       (0),
 m_inventory                 (0),
 m_buttonBar                 (0),
 m_workspace                 (&workspace),
@@ -242,6 +244,23 @@ m_doubleToolbar(0)
 				m_toolbarMediator->startProcessingActions();
 				m_workspace->addMediator (*m_toolbarMediator);
 				cacheToolbar();
+			}
+		}
+
+		//-----------------------------------------------------------------
+		{
+			mediatorPage = 0;
+			hud.getCodeDataObject(TUIPage, mediatorPage, "CombatQueue");
+			if (mediatorPage)
+			{
+				mediatorPage->SetEnabled(false);
+				m_combatQueueMediator = new SwgCuiCombatQueue(*mediatorPage);
+				m_combatQueueMediator->setSettingsAutoSizeLocation(true, true);
+				m_combatQueueMediator->setStickyVisible(true);
+				m_combatQueueMediator->setShowFocusedGlowRect(false);
+				m_combatQueueMediator->fetch();
+				m_combatQueueMediator->activate();
+				m_workspace->addMediator(*m_combatQueueMediator);
 			}
 		}
 
@@ -396,6 +415,11 @@ SwgCuiHudWindowManager::~SwgCuiHudWindowManager ()
 			m_workspace->removeMediator (*m_toolbarMediator);
 		}
 
+		if (m_combatQueueMediator != NULL)
+		{
+			m_workspace->removeMediator(*m_combatQueueMediator);
+		}
+
 		if (m_buttonBar != NULL)
 		{
 			m_workspace->removeMediator (*m_buttonBar);
@@ -446,6 +470,12 @@ SwgCuiHudWindowManager::~SwgCuiHudWindowManager ()
 	{
 		m_toolbarMediator->release ();
 		m_toolbarMediator = 0;
+	}
+
+	if (m_combatQueueMediator)
+	{
+		m_combatQueueMediator->release();
+		m_combatQueueMediator = 0;
 	}
 
 	if (m_notificationsMediator)
@@ -812,6 +842,9 @@ void SwgCuiHudWindowManager::update ()
 {
 	if (m_lastHudOpacity != CuiPreferences::getHudOpacity ()) //lint !e777 //floats equality
 		updateHudOpacity ();
+
+	if (m_combatQueueMediator && m_combatQueueMediator->isActive())
+		m_combatQueueMediator->updateTarget();
 }
 
 //----------------------------------------------------------------------

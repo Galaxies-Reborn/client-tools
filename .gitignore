@@ -116,6 +116,7 @@ src/build/win32/x64/
 **/build/win32/x64/
 **/x64/Release/
 scripts/__pycache__/
+**/__pycache__/
 mss64-stub/*.exp
 deps/x64/lib/lgLcd.lib
 deps/x64/lib/lgLcd_stubs.obj

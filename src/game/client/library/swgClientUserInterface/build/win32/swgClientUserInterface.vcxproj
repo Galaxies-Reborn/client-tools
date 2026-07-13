@@ -567,6 +567,10 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
     </ClCompile>
+    <ClCompile Include="..\..\src\shared\page\SwgCuiCombatQueue.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
+    </ClCompile>
     <ClCompile Include="..\..\src\shared\page\SwgCuiCommandBrowser.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
@@ -1366,6 +1370,7 @@
     <ClInclude Include="..\..\src\shared\page\SwgCuiColorTest.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiCombatState.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiCombatState_Action.h" />
+    <ClInclude Include="..\..\src\shared\page\SwgCuiCombatQueue.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiCommandBrowser.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiCommunity.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiCommunity_Character.h" />
