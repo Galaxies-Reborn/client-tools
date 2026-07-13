@@ -26,7 +26,25 @@ Run the source-contract and skill-data tests with:
 python -m unittest discover -s scripts/tests -p 'test_*.py' -v
 ```
 
-## Current skills UI baseline
+## Skills lifecycle baseline
+
+The skills mediator refreshes its profession tree, XP bars, skill-point total,
+and skill-mod table from the retained player delta messages while the window is
+open. Rebuilding a graph preserves the selected skill box and deduplicates its
+dynamic widget registrations so frequent XP updates do not accumulate
+callbacks or references.
+
+Surrender is intentionally server-authoritative. The client first verifies
+that the selected skill is learned, lists any learned transitive dependents,
+and otherwise opens the retained typed confirmation dialog. The confirmation
+callback revalidates ownership and dependencies, snapshots one command
+sequence, and keeps the surrender button disabled until that queue entry
+completes. Missing/invisible command rows fail closed; queue clears and scene or
+character changes discard stale snapshots. Authoritative skill deltas refresh
+the resulting UI state. The client never mutates skills, points, commands,
+modifiers, or schematics locally.
+
+## Skill data provenance
 
 `SwgCuiSkills` already implements a substantial Pre-CU profession-tree view,
 but its generated profession and skill-box headers came from an external
