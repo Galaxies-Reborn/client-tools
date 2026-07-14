@@ -230,6 +230,7 @@ function Send-BridgeKeySequence {
         [ValidateRange(0, 255)]
         [int]$KeyCode,
 
+        [AllowEmptyCollection()]
         [ValidateRange(0, 255)]
         [int[]]$Modifiers = @()
     )
@@ -349,8 +350,13 @@ switch ($Action) {
         }
 
         [int[]]$modifiers = if ($hasModifiers) { @($ModifierDikCode) } else { @() }
-        Send-BridgeKeySequence -Window $window -Message $message -KeyCode $keyCode -Modifiers $modifiers
-        $modifierDetail = if (@($modifiers).Count -gt 0) { $modifiers -join "," } else { "none" }
+        if ($hasModifiers) {
+            Send-BridgeKeySequence -Window $window -Message $message -KeyCode $keyCode -Modifiers $modifiers
+        }
+        else {
+            Send-BridgeKeySequence -Window $window -Message $message -KeyCode $keyCode
+        }
+        $modifierDetail = if ($hasModifiers) { $modifiers -join "," } else { "none" }
         $detail = "queued dik=$keyCode modifiers=$modifierDetail"
     }
 
