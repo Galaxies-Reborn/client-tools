@@ -51,6 +51,10 @@ src/compile
 aclocal.m4
 autom4te.cache/
 config/
+!config/
+config/*
+!config/precu/
+!config/precu/**
 configure
 depcomp
 install-sh
