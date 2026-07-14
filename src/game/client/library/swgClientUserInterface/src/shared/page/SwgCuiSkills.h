@@ -77,8 +77,7 @@ private:
 	void                       reconcilePendingSurrender ();
 	void                       onCommandRemoving     (ClientCommandQueue::Messages::Removing::Payload const & payload);
 	bool                       tryPopulateGraph4x4    (SkillObject const * novice, std::set<std::string> const & playerSkills);
-	void                       applyTreeBox           (char const * path, std::string const & skillName, std::set<std::string> const & playerSkills, bool nextTrainable);
-	void                       applySkillBoxXp        (char const * path, class UIButton * btn, std::string const & skillName, bool hasSkill, bool nextTrainable);
+	void                       applyTreeBox           (char const * path, std::string const & skillName, std::set<std::string> const & playerSkills);
 	void                       hideAllGraphs          ();
 
 	// Top-level page bindings (resolved via CodeData on the /Skill.skills page).
@@ -114,8 +113,16 @@ private:
 	UIDataSource *             m_dsInfoCmdsName;
 	UIDataSource *             m_dsInfoCmdsIcons;
 
-	// Skill-points display + surrender button (under both.right.all.skillPoints).
+	// Authentic Publish 14 selected-skill presentation contract from the nested
+	// both.right CodeData block in ui_skill.inc.
 	UIText *                   m_textSkillPoints;
+	UIText *                   m_textAcquire;
+	UIText *                   m_textSurrender;
+	UIText *                   m_textExpRequired;
+	UIPage *                   m_pageLearningCurrent;
+	UIPage *                   m_pageLearningCost;
+	UIPage *                   m_pageLearningRecover;
+	UIPage *                   m_barExp;
 	UIButton *                 m_buttonSurrender;
 
 	// Map from a tree-cell button widget to its currently-displayed skill
