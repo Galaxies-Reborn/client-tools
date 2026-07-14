@@ -52,6 +52,7 @@ public:
 	void                       onSkillsChanged       (CreatureObject const & creature);
 	void                       onExperienceChanged   (PlayerObject const & player);
 	void                       onSkillModsChanged    (CreatureObject const & creature);
+	void                       onCommandsChanged     (CreatureObject const & creature);
 	void                       onDeleteSkillConfirmation (std::string const & skillName);
 	void                       onSceneChanged        (bool const &);
 
@@ -68,6 +69,7 @@ private:
 	void                       synchronizeProfessionTreeSelection ();
 	void                       populateExperience    ();
 	void                       populateSkillMods     ();
+	void                       populateCertifications ();
 	void                       populateSelectedProfession ();
 	void                       populateSelectedSkill  ();
 	void                       updateSkillPointsDisplay ();
@@ -106,6 +108,7 @@ private:
 	UIDataSource *             m_dsExpPoints;
 	UIDataSource *             m_dsModsName;
 	UIDataSource *             m_dsModsPoints;
+	UIDataSource *             m_dsCertsName;
 
 	// Right-side per-selected-skill detail panels (under both.right.all.info).
 	UIDataSource *             m_dsInfoModsName;
