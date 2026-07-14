@@ -186,11 +186,36 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         self.assertIn("[int[]]$ModifierDikCode", parameter_block)
 
         sequence = function_body(self.helper, "function Send-BridgeKeySequence")
+        self.assertIn("[AllowEmptyCollection()]", sequence)
         self.assertIn("try {", sequence)
         self.assertIn("finally {", sequence)
         self.assertIn("$pressedModifiers.Count - 1", sequence)
         self.assertIn("$command.InputReset", sequence)
         self.assertIn("$actionError", sequence)
+
+    def test_plain_key_sequence_accepts_no_modifiers(self):
+        sequence = function_body(self.helper, "function Send-BridgeKeySequence")
+        powershell = rf"""
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+$command = @{{ KeyDown = 8; KeyUp = 9; InputReset = 11 }}
+{sequence}
+$script:queued = [System.Collections.Generic.List[string]]::new()
+function Send-BridgeCommand {{
+    param([IntPtr]$Window, [uint32]$Message, [int]$Command, [long]$Data = 0)
+    $script:queued.Add("$Command`:$Data")
+}}
+Send-BridgeKeySequence -Window ([IntPtr]1) -Message 1 -KeyCode 1
+@($script:queued) | ConvertTo-Json -Compress
+"""
+        completed = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", powershell],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        self.assertEqual(["8:1", "9:1"], json.loads(completed.stdout))
 
     def test_chord_sequence_releases_keys_and_resets_after_each_post_failure(self):
         sequence = function_body(self.helper, "function Send-BridgeKeySequence")
