@@ -52,6 +52,7 @@
 #include "sharedGame/CommoditiesAdvancedSearchAttribute.h"
 #include "sharedGame/SetupSharedGame.h"
 #include "sharedImage/SetupSharedImage.h"
+#include "sharedIoWin/IoWinManager.h"
 #include "sharedIoWin/SetupSharedIoWin.h"
 #include "sharedLog/SetupSharedLog.h"
 #include "sharedLog/LogManager.h"
@@ -95,6 +96,197 @@ extern void externalCommandHandler(const char*);
 
 namespace ClientMainNamespace
 {
+	enum BackgroundInputCommand
+	{
+		BIC_ping = 0,
+		BIC_mouseMove,
+		BIC_leftMouseDown,
+		BIC_leftMouseUp,
+		BIC_rightMouseDown,
+		BIC_rightMouseUp,
+		BIC_middleMouseDown,
+		BIC_middleMouseUp,
+		BIC_keyDown,
+		BIC_keyUp,
+		BIC_character,
+		BIC_inputReset
+	};
+
+	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
+	LRESULT const cms_backgroundInputProtocolVersion = 1;
+	UINT s_backgroundInputMessage = 0;
+	HWND s_backgroundInputWindow = 0;
+	WNDPROC s_backgroundInputPreviousWindowProc = 0;
+	bool s_backgroundInputInstalled = false;
+
+	void queueBackgroundMousePosition(LPARAM lParam)
+	{
+		int const x = static_cast<int>(static_cast<short>(LOWORD(lParam)));
+		int const y = static_cast<int>(static_cast<short>(HIWORD(lParam)));
+		IoWinManager::queueSetSystemMouseCursorPosition(x, y);
+	}
+
+	bool queueBackgroundKey(bool down, LPARAM lParam)
+	{
+		if (lParam < 0 || lParam > 255)
+			return false;
+
+		int const key = static_cast<int>(lParam);
+		if (down)
+			IoWinManager::queueKeyDown(0, key);
+		else
+			IoWinManager::queueKeyUp(0, key);
+
+		return true;
+	}
+
+	LRESULT CALLBACK backgroundInputWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+	{
+		if (s_backgroundInputInstalled && message == s_backgroundInputMessage)
+		{
+			switch (static_cast<int>(wParam))
+			{
+			case BIC_ping:
+				return cms_backgroundInputProtocolVersion;
+
+			case BIC_mouseMove:
+				queueBackgroundMousePosition(lParam);
+				return 1;
+
+			case BIC_leftMouseDown:
+				queueBackgroundMousePosition(lParam);
+				IoWinManager::queueMouseButtonDown(0, 0);
+				return 1;
+
+			case BIC_leftMouseUp:
+				queueBackgroundMousePosition(lParam);
+				IoWinManager::queueMouseButtonUp(0, 0);
+				return 1;
+
+			case BIC_rightMouseDown:
+				queueBackgroundMousePosition(lParam);
+				IoWinManager::queueMouseButtonDown(0, 1);
+				return 1;
+
+			case BIC_rightMouseUp:
+				queueBackgroundMousePosition(lParam);
+				IoWinManager::queueMouseButtonUp(0, 1);
+				return 1;
+
+			case BIC_middleMouseDown:
+				queueBackgroundMousePosition(lParam);
+				IoWinManager::queueMouseButtonDown(0, 2);
+				return 1;
+
+			case BIC_middleMouseUp:
+				queueBackgroundMousePosition(lParam);
+				IoWinManager::queueMouseButtonUp(0, 2);
+				return 1;
+
+			case BIC_keyDown:
+				return queueBackgroundKey(true, lParam) ? 1 : 0;
+
+			case BIC_keyUp:
+				return queueBackgroundKey(false, lParam) ? 1 : 0;
+
+			case BIC_character:
+				if (lParam <= 0 || lParam > 0xffff)
+					return 0;
+				IoWinManager::queueCharacter(0, static_cast<int>(lParam));
+				return 1;
+
+			case BIC_inputReset:
+				IoWinManager::queueInputReset();
+				return 1;
+
+			default:
+				return 0;
+			}
+		}
+
+		if (s_backgroundInputPreviousWindowProc)
+			return CallWindowProc(s_backgroundInputPreviousWindowProc, hwnd, message, wParam, lParam);
+
+		return DefWindowProc(hwnd, message, wParam, lParam);
+	}
+
+	bool installBackgroundInputBridge()
+	{
+		if (!ConfigFile::getKeyBool("SwgClient", "enableBackgroundInputBridge", false))
+			return false;
+
+		if (s_backgroundInputInstalled)
+			return true;
+
+		HWND const window = Os::getWindow();
+		if (!window)
+		{
+			WARNING(true, ("Pre-CU background input bridge has no client window"));
+			return false;
+		}
+
+		UINT const registeredMessage = RegisterWindowMessageA(cms_backgroundInputMessageName);
+		if (!registeredMessage)
+		{
+			WARNING(true, ("Pre-CU background input bridge could not register its window message"));
+			return false;
+		}
+
+		SetLastError(ERROR_SUCCESS);
+		LONG_PTR const previousWindowProc = SetWindowLongPtr(
+			window,
+			GWLP_WNDPROC,
+			reinterpret_cast<LONG_PTR>(&backgroundInputWindowProc));
+		if (previousWindowProc == 0 && GetLastError() != ERROR_SUCCESS)
+		{
+			WARNING(true, ("Pre-CU background input bridge could not subclass the client window"));
+			return false;
+		}
+
+		s_backgroundInputMessage = registeredMessage;
+		s_backgroundInputWindow = window;
+		s_backgroundInputPreviousWindowProc = reinterpret_cast<WNDPROC>(previousWindowProc);
+		s_backgroundInputInstalled = true;
+
+		REPORT_LOG(true, ("Pre-CU background input bridge enabled (message=0x%04x, protocol=%d)\n",
+			static_cast<unsigned int>(s_backgroundInputMessage),
+			static_cast<int>(cms_backgroundInputProtocolVersion)));
+		return true;
+	}
+
+	void removeBackgroundInputBridge()
+	{
+		if (!s_backgroundInputInstalled)
+			return;
+
+		if (s_backgroundInputWindow && IsWindow(s_backgroundInputWindow) && s_backgroundInputPreviousWindowProc)
+		{
+			WNDPROC const currentWindowProc = reinterpret_cast<WNDPROC>(
+				GetWindowLongPtr(s_backgroundInputWindow, GWLP_WNDPROC));
+			if (currentWindowProc != &backgroundInputWindowProc)
+			{
+				WARNING(true, ("Pre-CU background input bridge is no longer the active client window subclass"));
+				return;
+			}
+
+			SetLastError(ERROR_SUCCESS);
+			LONG_PTR const result = SetWindowLongPtr(
+				s_backgroundInputWindow,
+				GWLP_WNDPROC,
+				reinterpret_cast<LONG_PTR>(s_backgroundInputPreviousWindowProc));
+			if (result == 0 && GetLastError() != ERROR_SUCCESS)
+			{
+				WARNING(true, ("Pre-CU background input bridge could not restore the client window procedure"));
+				return;
+			}
+		}
+
+		s_backgroundInputInstalled = false;
+		s_backgroundInputPreviousWindowProc = 0;
+		s_backgroundInputWindow = 0;
+		s_backgroundInputMessage = 0;
+	}
+
 	void installConfigFileOverride ()
 	{
 		AbstractFile * const abstractFile = TreeFile::open ("misc/override.cfg", AbstractFile::PriorityData, true);
@@ -356,6 +548,7 @@ int ClientMain(
 
 			//-- setup the client user interface.
 			SetupSwgClientUserInterface::install();
+			bool const backgroundInputBridgeInstalled = installBackgroundInputBridge();
 
 			//-- G15 LCD
 			SwgCuiG15Lcd::initializeLcd();
@@ -363,6 +556,8 @@ int ClientMain(
 			//-- run game
 			rootInstallTimer.manualExit();
 			SetupSharedFoundation::callbackWithExceptionHandling(Game::run);
+			if (backgroundInputBridgeInstalled)
+				removeBackgroundInputBridge();
 
 			//-- save options
 			// @todo: write a flexible options load/save system, both of ours suck
