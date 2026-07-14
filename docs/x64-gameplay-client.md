@@ -66,8 +66,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Stage-X64Clien
 ```
 
 The profile owns the canonical 51-TRE archive order, login/preload defaults,
-1024x768 windowed settings, and the legacy-interior Bloom compatibility lock.
-It preserves `user.cfg`.
+1024x768 windowed settings, the legacy-interior Bloom compatibility lock, and
+non-activating D3D9 window transitions for background automation. It preserves
+`user.cfg`.
 
 Or build and stage in one command:
 

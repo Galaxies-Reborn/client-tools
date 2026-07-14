@@ -10,6 +10,15 @@ LIVE_CONFIG = PROFILE_ROOT / "precu_live.cfg"
 BLOOM_SOURCE = REPOSITORY_ROOT / (
     "src/engine/client/library/clientGame/src/shared/core/Bloom.cpp"
 )
+DIRECT3D_CONFIG_HEADER = REPOSITORY_ROOT / (
+    "src/engine/client/application/Direct3d9/src/win32/ConfigDirect3d9.h"
+)
+DIRECT3D_CONFIG_SOURCE = REPOSITORY_ROOT / (
+    "src/engine/client/application/Direct3d9/src/win32/ConfigDirect3d9.cpp"
+)
+DIRECT3D_SOURCE = REPOSITORY_ROOT / (
+    "src/engine/client/application/Direct3d9/src/win32/Direct3d9.cpp"
+)
 STAGE_SCRIPT = REPOSITORY_ROOT / "scripts" / "Stage-X64Client.ps1"
 BUILD_SCRIPT = REPOSITORY_ROOT / "scripts" / "Build-X64Client.ps1"
 
@@ -130,6 +139,31 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
         script = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn("[int]$MaxCpuCount = 4", script)
         self.assertIn('"/m:$MaxCpuCount"', script)
+
+    def test_background_profile_cannot_activate_the_client_window(self):
+        client = CLIENT_CONFIG.read_text(encoding="utf-8")
+        options = (PROFILE_ROOT / "options.cfg").read_text(encoding="utf-8")
+        config_header = DIRECT3D_CONFIG_HEADER.read_text(encoding="utf-8")
+        config_source = DIRECT3D_CONFIG_SOURCE.read_text(encoding="utf-8")
+        direct3d_source = DIRECT3D_SOURCE.read_text(encoding="utf-8")
+
+        self.assertRegex(
+            options,
+            r"(?m)^\s*doNotActivateWindow\s*=\s*true\s*$",
+        )
+        user_include = client.index('.include "user.cfg"')
+        profile_lock = client.index("doNotActivateWindow=true")
+        self.assertGreater(profile_lock, user_include)
+        self.assertIn("getDoNotActivateWindow", config_header)
+        self.assertIn("KEY_BOOL(doNotActivateWindow, false)", config_source)
+        self.assertIn(
+            "ConfigDirect3d9::getDoNotActivateWindow() ? SWP_NOACTIVATE : 0",
+            direct3d_source,
+        )
+        self.assertEqual(
+            direct3d_source.count("SWP_SHOWWINDOW | windowActivationFlag"),
+            2,
+        )
 
 
 if __name__ == "__main__":
