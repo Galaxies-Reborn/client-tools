@@ -55,6 +55,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -336,6 +337,7 @@ m_dsExpName         (0),
 m_dsExpPoints       (0),
 m_dsModsName        (0),
 m_dsModsPoints      (0),
+m_dsCertsName       (0),
 m_dsInfoModsName    (0),
 m_dsInfoModsPoints  (0),
 m_dsInfoCmdsName    (0),
@@ -383,14 +385,15 @@ m_callback          (new MessageDispatch::Callback)
 			(void *)m_treeProf, (void *)m_dsProfTree));
 	}
 
-	// XP and Skill-Mods table column DataSources, nested as
-	// myStats.comp.TableExp.containerall.{name,points} and same for TableMods.
+	// XP, Skill-Mod, and weapon-certification table column DataSources, nested
+	// under the authentic myStats.comp tables.
 	if (m_pageMyStats)
 	{
 		UIBaseObject * const expNameObj   = m_pageMyStats->GetObjectFromPath("comp.TableExp.containerall.name",    TUIDataSource);
 		UIBaseObject * const expPointsObj = m_pageMyStats->GetObjectFromPath("comp.TableExp.containerall.points",  TUIDataSource);
 		UIBaseObject * const modsNameObj  = m_pageMyStats->GetObjectFromPath("comp.TableMods.containerall.name",   TUIDataSource);
 		UIBaseObject * const modsPtsObj   = m_pageMyStats->GetObjectFromPath("comp.TableMods.containerall.points", TUIDataSource);
+		UIBaseObject * const certsNameObj = m_pageMyStats->GetObjectFromPath("comp.TableCerts.containerall.name",  TUIDataSource);
 		if (expNameObj)
 			m_dsExpName = static_cast<UIDataSource *>(expNameObj);
 		if (expPointsObj)
@@ -399,9 +402,12 @@ m_callback          (new MessageDispatch::Callback)
 			m_dsModsName = static_cast<UIDataSource *>(modsNameObj);
 		if (modsPtsObj)
 			m_dsModsPoints = static_cast<UIDataSource *>(modsPtsObj);
+		if (certsNameObj)
+			m_dsCertsName = static_cast<UIDataSource *>(certsNameObj);
 
-		REPORT_LOG(true, ("SwgCuiSkills:   myStats columns: expName=%p expPoints=%p modsName=%p modsPoints=%p\n",
-			(void *)m_dsExpName, (void *)m_dsExpPoints, (void *)m_dsModsName, (void *)m_dsModsPoints));
+		REPORT_LOG(true, ("SwgCuiSkills:   myStats columns: expName=%p expPoints=%p modsName=%p modsPoints=%p certsName=%p\n",
+			(void *)m_dsExpName, (void *)m_dsExpPoints, (void *)m_dsModsName,
+			(void *)m_dsModsPoints, (void *)m_dsCertsName));
 	}
 
 	// Right-panel header + V2 text-body fallback + V3 graph containers.
@@ -517,6 +523,8 @@ void SwgCuiSkills::performActivate()
 		static_cast<PlayerObject::Messages::ExperienceChanged *>(0));
 	m_callback->connect(*this, &SwgCuiSkills::onSkillModsChanged,
 		static_cast<CreatureObject::Messages::SkillModsChanged *>(0));
+	m_callback->connect(*this, &SwgCuiSkills::onCommandsChanged,
+		static_cast<CreatureObject::Messages::CommandsChanged *>(0));
 
 	// A confirmation or successful request may have become stale while the page
 	// was inactive or while the active player was replaced.
@@ -533,6 +541,7 @@ void SwgCuiSkills::performActivate()
 	populateProfessionList();
 	populateExperience();
 	populateSkillMods();
+	populateCertifications();
 	populateSelectedProfession();
 	updateSkillPointsDisplay();
 }
@@ -548,6 +557,8 @@ void SwgCuiSkills::performDeactivate()
 		static_cast<PlayerObject::Messages::ExperienceChanged *>(0));
 	m_callback->disconnect(*this, &SwgCuiSkills::onSkillModsChanged,
 		static_cast<CreatureObject::Messages::SkillModsChanged *>(0));
+	m_callback->disconnect(*this, &SwgCuiSkills::onCommandsChanged,
+		static_cast<CreatureObject::Messages::CommandsChanged *>(0));
 	CuiMediator::performDeactivate();
 }
 
@@ -643,6 +654,14 @@ void SwgCuiSkills::onSkillModsChanged(CreatureObject const & creature)
 {
 	if (&creature == Game::getPlayerCreature())
 		populateSkillMods();
+}
+
+//-----------------------------------------------------------------------
+
+void SwgCuiSkills::onCommandsChanged(CreatureObject const & creature)
+{
+	if (&creature == Game::getPlayerCreature())
+		populateCertifications();
 }
 
 //-----------------------------------------------------------------------
@@ -977,6 +996,44 @@ void SwgCuiSkills::populateSkillMods()
 
 //-----------------------------------------------------------------------
 
+void SwgCuiSkills::populateCertifications()
+{
+	// ui_skill.inc intentionally carries four editor sample rows in this data
+	// source. Retail clears them and rebuilds the list from the player's granted
+	// cert_* commands; clearing before the player check prevents those samples
+	// from leaking through during login or scene transitions.
+	if (m_dsCertsName)
+		m_dsCertsName->Clear();
+	if (!m_dsCertsName)
+		return;
+
+	CreatureObject const * const player = Game::getPlayerCreature();
+	if (!player)
+		return;
+
+	std::map<std::string, int> const & commands = player->getCommands();
+	int rowIdx = 0;
+	for (std::map<std::string, int>::const_iterator it = commands.begin();
+		it != commands.end(); ++it)
+	{
+		std::string const & commandName = it->first;
+		if (commandName.compare(0, 5, "cert_") != 0)
+			continue;
+
+		Unicode::String localizedName;
+		if (!CuiSkillManager::localizeCmdName(Unicode::toLower(commandName), localizedName) ||
+			localizedName.empty())
+		{
+			localizedName = prettifyKey(commandName);
+		}
+
+		appendGrantedDetailRow(m_dsCertsName, 0, localizedName, std::string(), rowIdx);
+		++rowIdx;
+	}
+}
+
+//-----------------------------------------------------------------------
+
 void SwgCuiSkills::populateProfessionList()
 {
 	if (!m_dsProfTree)
@@ -1245,12 +1302,17 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 	// before re-registering buttons + populating labels.
 	m_buttonSkills.clear();
 	m_linkSkills.clear();
+	std::string const masterName = (def->masterSkill && def->masterSkill[0])
+		? std::string(def->masterSkill)
+		: stripNoviceSuffix(novice->getSkillName()) + "_master";
 
-	// Branch "To: X" labels above each column (graph.disciplineNext.<col>.<slot>).
-	// Each slot maps to one profession this branch can lead into.
+	// The Publish 14 graph contract supplies six branch-continuation text slots
+	// per column. The canonical profession map currently needs at most three,
+	// but every slot must be cleared because the authentic asset initializes all
+	// six with its editor-only "xxx to: specialist" sample.
 	for (int col = 0; col < 4; ++col)
 	{
-		for (int slot = 0; slot < 3; ++slot)
+		for (int slot = 0; slot < 6; ++slot)
 		{
 			char path[64];
 			snprintf(path, sizeof(path), "graph.disciplineNext.%d.%d", col, slot);
@@ -1258,12 +1320,89 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 			if (!linkObj)
 				continue;
 			UIText * const linkText = static_cast<UIText *>(linkObj);
+			linkText->SetLocalText(Unicode::emptyString);
+			linkText->SetVisible(false);
+		}
+	}
+
+	// The four graph.next slots describe continuations gated by this profession's
+	// master box. Clear the asset samples first, then discover those links from
+	// the runtime SkillObject prerequisites used by acquisition authority.
+	for (int slot = 0; slot < 4; ++slot)
+	{
+		char path[64];
+		snprintf(path, sizeof(path), "graph.next.%d", slot);
+		UIBaseObject * const linkObj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+		if (linkObj)
+		{
+			UIText * const linkText = static_cast<UIText *>(linkObj);
+			linkText->SetLocalText(Unicode::emptyString);
+			linkText->SetVisible(false);
+		}
+	}
+
+	int nextSlot = 0;
+	for (int i = 0; i < k_professionDefCount && nextSlot < 4; ++i)
+	{
+		ProfessionDef const & candidate = k_professionDefs[i];
+		if (!candidate.noviceSkill || !candidate.noviceSkill[0] ||
+			novice->getSkillName() == candidate.noviceSkill)
+		{
+			continue;
+		}
+
+		SkillObject const * const candidateNovice =
+			SkillManager::getInstance().getSkill(candidate.noviceSkill);
+		if (!candidateNovice)
+			continue;
+
+		bool requiresThisMaster = false;
+		SkillObject::SkillVector const & prerequisites =
+			candidateNovice->getPrerequisiteSkills();
+		for (SkillObject::SkillVector::const_iterator prerequisite = prerequisites.begin();
+			prerequisite != prerequisites.end(); ++prerequisite)
+		{
+			if (*prerequisite && (*prerequisite)->getSkillName() == masterName)
+			{
+				requiresThisMaster = true;
+				break;
+			}
+		}
+		if (!requiresThisMaster)
+			continue;
+
+		char path[64];
+		snprintf(path, sizeof(path), "graph.next.%d", nextSlot);
+		UIBaseObject * const linkObj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+		if (linkObj && candidate.displayName && candidate.displayName[0])
+		{
+			UIText * const linkText = static_cast<UIText *>(linkObj);
+			Unicode::String label = Unicode::narrowToWide("To: ");
+			label += Unicode::narrowToWide(candidate.displayName);
+			linkText->SetLocalText(label);
+			linkText->SetVisible(true);
+			m_linkSkills[linkText] = candidate.noviceSkill;
+			if (!isRegisteredMediatorObject(*linkText))
+				registerMediatorObject(*linkText, true);
+		}
+		++nextSlot;
+	}
+
+	// Populate the branch transitions backed by the canonical profession map.
+	for (int col = 0; col < 4; ++col)
+	{
+		for (int slot = 0; slot < 3; ++slot)
+		{
 			char const * const linkRoot = def->branchLinks[col][slot];
 			if (!linkRoot || !linkRoot[0])
-			{
-				linkText->SetLocalText(Unicode::emptyString);
 				continue;
-			}
+
+			char path[64];
+			snprintf(path, sizeof(path), "graph.disciplineNext.%d.%d", col, slot);
+			UIBaseObject * const linkObj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+			if (!linkObj)
+				continue;
+			UIText * const linkText = static_cast<UIText *>(linkObj);
 			// Resolve link root (e.g. "social_imagedesigner") to a
 			// canonical display name by finding the ProfessionDef whose
 			// noviceSkill is "<root>_novice". If no match, fall back to
@@ -1279,6 +1418,7 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 			Unicode::String label = Unicode::narrowToWide("To: ");
 			label += display;
 			linkText->SetLocalText(label);
+			linkText->SetVisible(true);
 
 			// Make the link a clickable shortcut to that profession's tree
 			// (handled in OnButtonPressed via m_linkSkills).
@@ -1311,10 +1451,6 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 	// "xxx skill_five_a" placeholder. Now we fill the real boxes
 	// and register them clickable so their mods/commands populate the panels.
 	{
-		std::string const masterName = (def->masterSkill && def->masterSkill[0])
-			? std::string(def->masterSkill)
-			: stripNoviceSuffix(novice->getSkillName()) + "_master";
-
 		applyTreeBox("graph.master.b", masterName,             playerSkills);
 		applyTreeBox("graph.novice.b", novice->getSkillName(), playerSkills);
 	}
@@ -1334,7 +1470,11 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 			snprintf(path, sizeof(path), "graph.prev.%d", s);
 			UIBaseObject * const obj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
 			if (obj)
-				static_cast<UIText *>(obj)->SetLocalText(Unicode::emptyString);
+			{
+				UIText * const text = static_cast<UIText *>(obj);
+				text->SetLocalText(Unicode::emptyString);
+				text->SetVisible(false);
+			}
 		}
 
 		int prevSlot = 0;
@@ -1364,6 +1504,7 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 				Unicode::String label = Unicode::narrowToWide("To: ");
 				label += Unicode::narrowToWide(d.displayName);
 				t->SetLocalText(label);
+				t->SetVisible(true);
 				m_linkSkills[t] = d.noviceSkill;
 				if (!isRegisteredMediatorObject(*t))
 					registerMediatorObject(*t, true);
