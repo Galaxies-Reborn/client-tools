@@ -1973,12 +1973,12 @@ void GroundScene::update(float elapsedTime)
 	{
 		Vector const playerPosition = getPlayer()->getPosition_w();
 		snprintf(ms_playerPosition, sizeof(ms_playerPosition), "Player: %5.2f %5.2f %5.2f\n", playerPosition.x, playerPosition.y, playerPosition.z);
-		// If the player's parent cell is a "phantom" cell (its building's .pob
-		// asset was missing from the post-NGE TRE, so PortalProperty::cellLoaded
-		// -> CellProperty::initialize never ran and the cell was never bound to a
-		// PortalProperty), reset it to the world cell so outdoor rendering works.
-		// Otherwise the camera thinks it's inside a non-existent cell and the
-		// outdoor world gets culled away.
+		// A server-created interior can arrive before its building's .pob has
+		// finished loading.  Until PortalProperty::cellLoaded binds the cell, use
+		// the world cell for this frame's snapshot so rendering remains valid.
+		// Do not overwrite the player's authoritative parent cell: doing so loses
+		// the private tutorial/building containment permanently when the portal
+		// finishes loading on a later frame.
 		//
 		// Test the CELL's own portal binding -- playerCell->getPortalProperty().
 		// Do NOT test cellOwner.getPortalProperty(): a cell's owner IS the
@@ -1986,16 +1986,15 @@ void GroundScene::update(float elapsedTime)
 		// the building/POB, not on the cell). The old cellOwner test was therefore
 		// NULL for EVERY real interior cell, so it kicked the player out to the
 		// world cell every frame indoors and culled the whole interior away.
-		// CellProperty::getPortalProperty() is non-NULL exactly when the cell
-		// finished loading (initialize() sets m_portalProperty), so it is NULL
-		// only for a genuine phantom cell -- which is what we want to catch here.
+		// CellProperty::getPortalProperty() is non-NULL once initialize() binds the
+		// cell.  A NULL value can therefore be either a genuinely missing portal
+		// or the normal transient state while a server-created POB is loading.
 		CellProperty const * playerCell = getPlayer()->getParentCell();
 		if (playerCell && playerCell != CellProperty::getWorldCellProperty())
 		{
 			if (playerCell->getPortalProperty() == NULL)
 			{
-				WARNING(true, ("GroundScene::update - player parent cell is phantom (no PortalProperty), resetting to world cell for rendering"));
-				getPlayer()->setParentCell(CellProperty::getWorldCellProperty());
+				WARNING(true, ("GroundScene::update - player parent cell has no PortalProperty yet; using world cell for this snapshot without changing containment"));
 				playerCell = CellProperty::getWorldCellProperty();
 			}
 		}
