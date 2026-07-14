@@ -141,6 +141,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "RegisterWindowMessage",
             "PostMessage",
             "SendMessageTimeout",
+            "GetForegroundWindow",
         ):
             with self.subTest(required_api=required_api):
                 self.assertIn(required_api, self.helper)
@@ -155,6 +156,131 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         for forbidden_api in forbidden_apis:
             with self.subTest(forbidden_api=forbidden_api):
                 self.assertNotIn(forbidden_api, self.helper)
+
+    def test_ui_state_dependent_actions_are_foreground_guarded_before_queueing(self):
+        documentation = self.helper[: self.helper.index("[CmdletBinding()]")]
+        self.assertNotIn("without activating its window", documentation)
+        self.assertIn("Successful actions are only", documentation)
+        self.assertIn("processing is asynchronous", documentation)
+        self.assertIn("current UI state", documentation)
+
+        guard = function_body(
+            self.helper, "function Assert-BridgeForegroundForUiStateAction"
+        )
+        self.assertIn('$RequestedAction -eq "Text"', guard)
+        self.assertIn('$RequestedAction -in @("Key", "Chord")', guard)
+        self.assertIn("$ResolvedDikCode -eq 0x1c", guard)
+        self.assertIn(
+            "[PrecuBackgroundInput.NativeMethods]::GetForegroundWindow()", guard
+        )
+
+        key_start = self.helper.index('{ $_ -in @("Key", "Chord") }')
+        text_start = self.helper.index('    "Text" {', key_start)
+        key_action = self.helper[key_start:text_start]
+        self.assertLess(
+            key_action.index("Assert-BridgeForegroundForUiStateAction"),
+            key_action.index("Send-BridgeKeySequence"),
+        )
+
+        reset_start = self.helper.index('    "Reset" {', text_start)
+        text_action = self.helper[text_start:reset_start]
+        self.assertLess(
+            text_action.index("Assert-BridgeForegroundForUiStateAction"),
+            text_action.index("Send-BridgeCommand"),
+        )
+
+    def test_foreground_guard_rejects_only_off_focus_text_and_enter(self):
+        guard = function_body(
+            self.helper, "function Assert-BridgeForegroundForUiStateAction"
+        )
+        powershell = rf"""
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+{guard}
+
+function Invoke-GuardScenario {{
+    param(
+        [string]$Name,
+        [string]$RequestedAction,
+        [int]$ResolvedDikCode,
+        [IntPtr]$TargetWindow,
+        [IntPtr]$ForegroundWindow
+    )
+
+    $capturedForegroundWindow = $ForegroundWindow
+    $provider = {{ $capturedForegroundWindow }}.GetNewClosure()
+    $allowed = $true
+    $errorMessage = $null
+    try {{
+        Assert-BridgeForegroundForUiStateAction `
+            -TargetWindow $TargetWindow `
+            -RequestedAction $RequestedAction `
+            -ResolvedDikCode $ResolvedDikCode `
+            -ForegroundWindowProvider $provider
+    }}
+    catch {{
+        $allowed = $false
+        $errorMessage = $_.Exception.Message
+    }}
+
+    [pscustomobject]@{{
+        Name = $Name
+        Allowed = $allowed
+        Error = $errorMessage
+    }}
+}}
+
+$target = [IntPtr]::new(1234)
+$other = [IntPtr]::new(5678)
+$results = @()
+$results += Invoke-GuardScenario -Name "text-background" -RequestedAction "Text" -ResolvedDikCode -1 -TargetWindow $target -ForegroundWindow $other
+$results += Invoke-GuardScenario -Name "key-enter-background" -RequestedAction "Key" -ResolvedDikCode 0x1c -TargetWindow $target -ForegroundWindow $other
+$results += Invoke-GuardScenario -Name "chord-enter-background" -RequestedAction "Chord" -ResolvedDikCode 0x1c -TargetWindow $target -ForegroundWindow $other
+$results += Invoke-GuardScenario -Name "text-foreground" -RequestedAction "Text" -ResolvedDikCode -1 -TargetWindow $target -ForegroundWindow $target
+$results += Invoke-GuardScenario -Name "key-enter-foreground" -RequestedAction "Key" -ResolvedDikCode 0x1c -TargetWindow $target -ForegroundWindow $target
+$results += Invoke-GuardScenario -Name "chord-enter-foreground" -RequestedAction "Chord" -ResolvedDikCode 0x1c -TargetWindow $target -ForegroundWindow $target
+$results += Invoke-GuardScenario -Name "escape-background" -RequestedAction "Key" -ResolvedDikCode 0x01 -TargetWindow $target -ForegroundWindow $other
+$results += Invoke-GuardScenario -Name "ctrl-s-background" -RequestedAction "Chord" -ResolvedDikCode 31 -TargetWindow $target -ForegroundWindow $other
+$results += Invoke-GuardScenario -Name "mouse-background" -RequestedAction "LeftClick" -ResolvedDikCode -1 -TargetWindow $target -ForegroundWindow $other
+$results | ConvertTo-Json -Compress
+"""
+        completed = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-EncodedCommand",
+                base64.b64encode(powershell.encode("utf-16le")).decode("ascii"),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        scenarios = {
+            item["Name"]: item for item in json.loads(completed.stdout)
+        }
+
+        for name in (
+            "text-background",
+            "key-enter-background",
+            "chord-enter-background",
+        ):
+            with self.subTest(name=name):
+                self.assertFalse(scenarios[name]["Allowed"])
+                self.assertIn("is refused", scenarios[name]["Error"])
+
+        for name in (
+            "text-foreground",
+            "key-enter-foreground",
+            "chord-enter-foreground",
+            "escape-background",
+            "ctrl-s-background",
+            "mouse-background",
+        ):
+            with self.subTest(name=name):
+                self.assertTrue(scenarios[name]["Allowed"])
+                self.assertIsNone(scenarios[name]["Error"])
 
     def test_helper_command_numbers_match_client_protocol(self):
         expected_helper_commands = {

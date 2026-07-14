@@ -1,12 +1,15 @@
 <#
 .SYNOPSIS
-Sends opt-in test input to a Pre-CU SWG client without activating its window.
+Queues opt-in, window-targeted test input for a Pre-CU SWG client.
 
 .DESCRIPTION
 The client must be built with the Pre-CU background input bridge and started with
 enableBackgroundInputBridge=true in the [SwgClient] configuration section. The
-bridge is disabled by default. This helper never moves the Windows cursor, sends
-system-wide input, or changes the foreground window.
+bridge is disabled by default. This helper does not move the Windows cursor, send
+system-wide input, or request foreground activation. Successful actions are only
+queued; processing is asynchronous and depends on the client's current UI state.
+Text and Enter are refused unless the target client is already foreground because
+they can select or submit stateful UI text input.
 
 .EXAMPLE
 .\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Ping
@@ -17,11 +20,15 @@ system-wide input, or changes the foreground window.
 .EXAMPLE
 .\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Key -KeyName Enter
 
+Queues Enter only when the target client is already the foreground window.
+
 .EXAMPLE
 .\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Chord -DikCode 31 -ModifierDikCode 29
 
 .EXAMPLE
 .\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Text -Text "hello"
+
+Queues text only when the target client is already the foreground window.
 #>
 
 [CmdletBinding()]
@@ -118,6 +125,9 @@ namespace PrecuBackgroundInput
             uint flags,
             uint timeoutMilliseconds,
             out IntPtr result);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
     }
 }
 "@
@@ -160,6 +170,43 @@ function ConvertTo-PointLParam {
 
     [long]$packedPoint = ([long]$ClientY * 0x10000L) + [long]$ClientX
     return [IntPtr]::new($packedPoint)
+}
+
+function Assert-BridgeForegroundForUiStateAction {
+    param(
+        [Parameter(Mandatory = $true)]
+        [IntPtr]$TargetWindow,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RequestedAction,
+
+        [int]$ResolvedDikCode = -1,
+
+        [scriptblock]$ForegroundWindowProvider
+    )
+
+    $requiresForeground = $RequestedAction -eq "Text" -or
+        ($RequestedAction -in @("Key", "Chord") -and $ResolvedDikCode -eq 0x1c)
+    if (-not $requiresForeground) {
+        return
+    }
+
+    [IntPtr]$foregroundWindow = if ($null -ne $ForegroundWindowProvider) {
+        & $ForegroundWindowProvider
+    }
+    else {
+        [PrecuBackgroundInput.NativeMethods]::GetForegroundWindow()
+    }
+
+    if ($foregroundWindow -ne $TargetWindow) {
+        $actionDescription = if ($RequestedAction -eq "Text") {
+            "Text"
+        }
+        else {
+            "$RequestedAction Enter (DIK 0x1c)"
+        }
+        throw "$actionDescription is UI-state dependent and is refused while the target client is not the foreground window."
+    }
 }
 
 function Send-BridgeCommand {
@@ -349,6 +396,11 @@ switch ($Action) {
             throw "ModifierDikCode is valid only with -Action Chord."
         }
 
+        Assert-BridgeForegroundForUiStateAction `
+            -TargetWindow $window `
+            -RequestedAction $Action `
+            -ResolvedDikCode $keyCode
+
         [int[]]$modifiers = if ($hasModifiers) { @($ModifierDikCode) } else { @() }
         if ($hasModifiers) {
             Send-BridgeKeySequence -Window $window -Message $message -KeyCode $keyCode -Modifiers $modifiers
@@ -364,6 +416,7 @@ switch ($Action) {
         if (-not $PSBoundParameters.ContainsKey("Text")) {
             throw "Text requires -Text (an empty string is permitted)."
         }
+        Assert-BridgeForegroundForUiStateAction -TargetWindow $window -RequestedAction $Action
         foreach ($character in $Text.ToCharArray()) {
             $characterCode = [int]$character
             if ($characterCode -eq 0) {
