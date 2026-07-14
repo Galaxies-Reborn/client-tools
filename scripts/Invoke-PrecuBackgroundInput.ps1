@@ -18,13 +18,16 @@ system-wide input, or changes the foreground window.
 .\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Key -KeyName Enter
 
 .EXAMPLE
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Chord -DikCode 31 -ModifierDikCode 29
+
+.EXAMPLE
 .\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Text -Text "hello"
 #>
 
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Text", "Reset")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -41,6 +44,9 @@ param(
 
     [ValidateRange(0, 255)]
     [int]$DikCode,
+
+    [ValidateRange(0, 255)]
+    [int[]]$ModifierDikCode,
 
     [AllowEmptyString()]
     [string]$Text
@@ -212,6 +218,78 @@ function Test-BridgeProtocol {
     return $protocolVersion
 }
 
+function Send-BridgeKeySequence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [IntPtr]$Window,
+
+        [Parameter(Mandatory = $true)]
+        [uint32]$Message,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateRange(0, 255)]
+        [int]$KeyCode,
+
+        [ValidateRange(0, 255)]
+        [int[]]$Modifiers = @()
+    )
+
+    $pressedModifiers = [System.Collections.Generic.List[int]]::new()
+    $keyIsDown = $false
+    $actionError = $null
+    $cleanupErrors = [System.Collections.Generic.List[object]]::new()
+
+    try {
+        foreach ($modifier in $Modifiers) {
+            Send-BridgeCommand -Window $Window -Message $Message -Command $command.KeyDown -Data $modifier
+            $pressedModifiers.Add($modifier)
+        }
+
+        Send-BridgeCommand -Window $Window -Message $Message -Command $command.KeyDown -Data $KeyCode
+        $keyIsDown = $true
+        Send-BridgeCommand -Window $Window -Message $Message -Command $command.KeyUp -Data $KeyCode
+        $keyIsDown = $false
+    }
+    catch {
+        $actionError = $_
+    }
+    finally {
+        if ($keyIsDown) {
+            try {
+                Send-BridgeCommand -Window $Window -Message $Message -Command $command.KeyUp -Data $KeyCode
+            }
+            catch {
+                [void]$cleanupErrors.Add($_)
+            }
+        }
+
+        for ($index = $pressedModifiers.Count - 1; $index -ge 0; --$index) {
+            try {
+                Send-BridgeCommand -Window $Window -Message $Message -Command $command.KeyUp -Data $pressedModifiers[$index]
+            }
+            catch {
+                [void]$cleanupErrors.Add($_)
+            }
+        }
+
+        if ($actionError -or $cleanupErrors.Count -gt 0) {
+            try {
+                Send-BridgeCommand -Window $Window -Message $Message -Command $command.InputReset
+            }
+            catch {
+                [void]$cleanupErrors.Add($_)
+            }
+        }
+    }
+
+    if ($actionError) {
+        throw $actionError
+    }
+    if ($cleanupErrors.Count -gt 0) {
+        throw $cleanupErrors[0]
+    }
+}
+
 $client = Resolve-ClientWindow
 $window = [IntPtr]$client.MainWindowHandle
 $message = [PrecuBackgroundInput.NativeMethods]::RegisterWindowMessage($messageName)
@@ -253,16 +331,27 @@ switch ($Action) {
         $detail = "x=$X y=$Y"
     }
 
-    "Key" {
+    { $_ -in @("Key", "Chord") } {
         $hasKeyName = $PSBoundParameters.ContainsKey("KeyName")
         $hasDikCode = $PSBoundParameters.ContainsKey("DikCode")
         if ($hasKeyName -eq $hasDikCode) {
-            throw "Key requires exactly one of -KeyName or -DikCode."
+            throw "$Action requires exactly one of -KeyName or -DikCode."
         }
         $keyCode = if ($hasDikCode) { $DikCode } else { $dikByName[$KeyName] }
-        Send-BridgeCommand -Window $window -Message $message -Command $command.KeyDown -Data $keyCode
-        Send-BridgeCommand -Window $window -Message $message -Command $command.KeyUp -Data $keyCode
-        $detail = "dik=$keyCode"
+
+        $hasModifiers = $PSBoundParameters.ContainsKey("ModifierDikCode") -and
+            @($ModifierDikCode).Count -gt 0
+        if ($Action -eq "Chord" -and -not $hasModifiers) {
+            throw "Chord requires at least one -ModifierDikCode."
+        }
+        if ($Action -eq "Key" -and $hasModifiers) {
+            throw "ModifierDikCode is valid only with -Action Chord."
+        }
+
+        [int[]]$modifiers = if ($hasModifiers) { @($ModifierDikCode) } else { @() }
+        Send-BridgeKeySequence -Window $window -Message $message -KeyCode $keyCode -Modifiers $modifiers
+        $modifierDetail = if (@($modifiers).Count -gt 0) { $modifiers -join "," } else { "none" }
+        $detail = "queued dik=$keyCode modifiers=$modifierDetail"
     }
 
     "Text" {

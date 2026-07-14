@@ -1,4 +1,7 @@
+import base64
 import re
+import json
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -8,6 +11,20 @@ CLIENT_MAIN_SOURCE = REPOSITORY_ROOT / (
     "src/game/client/application/SwgClient/src/win32/ClientMain.cpp"
 )
 HELPER_SOURCE = REPOSITORY_ROOT / "scripts/Invoke-PrecuBackgroundInput.ps1"
+
+
+def function_body(source: str, signature: str) -> str:
+    start = source.index(signature)
+    open_brace = source.index("{", start + len(signature))
+    depth = 0
+    for position in range(open_brace, len(source)):
+        if source[position] == "{":
+            depth += 1
+        elif source[position] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start : position + 1]
+    raise ValueError(f"unterminated function body: {signature}")
 
 
 class PrecuBackgroundInputBridgeTests(unittest.TestCase):
@@ -160,6 +177,80 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
                     self.helper,
                     rf"(?m)^\s*{re.escape(name)}\s*=\s*{value}\s*$",
                 )
+
+    def test_helper_exposes_atomic_chords_not_raw_key_state(self):
+        parameter_block = self.helper[: self.helper.index("Set-StrictMode")]
+        self.assertIn('"Key", "Chord", "Text"', parameter_block)
+        self.assertNotIn('"KeyDown"', parameter_block)
+        self.assertNotIn('"KeyUp"', parameter_block)
+        self.assertIn("[int[]]$ModifierDikCode", parameter_block)
+
+        sequence = function_body(self.helper, "function Send-BridgeKeySequence")
+        self.assertIn("try {", sequence)
+        self.assertIn("finally {", sequence)
+        self.assertIn("$pressedModifiers.Count - 1", sequence)
+        self.assertIn("$command.InputReset", sequence)
+        self.assertIn("$actionError", sequence)
+
+    def test_chord_sequence_releases_keys_and_resets_after_each_post_failure(self):
+        sequence = function_body(self.helper, "function Send-BridgeKeySequence")
+        powershell = rf"""
+$ErrorActionPreference = "Stop"
+$command = @{{ KeyDown = 8; KeyUp = 9; InputReset = 11 }}
+{sequence}
+$results = @()
+foreach ($failAt in @(0, 1, 2, 3, 4, 5, 6)) {{
+    $script:postIndex = 0
+    $script:failAt = $failAt
+    $script:queued = [System.Collections.Generic.List[string]]::new()
+    function Send-BridgeCommand {{
+        param([IntPtr]$Window, [uint32]$Message, [int]$Command, [long]$Data = 0)
+        ++$script:postIndex
+        if ($script:failAt -gt 0 -and $script:postIndex -eq $script:failAt) {{
+            throw "injected post failure $script:postIndex"
+        }}
+        $script:queued.Add("$Command`:$Data")
+    }}
+    $failed = $false
+    try {{
+        Send-BridgeKeySequence -Window ([IntPtr]1) -Message 1 -KeyCode 31 -Modifiers @(29, 42)
+    }} catch {{
+        $failed = $true
+    }}
+    $results += [pscustomobject]@{{
+        FailAt = $failAt
+        Failed = $failed
+        Queued = @($script:queued)
+    }}
+}}
+$results | ConvertTo-Json -Depth 4 -Compress
+"""
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-EncodedCommand",
+                base64.b64encode(powershell.encode("utf-16le")).decode("ascii"),
+            ],
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        scenarios = {item["FailAt"]: item for item in json.loads(result.stdout)}
+        expected = {
+            0: ["8:29", "8:42", "8:31", "9:31", "9:42", "9:29"],
+            1: ["11:0"],
+            2: ["8:29", "9:29", "11:0"],
+            3: ["8:29", "8:42", "9:42", "9:29", "11:0"],
+            4: ["8:29", "8:42", "8:31", "9:31", "9:42", "9:29", "11:0"],
+            5: ["8:29", "8:42", "8:31", "9:31", "9:29", "11:0"],
+            6: ["8:29", "8:42", "8:31", "9:31", "9:42", "11:0"],
+        }
+        for fail_at, queued in expected.items():
+            with self.subTest(fail_at=fail_at):
+                self.assertEqual(fail_at != 0, scenarios[fail_at]["Failed"])
+                self.assertEqual(queued, scenarios[fail_at]["Queued"])
 
 
 if __name__ == "__main__":
