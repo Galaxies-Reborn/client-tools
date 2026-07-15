@@ -65,19 +65,18 @@ namespace SwgCuiCharacterSheetNamespace
 		TAB_numTabPages
 	};
 
-	// The retained NGE protocol only exposes six attributes. Keep the original
-	// nine-row Publish 14 order and mark the three absent secondary attributes
-	// unavailable until the three-pool protocol milestone restores them.
+	// The dedicated Publish 14 protocol exposes the original nine attributes in
+	// retail order.
 	int const s_attributeForRow[9] =
 	{
 		Attributes::Health,
-		-1,
+		Attributes::Strength,
 		Attributes::Constitution,
 		Attributes::Action,
-		-1,
+		Attributes::Quickness,
 		Attributes::Stamina,
 		Attributes::Mind,
-		-1,
+		Attributes::Focus,
 		Attributes::Willpower
 	};
 
@@ -252,8 +251,8 @@ m_creatureObjectWatcher(new CreatureObjectWatcher)
 
 	clearPrivateFields();
 
-	// Stat migration requires the nine-attribute protocol and remains disabled
-	// until that protocol is restored; the authentic widget stays in the page.
+	// The nine-attribute protocol is restored here. Keep the authentic widget
+	// hidden until the separate Publish 14 stat-migration mediator is restored.
 	if (m_statMigrationButton)
 		m_statMigrationButton->SetVisible(false);
 
@@ -493,8 +492,8 @@ CreatureObject * SwgCuiCharacterSheet::getCreatureToExamine() const
 
 void SwgCuiCharacterSheet::OnButtonPressed(UIWidget * context)
 {
-	// The authentic button is deliberately hidden until the nine-attribute
-	// migration protocol is restored. Do not route it into the NGE workflow.
+	// The authentic button is deliberately hidden until its Publish 14
+	// migration mediator is restored. Do not route it into the NGE workflow.
 	UNREF(context);
 }
 
