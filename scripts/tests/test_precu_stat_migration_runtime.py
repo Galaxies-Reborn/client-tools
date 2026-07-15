@@ -10,8 +10,14 @@ UI_ROOT = REPOSITORY_ROOT / (
 MEDIATOR_CPP = UI_ROOT / "src/shared/page/SwgCuiStatMigration.cpp"
 MEDIATOR_H = UI_ROOT / "src/shared/page/SwgCuiStatMigration.h"
 CHARACTER_SHEET_CPP = UI_ROOT / "src/shared/page/SwgCuiCharacterSheet.cpp"
+IMAGE_DESIGNER_CPP = UI_ROOT / "src/shared/page/SwgCuiImageDesignerDesigner.cpp"
+IMAGE_DESIGNER_H = UI_ROOT / "src/shared/page/SwgCuiImageDesignerDesigner.h"
 FACTORY_CPP = UI_ROOT / "src/shared/core/SwgCuiMediatorFactorySetup.cpp"
 PROJECT = UI_ROOT / "build/win32/swgClientUserInterface.vcxproj"
+SHARED_IMAGE_DESIGNER_CPP = REPOSITORY_ROOT / (
+    "src/engine/shared/library/sharedGame/src/shared/core/"
+    "SharedImageDesignerManager.cpp"
+)
 
 
 class Publish14StatMigrationRuntimeTests(unittest.TestCase):
@@ -20,8 +26,13 @@ class Publish14StatMigrationRuntimeTests(unittest.TestCase):
         cls.source = MEDIATOR_CPP.read_text(encoding="utf-8")
         cls.header = MEDIATOR_H.read_text(encoding="utf-8")
         cls.character_sheet = CHARACTER_SHEET_CPP.read_text(encoding="utf-8")
+        cls.image_designer = IMAGE_DESIGNER_CPP.read_text(encoding="utf-8")
+        cls.image_designer_header = IMAGE_DESIGNER_H.read_text(encoding="utf-8")
         cls.factory = FACTORY_CPP.read_text(encoding="utf-8")
         cls.project = PROJECT.read_text(encoding="utf-8")
+        cls.shared_image_designer = SHARED_IMAGE_DESIGNER_CPP.read_text(
+            encoding="utf-8"
+        )
 
     def test_authentic_widget_contract_is_bound_in_wire_order(self):
         match = re.search(
@@ -126,6 +137,52 @@ class Publish14StatMigrationRuntimeTests(unittest.TestCase):
         )
         self.assertIn("SwgCuiStatMigration.cpp", self.project)
         self.assertIn("SwgCuiStatMigration.h", self.project)
+
+    def test_retail_image_designer_checkbox_is_bound_and_registered(self):
+        self.assertIn("UICheckbox * m_doStatMigration", self.image_designer_header)
+        self.assertIn(
+            'getCodeDataObject (TUICheckbox, m_doStatMigration, "checkboxDoStatMigration")',
+            self.image_designer,
+        )
+        self.assertIn(
+            "registerMediatorObject (*m_doStatMigration, true)",
+            self.image_designer,
+        )
+
+    def test_checkbox_drives_retained_stat_migration_design_type(self):
+        self.assertIn("if(context == m_doStatMigration)", self.image_designer)
+        self.assertIn(
+            "session.designType = ImageDesignChangeMessage::DT_STAT_MIGRATION",
+            self.image_designer,
+        )
+        self.assertIn(
+            "session.designType = ImageDesignChangeMessage::DT_COSMETIC",
+            self.image_designer,
+        )
+        self.assertNotIn('enqueueCommand("requestStatMigrationStart"', self.image_designer)
+        self.assertNotIn('enqueueCommand("requestStatMigrationStop"', self.image_designer)
+
+    def test_checkbox_is_overlaid_without_a_non_self_salon_session(self):
+        self.assertIn(
+            "m_terminalId != NetworkId::cms_invalid && m_recipientId != player->getNetworkId()",
+            self.image_designer,
+        )
+        self.assertIn('statMigrationParent->GetChild("Overlay")', self.image_designer)
+        self.assertIn("overlay->SetVisible(!canMigrateStats)", self.image_designer)
+
+    def test_retail_image_designer_timer_and_design_type_are_preserved(self):
+        self.assertIn(
+            "ConfigSharedGame::getImageDesignerStatMigrationSessionTimeSeconds()",
+            self.shared_image_designer,
+        )
+        self.assertIn(
+            "bool const statMigrationRequested = session.designType == ImageDesignChangeMessage::DT_STAT_MIGRATION",
+            self.shared_image_designer,
+        )
+        self.assertIn(
+            "statMigrationRequested ? ImageDesignChangeMessage::DT_STAT_MIGRATION",
+            self.shared_image_designer,
+        )
 
 
 if __name__ == "__main__":

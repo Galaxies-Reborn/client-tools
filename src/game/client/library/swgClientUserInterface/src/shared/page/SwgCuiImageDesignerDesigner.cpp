@@ -95,6 +95,7 @@ SwgCuiImageDesignerDesigner::SwgCuiImageDesignerDesigner (UIPage & page)
   m_paperDollViewer(NULL),
   m_paperDoll(NULL),
   m_costTextBox(NULL),
+	m_doStatMigration(NULL),
   m_offeredMoney(NULL),
   m_holoEmoteBeehiveCheck(NULL),
   m_holoEmoteBrainstormCheck(NULL),
@@ -147,6 +148,7 @@ SwgCuiImageDesignerDesigner::SwgCuiImageDesignerDesigner (UIPage & page)
 	getCodeDataObject (TUIButton, m_buttonRevert, "buttonRevert");
 	getCodeDataObject (TUIButton, m_buttonCommit, "buttonCommit");
 	getCodeDataObject (TUITextbox, m_costTextBox, "costTextBox");
+	getCodeDataObject (TUICheckbox, m_doStatMigration, "checkboxDoStatMigration");
 	getCodeDataObject (TUIText, m_offeredMoney, "offeredMoney");
 	getCodeDataObject (TUICheckbox, m_holoEmoteBeehiveCheck, "holoEmoteBeehive");
 	getCodeDataObject (TUICheckbox, m_holoEmoteBrainstormCheck, "holoEmoteBrainstorm");
@@ -238,6 +240,7 @@ SwgCuiImageDesignerDesigner::SwgCuiImageDesignerDesigner (UIPage & page)
 	registerMediatorObject (*m_buttonRevert, true);
 	registerMediatorObject (*m_buttonCommit, true);
 	registerMediatorObject (*m_costTextBox, true);
+	registerMediatorObject (*m_doStatMigration, true);
 	registerMediatorObject (*m_buttonCancel, true);
 	registerMediatorObject (*m_buttonRevert, true);
 	registerMediatorObject (*m_buttonCommit, true);
@@ -278,6 +281,7 @@ SwgCuiImageDesignerDesigner::~SwgCuiImageDesignerDesigner()
 	m_buttonCancel = NULL;
 	m_buttonRevert = NULL;
 	m_buttonCommit = NULL;
+	m_doStatMigration = NULL;
 	m_offeredMoney = NULL;
 	m_holoEmoteBeehiveCheck = NULL;
 	m_holoEmoteBrainstormCheck = NULL;
@@ -386,6 +390,7 @@ void SwgCuiImageDesignerDesigner::OnButtonPressed(UIWidget * const context)
 			(*i)->SetChecked(false, false);
 		}
 		m_holoEmoteNoneCheck->SetChecked(true, false);
+		m_doStatMigration->SetChecked(false, false);
 
 		SharedImageDesignerManager::Session session;
 		bool const result = SharedImageDesignerManager::getSession(Game::getPlayer()->getNetworkId(), session);
@@ -548,6 +553,22 @@ void SwgCuiImageDesignerDesigner::OnCheckboxSet(UIWidget * const context)
 	if(!result)
 		return;
 
+	if(context == m_doStatMigration)
+	{
+		CreatureObject const * const player = Game::getPlayerCreature();
+		bool const allowed = player && m_terminalId != NetworkId::cms_invalid && m_recipientId != player->getNetworkId();
+		if(!allowed)
+		{
+			m_doStatMigration->SetChecked(false, false);
+			return;
+		}
+
+		session.designType = ImageDesignChangeMessage::DT_STAT_MIGRATION;
+		SharedImageDesignerManager::updateSession(session);
+		m_forceUpdate = true;
+		return;
+	}
+
 	//check holo emote check boxes
 	for(std::set<UICheckbox *>::iterator i = m_holoEmoteCheckboxes.begin(); i != m_holoEmoteCheckboxes.end(); ++i)
 	{
@@ -587,6 +608,17 @@ void SwgCuiImageDesignerDesigner::OnCheckboxUnset(UIWidget * const context)
 		return;
 	}
 
+	if(context == m_doStatMigration)
+	{
+		session.designType = ImageDesignChangeMessage::DT_COSMETIC;
+		CreatureObject const * const recipient = getRecipientCreature();
+		if(recipient)
+			SharedImageDesignerManager::updateDesignType(session, CustomizationManager::getSharedSpeciesGender(*recipient));
+		SharedImageDesignerManager::updateSession(session);
+		m_forceUpdate = true;
+		return;
+	}
+
 	//check holo emote check boxes
 	for(std::set<UICheckbox *>::iterator i = m_holoEmoteCheckboxes.begin(); i != m_holoEmoteCheckboxes.end(); ++i)
 	{
@@ -597,6 +629,7 @@ void SwgCuiImageDesignerDesigner::OnCheckboxUnset(UIWidget * const context)
 			m_forceUpdate = true;
 		}
 	}
+
 }
 
 //----------------------------------------------------------------------
@@ -867,6 +900,16 @@ void SwgCuiImageDesignerDesigner::setupPage()
 				}
 			}
 		}
+	}
+
+	bool const canMigrateStats = m_terminalId != NetworkId::cms_invalid && m_recipientId != player->getNetworkId();
+	m_doStatMigration->SetChecked(false, false);
+	UIBaseObject const * const statMigrationParent = m_doStatMigration->GetParent();
+	if(statMigrationParent)
+	{
+		UIWidget * const overlay = dynamic_cast<UIWidget *>(statMigrationParent->GetChild("Overlay"));
+		if(overlay)
+			overlay->SetVisible(!canMigrateStats);
 	}
 
 	if(Game::getSinglePlayer())
