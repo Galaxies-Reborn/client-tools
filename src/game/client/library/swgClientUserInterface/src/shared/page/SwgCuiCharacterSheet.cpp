@@ -29,6 +29,7 @@
 #include "clientGame/PlayerObject.h"
 #include "clientGame/Species.h"
 #include "clientUserInterface/CuiManager.h"
+#include "clientUserInterface/CuiMediatorFactory.h"
 #include "clientUserInterface/CuiStringIdsCharacterSheet.h"
 #include "clientUserInterface/CuiUtils.h"
 #include "sharedFoundation/Watcher.h"
@@ -43,6 +44,7 @@
 #include "sharedNetworkMessages/GuildRequestMessage.h"
 #include "sharedNetworkMessages/GuildResponseMessage.h"
 #include "swgSharedUtility/Attributes.h"
+#include "swgClientUserInterface/SwgCuiMediatorTypes.h"
 
 //-----------------------------------------------------------------------
 
@@ -233,6 +235,8 @@ m_creatureObjectWatcher(new CreatureObjectWatcher)
 	getCodeDataObject(TUIText, m_badgeWindow, "badges");
 	getCodeDataObject(TUIText, m_bio, "bio");
 	getCodeDataObject(TUIButton, m_statMigrationButton, "buttonStatMigration", true);
+	if (m_statMigrationButton)
+		registerMediatorObject(*m_statMigrationButton, true);
 
 	m_characterName->Clear();
 	m_rank->Clear();
@@ -251,8 +255,8 @@ m_creatureObjectWatcher(new CreatureObjectWatcher)
 
 	clearPrivateFields();
 
-	// The nine-attribute protocol is restored here. Keep the authentic widget
-	// hidden until the separate Publish 14 stat-migration mediator is restored.
+	// The migration action belongs only to the local player's private sheet.
+	// setExamineMode() makes it visible after the initial subject is selected.
 	if (m_statMigrationButton)
 		m_statMigrationButton->SetVisible(false);
 
@@ -454,6 +458,8 @@ void SwgCuiCharacterSheet::setExamineMode(CreatureObject * playerToExamine)
 	m_bio->Clear();
 
 	bool const examiningSelf = creature && creature == Game::getPlayerCreature();
+	if (m_statMigrationButton)
+		m_statMigrationButton->SetVisible(examiningSelf);
 	UIButton * const factionsTab = m_tabbedPane->GetTabButton(TAB_factions);
 	if (factionsTab)
 		factionsTab->SetVisible(examiningSelf);
@@ -492,9 +498,8 @@ CreatureObject * SwgCuiCharacterSheet::getCreatureToExamine() const
 
 void SwgCuiCharacterSheet::OnButtonPressed(UIWidget * context)
 {
-	// The authentic button is deliberately hidden until its Publish 14
-	// migration mediator is restored. Do not route it into the NGE workflow.
-	UNREF(context);
+	if (context == m_statMigrationButton && isExaminingSelf())
+		CuiMediatorFactory::activateInWorkspace(CuiMediatorTypes::WS_StatMigration);
 }
 
 //-----------------------------------------------------------------------

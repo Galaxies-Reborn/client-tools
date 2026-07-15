@@ -26,6 +26,22 @@ Run the source-contract and skill-data tests with:
 python -m unittest discover -s scripts/tests -p 'test_*.py' -v
 ```
 
+## Publish 14.1 stat migration
+
+`SwgCuiStatMigration` restores the retained `/pda.StatMigration` page against
+its original nine-slider contract. The local character sheet exposes the
+button only when examining the current player. On activation the mediator
+loads racial slider bounds from `attribute_limits`, disables submission until
+the server returns `StatMigrationTargetsMessage`, and preserves the exact
+Health/Strength/Constitution/Action/Quickness/Stamina/Mind/Focus/Willpower
+wire order.
+
+Slider changes spend only the server-owned points-left balance. Submission is
+blocked until that balance reaches zero and sends the legacy ten-integer
+payload: nine targets followed by advisory points-left. The server remains
+authoritative for every bound and the racial total; normal-world application
+is intentionally deferred to the Image Designer transaction milestone.
+
 ## Skills lifecycle baseline
 
 The skills mediator refreshes its profession tree, XP bars, skill-point total,
