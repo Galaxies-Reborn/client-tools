@@ -1036,6 +1036,10 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
     </ClCompile>
+    <ClCompile Include="..\..\src\shared\page\SwgCuiStatMigration.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
+    </ClCompile>
     <ClCompile Include="..\..\src\shared\page\SwgCuiSceneSelection.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
@@ -1497,6 +1501,7 @@
     <ClInclude Include="..\..\src\shared\page\SwgCuiRoadmap.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiRoadmap_Profession.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiSkills.h" />
+    <ClInclude Include="..\..\src\shared\page\SwgCuiStatMigration.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiSceneSelection.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiServerDisconnected.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiService.h" />
