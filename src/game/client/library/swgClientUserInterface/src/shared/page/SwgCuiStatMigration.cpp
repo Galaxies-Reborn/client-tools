@@ -12,7 +12,6 @@
 #include "swgClientUserInterface/SwgCuiStatMigration.h"
 
 #include "UIButton.h"
-#include "UIData.h"
 #include "UIPage.h"
 #include "UISliderbar.h"
 #include "UIText.h"
@@ -23,8 +22,6 @@
 #include "clientUserInterface/CuiManager.h"
 #include "clientUserInterface/CuiMessageBox.h"
 #include "clientUserInterface/CuiStringIdsCharacterSheet.h"
-#include "clientUserInterface/CuiStringVariablesData.h"
-#include "clientUserInterface/CuiStringVariablesManager.h"
 #include "sharedFoundation/Watcher.h"
 #include "sharedGame/PlayerCreationManager.h"
 #include "sharedMessageDispatch/Transceiver.h"
@@ -39,17 +36,17 @@ namespace SwgCuiStatMigrationNamespace
 {
 	int const s_attributeCount = 9;
 
-	char const * const s_statPageCodeDataNames[s_attributeCount] =
+	char const * const s_statPagePaths[s_attributeCount] =
 	{
-		"statsHealth",
-		"statsStrength",
-		"statsConstitution",
-		"statsAction",
-		"statsQuickness",
-		"statsStamina",
-		"statsMind",
-		"statsFocus",
-		"statsWillPower"
+		"stats.comp.health",
+		"stats.comp.strength",
+		"stats.comp.constitution",
+		"stats.comp.action",
+		"stats.comp.quickness",
+		"stats.comp.stamina",
+		"stats.comp.mind",
+		"stats.comp.focus",
+		"stats.comp.willpower"
 	};
 
 	int const s_attributes[s_attributeCount] =
@@ -65,13 +62,12 @@ namespace SwgCuiStatMigrationNamespace
 		Attributes::Willpower
 	};
 
-	Unicode::String formatStatText(char const * key, int value)
+	Unicode::String formatStatValue(int value)
 	{
-		CuiStringVariablesData data;
-		data.digit_i = value;
-		Unicode::String result;
-		CuiStringVariablesManager::process(StringId("ui", key), data, result);
-		return result;
+		char buffer[32];
+		_snprintf(buffer, sizeof(buffer), "%d", value);
+		buffer[sizeof(buffer) - 1] = 0;
+		return Unicode::narrowToWide(buffer);
 	}
 }
 
@@ -98,9 +94,15 @@ m_playerWatcher(new CreatureWatcher)
 	setState(MS_closeDeactivates);
 	removeState(MS_iconifiable);
 
-	getCodeDataObject(TUIButton, m_buttonCancel, "buttonCancel");
-	getCodeDataObject(TUIButton, m_buttonOk, "buttonOk");
-	getCodeDataObject(TUIText, m_pointsLeftText, "pointsLeft");
+	// Patch 14.1's page has a top-level CodeData map, but some retail TRE
+	// combinations do not preserve UIData children when the workspace makes its
+	// duplicate. Bind the same authentic widget paths directly so the visual
+	// tree remains the source of truth and mediator construction is crash-safe.
+	m_buttonCancel = static_cast<UIButton *>(page.GetObjectFromPath("buttonCancel", TUIButton));
+	m_buttonOk = static_cast<UIButton *>(page.GetObjectFromPath("buttonOk", TUIButton));
+	m_pointsLeftText = static_cast<UIText *>(page.GetObjectFromPath("stats.points.points", TUIText));
+	DEBUG_FATAL(!m_buttonCancel || !m_buttonOk || !m_pointsLeftText,
+		("Publish 14 stat migration page is missing its required controls"));
 	registerMediatorObject(*m_buttonCancel, true);
 	registerMediatorObject(*m_buttonOk, true);
 
@@ -111,12 +113,14 @@ m_playerWatcher(new CreatureWatcher)
 		m_currentTexts[i] = 0;
 		m_targetTexts[i] = 0;
 
-		getCodeDataObject(TUIPage, m_statPages[i], s_statPageCodeDataNames[i]);
-		UIData const * const codeData = dynamic_cast<UIData const *>(m_statPages[i]->GetChild("CodeData"));
-		DEBUG_FATAL(!codeData, ("Publish 14 stat migration page '%s' is missing CodeData", s_statPageCodeDataNames[i]));
-		getCodeDataObject(m_statPages[i], codeData, TUISliderbar, m_sliders[i], "stat");
-		getCodeDataObject(m_statPages[i], codeData, TUIText, m_currentTexts[i], "current");
-		getCodeDataObject(m_statPages[i], codeData, TUIText, m_targetTexts[i], "target");
+		m_statPages[i] = static_cast<UIPage *>(page.GetObjectFromPath(s_statPagePaths[i], TUIPage));
+		DEBUG_FATAL(!m_statPages[i],
+			("Publish 14 stat migration page '%s' is missing", s_statPagePaths[i]));
+		m_sliders[i] = static_cast<UISliderbar *>(m_statPages[i]->GetObjectFromPath("stat", TUISliderbar));
+		m_currentTexts[i] = static_cast<UIText *>(m_statPages[i]->GetObjectFromPath("current", TUIText));
+		m_targetTexts[i] = static_cast<UIText *>(m_statPages[i]->GetObjectFromPath("target", TUIText));
+		DEBUG_FATAL(!m_sliders[i] || !m_currentTexts[i] || !m_targetTexts[i],
+			("Publish 14 stat migration row '%s' is incomplete", s_statPagePaths[i]));
 		registerMediatorObject(*m_sliders[i], true);
 	}
 
@@ -169,7 +173,10 @@ void SwgCuiStatMigration::performActivate()
 		static_cast<CreatureObject::Messages::MaxAttributesChanged *>(0));
 	m_callbacksConnected = true;
 
-	ClientCommandQueue::enqueueCommand("requestStatMigrationData", NetworkId::cms_invalid, Unicode::emptyString);
+	// Retail command_table marks the migration commands as requiring a target.
+	// Target the player explicitly; an invalid target is filtered client-side and
+	// never reaches the server command handler.
+	ClientCommandQueue::enqueueCommand("requestStatMigrationData", player->getNetworkId(), Unicode::emptyString);
 	CuiManager::requestPointer(true);
 }
 
@@ -292,7 +299,7 @@ void SwgCuiStatMigration::setMigrationControlsEnabled(bool enabled)
 void SwgCuiStatMigration::updatePointsLeftText()
 {
 	if (m_pointsLeftText)
-		m_pointsLeftText->SetLocalText(formatStatText("stat_pointsleft", m_pointsLeft));
+		m_pointsLeftText->SetLocalText(formatStatValue(m_pointsLeft));
 }
 
 void SwgCuiStatMigration::updateAttributeDisplay(int index)
@@ -300,9 +307,9 @@ void SwgCuiStatMigration::updateAttributeDisplay(int index)
 	if (index < 0 || index >= s_attributeCount)
 		return;
 	if (m_currentTexts[index])
-		m_currentTexts[index]->SetLocalText(formatStatText("stat_current", m_current[index]));
+		m_currentTexts[index]->SetLocalText(formatStatValue(m_current[index]));
 	if (m_targetTexts[index])
-		m_targetTexts[index]->SetLocalText(formatStatText("stat_target", m_targets[index]));
+		m_targetTexts[index]->SetLocalText(formatStatValue(m_targets[index]));
 }
 
 void SwgCuiStatMigration::updateAllAttributeDisplays()
@@ -314,12 +321,16 @@ void SwgCuiStatMigration::updateAllAttributeDisplays()
 
 void SwgCuiStatMigration::sendTargets()
 {
+	CreatureObject const * const player = m_playerWatcher->getPointer();
+	if (!player)
+		return;
+
 	char buffer[256];
 	_snprintf(buffer, sizeof(buffer), "%d %d %d %d %d %d %d %d %d %d",
 		m_targets[0], m_targets[1], m_targets[2],
 		m_targets[3], m_targets[4], m_targets[5],
 		m_targets[6], m_targets[7], m_targets[8], m_pointsLeft);
 	buffer[sizeof(buffer) - 1] = 0;
-	ClientCommandQueue::enqueueCommand("requestSetStatMigrationData", NetworkId::cms_invalid,
+	ClientCommandQueue::enqueueCommand("requestSetStatMigrationData", player->getNetworkId(),
 		Unicode::narrowToWide(buffer));
 }

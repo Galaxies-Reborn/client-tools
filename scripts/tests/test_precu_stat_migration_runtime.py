@@ -25,7 +25,7 @@ class Publish14StatMigrationRuntimeTests(unittest.TestCase):
 
     def test_authentic_widget_contract_is_bound_in_wire_order(self):
         match = re.search(
-            r"s_statPageCodeDataNames\[s_attributeCount\]\s*=\s*\{(?P<body>.*?)\};",
+            r"s_statPagePaths\[s_attributeCount\]\s*=\s*\{(?P<body>.*?)\};",
             self.source,
             flags=re.DOTALL,
         )
@@ -34,21 +34,29 @@ class Publish14StatMigrationRuntimeTests(unittest.TestCase):
         self.assertEqual(
             names,
             [
-                "statsHealth",
-                "statsStrength",
-                "statsConstitution",
-                "statsAction",
-                "statsQuickness",
-                "statsStamina",
-                "statsMind",
-                "statsFocus",
-                "statsWillPower",
+                "stats.comp.health",
+                "stats.comp.strength",
+                "stats.comp.constitution",
+                "stats.comp.action",
+                "stats.comp.quickness",
+                "stats.comp.stamina",
+                "stats.comp.mind",
+                "stats.comp.focus",
+                "stats.comp.willpower",
             ],
         )
-        for binding in ("buttonCancel", "buttonOk", "pointsLeft"):
+        for binding in ("buttonCancel", "buttonOk", "stats.points.points"):
             self.assertIn(f'"{binding}"', self.source)
         for nested in ("stat", "current", "target"):
             self.assertIn(f'"{nested}"', self.source)
+
+    def test_retail_visual_paths_do_not_depend_on_duplicated_uidata(self):
+        self.assertIn('page.GetObjectFromPath("buttonCancel", TUIButton)', self.source)
+        self.assertIn('page.GetObjectFromPath("buttonOk", TUIButton)', self.source)
+        self.assertIn(
+            'page.GetObjectFromPath("stats.points.points", TUIText)', self.source
+        )
+        self.assertNotIn('m_statPages[i]->GetChild("CodeData")', self.source)
 
     def test_server_owned_targets_gate_the_controls(self):
         self.assertIn("setMigrationControlsEnabled(false);", self.source)
@@ -72,14 +80,34 @@ class Publish14StatMigrationRuntimeTests(unittest.TestCase):
     def test_submit_requires_zero_points_and_sends_legacy_ten_integers(self):
         self.assertIn("if (m_pointsLeft != 0)", self.source)
         self.assertIn("statmig_usealltpoints.localize()", self.source)
-        format_match = re.search(
+        format_matches = re.findall(
             r'_snprintf\(buffer, sizeof\(buffer\), "(?P<format>[^"]+)"',
             self.source,
         )
-        self.assertIsNotNone(format_match)
-        self.assertEqual(format_match.group("format").count("%d"), 10)
+        self.assertIn(10, [format_string.count("%d") for format_string in format_matches])
         self.assertIn('enqueueCommand("requestSetStatMigrationData"', self.source)
         self.assertIn('enqueueCommand("requestStatMigrationData"', self.source)
+
+    def test_required_retail_commands_target_the_player(self):
+        self.assertIn(
+            'enqueueCommand("requestStatMigrationData", player->getNetworkId()',
+            self.source,
+        )
+        self.assertIn(
+            'enqueueCommand("requestSetStatMigrationData", player->getNetworkId()',
+            self.source,
+        )
+        self.assertNotIn(
+            'enqueueCommand("requestStatMigrationData", NetworkId::cms_invalid',
+            self.source,
+        )
+
+    def test_retail_numeric_fields_do_not_repeat_the_xml_labels(self):
+        self.assertIn("Unicode::String formatStatValue(int value)", self.source)
+        self.assertIn("SetLocalText(formatStatValue(m_pointsLeft))", self.source)
+        self.assertIn("SetLocalText(formatStatValue(m_current[index]))", self.source)
+        self.assertIn("SetLocalText(formatStatValue(m_targets[index]))", self.source)
+        self.assertNotIn('formatStatText("stat_current"', self.source)
 
     def test_character_sheet_exposes_only_the_self_migration_entry_point(self):
         self.assertIn("registerMediatorObject(*m_statMigrationButton, true)", self.character_sheet)
