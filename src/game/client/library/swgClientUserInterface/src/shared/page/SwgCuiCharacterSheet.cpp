@@ -841,9 +841,18 @@ void SwgCuiCharacterSheet::refreshBadgeWindow()
 	if (!isExaminingSelf())
 		return;
 
+	std::vector<CollectionsDataTable::CollectionInfoSlot const *> const & allBadges = CollectionsDataTable::getSlotsInBook("badge_book");
+	if (allBadges.empty())
+	{
+		// Publish 14 uses datatables/badge/badge_map.iff rather than the later
+		// collection book. Until that catalog is bridged, do not interpret an
+		// absent NGE badge_book as the player having earned every possible badge.
+		m_badgeWindow->SetLocalText(current);
+		return;
+	}
+
 	current += CuiStringIdsCharacterSheet::badges_unearned.localize();
 	current.push_back('\n');
-	std::vector<CollectionsDataTable::CollectionInfoSlot const *> const & allBadges = CollectionsDataTable::getSlotsInBook("badge_book");
 	if (allBadges.size() == earnedBadges.size())
 	{
 		current += Unicode::narrowToWide("\\>025");
