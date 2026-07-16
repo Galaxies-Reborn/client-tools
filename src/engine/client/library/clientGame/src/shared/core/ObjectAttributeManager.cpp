@@ -957,8 +957,8 @@ void ObjectAttributeManager::populateMergedAttributes (const ClientObject & obj,
 			!GameObjectTypes::isTypeOf(creatureObject->getGameObjectType(), SharedObjectTemplate::GOT_vehicle)) // don't show con of vehicles.
 		{
 			Unicode::String message;
-			CuiCombatManager::getConMessage(*creatureObject, message);
-			mergedAttributeVector.push_back(AttributePair (SharedObjectAttributes::consider, message));
+			if (CuiCombatManager::getConMessage(*creatureObject, message))
+				mergedAttributeVector.push_back(AttributePair (SharedObjectAttributes::consider, message));
 		}
 
 		// Certifications

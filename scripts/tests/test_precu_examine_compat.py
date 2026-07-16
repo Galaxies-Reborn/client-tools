@@ -12,6 +12,14 @@ INVENTORY_INFO_CPP = ROOT / (
     "src/game/client/library/swgClientUserInterface/src/shared/page/"
     "SwgCuiInventoryInfo.cpp"
 )
+COMBAT_MANAGER_CPP = ROOT / (
+    "src/engine/client/library/clientUserInterface/src/shared/core/"
+    "CuiCombatManager.cpp"
+)
+OBJECT_ATTRIBUTE_MANAGER_CPP = ROOT / (
+    "src/engine/client/library/clientGame/src/shared/core/"
+    "ObjectAttributeManager.cpp"
+)
 
 ASSET_ENVIRONMENT_VARIABLE = "PRECU_EXAMINE_ASSET"
 ASSET_OVERRIDE = os.environ.get(ASSET_ENVIRONMENT_VARIABLE)
@@ -49,6 +57,15 @@ class Publish14ExamineSourceContractTests(unittest.TestCase):
         cls.constructor = function_body(
             cls.source, "SwgCuiInventoryInfo::SwgCuiInventoryInfo"
         )
+        cls.combat_source = COMBAT_MANAGER_CPP.read_text(encoding="utf-8")
+        cls.get_con_message = function_body(
+            cls.combat_source, "bool CuiCombatManager::getConMessage"
+        )
+        cls.attribute_source = OBJECT_ATTRIBUTE_MANAGER_CPP.read_text(encoding="utf-8")
+        cls.populate_attributes = function_body(
+            cls.attribute_source,
+            "void ObjectAttributeManager::populateMergedAttributes",
+        )
 
     def test_later_appearance_checkbox_is_optional(self) -> None:
         self.assertEqual(
@@ -68,6 +85,31 @@ class Publish14ExamineSourceContractTests(unittest.TestCase):
         self.assertRegex(
             between,
             r"if\s*\(\s*m_hideAppearanceItems\s*\)",
+        )
+
+    def test_missing_later_con_tables_fail_closed(self) -> None:
+        guard = re.search(
+            r"if\s*\(\s*!player\s*\|\|\s*s_conLevelData\.empty\s*\(\s*\)\s*\)"
+            r"\s*\{(?P<body>.*?)\}",
+            self.get_con_message,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(guard)
+        self.assertIn("_message.clear ();", guard.group("body"))
+        self.assertIn("return false;", guard.group("body"))
+
+        bounds_guard = self.get_con_message.index(
+            "conIndex < 0 || conIndex >= static_cast<int>(s_conLevelData.size ())"
+        )
+        first_index = self.get_con_message.index("s_conLevelData[conIndex]")
+        self.assertLess(bounds_guard, first_index)
+
+    def test_failed_con_decoration_is_not_added_to_examine_attributes(self) -> None:
+        self.assertRegex(
+            self.populate_attributes,
+            r"if\s*\(\s*CuiCombatManager::getConMessage\s*\("
+            r"\s*\*creatureObject\s*,\s*message\s*\)\s*\)\s*"
+            r"mergedAttributeVector\.push_back",
         )
 
 
@@ -102,6 +144,15 @@ class Publish14ExamineAssetContractTests(unittest.TestCase):
         for required in ("content=", "Label=", "textAttribs=", "textDesc=", "viewer="):
             with self.subTest(required=required):
                 self.assertIn(required, info_page.group(0))
+
+    def test_publish14_stack_has_no_nge_level_con_tables(self) -> None:
+        patch_root = EXAMINE_ASSET.parent.parent
+        for relative_path in (
+            "datatables/player/level_con_table.iff",
+            "datatables/player/con_display_data.iff",
+        ):
+            with self.subTest(relative_path=relative_path):
+                self.assertFalse((patch_root / relative_path).exists())
 
 
 if __name__ == "__main__":
