@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -64,7 +64,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 1
+$expectedProtocolVersion = 6
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -79,6 +79,12 @@ $command = @{
     Character       = 10
     InputReset      = 11
     ExamineCharacterSheet = 12
+    InviteTarget    = 13
+    JoinGroup       = 14
+    DisbandGroup    = 15
+    OpenStatMigration = 16
+    StartImageDesign = 17
+    TargetCounterpart = 18
 }
 $dikByName = @{
     Escape    = 0x01
@@ -436,6 +442,36 @@ switch ($Action) {
     "ExamineCharacterSheet" {
         Send-BridgeCommand -Window $window -Message $message -Command $command.ExamineCharacterSheet
         $detail = "queued for current targeted player"
+    }
+
+    "InviteTarget" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.InviteTarget
+        $detail = "queued for current targeted player"
+    }
+
+    "JoinGroup" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.JoinGroup
+        $detail = "queued"
+    }
+
+    "DisbandGroup" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.DisbandGroup
+        $detail = "queued"
+    }
+
+    "OpenStatMigration" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.OpenStatMigration
+        $detail = "queued"
+    }
+
+    "StartImageDesign" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.StartImageDesign
+        $detail = "queued for current targeted player"
+    }
+
+    "TargetCounterpart" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.TargetCounterpart
+        $detail = "queued for the bound live-test counterpart"
     }
 }
 

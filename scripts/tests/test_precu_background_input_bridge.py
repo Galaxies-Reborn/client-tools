@@ -67,10 +67,16 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_character",
             "BIC_inputReset",
             "BIC_examineCharacterSheet",
+            "BIC_inviteTarget",
+            "BIC_joinGroup",
+            "BIC_disbandGroup",
+            "BIC_openStatMigration",
+            "BIC_startImageDesign",
+            "BIC_targetCounterpart",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 1", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 6", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -298,6 +304,12 @@ $results | ConvertTo-Json -Compress
             "Character": 10,
             "InputReset": 11,
             "ExamineCharacterSheet": 12,
+            "InviteTarget": 13,
+            "JoinGroup": 14,
+            "DisbandGroup": 15,
+            "OpenStatMigration": 16,
+            "StartImageDesign": 17,
+            "TargetCounterpart": 18,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -334,6 +346,62 @@ $results | ConvertTo-Json -Compress
 
         parameter_block = self.helper[: self.helper.index("Set-StrictMode")]
         self.assertIn('"ExamineCharacterSheet"', parameter_block)
+
+    def test_image_designer_actions_use_fixed_production_paths(self):
+        target_action = function_body(
+            self.client_main, "bool performBackgroundTargetCommand(char const * const command)"
+        )
+        self.assertIn("CuiAction::findObjectFromFirstParam", target_action)
+        self.assertIn("target == player", target_action)
+        self.assertIn("CuiMessageQueueManager::executeCommandByString(command, true)", target_action)
+
+        self_action = function_body(
+            self.client_main, "bool performBackgroundSelfCommand(char const * const command)"
+        )
+        self.assertIn("CuiMessageQueueManager::executeCommandByString(command, true)", self_action)
+
+        stat_migration = function_body(
+            self.client_main, "bool performBackgroundOpenStatMigration()"
+        )
+        self.assertIn("CuiMediatorTypes::WS_StatMigration", stat_migration)
+
+        window_proc = function_body(
+            self.client_main,
+            "LRESULT CALLBACK backgroundInputWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)",
+        )
+        fixed_routes = {
+            'performBackgroundTargetCommand("/invite")',
+            'performBackgroundSelfCommand("/join")',
+            'performBackgroundSelfCommand("/disband")',
+            'performBackgroundTargetCommand("/imagedesign")',
+        }
+        for route in fixed_routes:
+            with self.subTest(route=route):
+                self.assertIn(route, window_proc)
+
+        parameter_block = self.helper[: self.helper.index("Set-StrictMode")]
+        for action in (
+            "InviteTarget",
+            "JoinGroup",
+            "DisbandGroup",
+            "OpenStatMigration",
+            "StartImageDesign",
+            "TargetCounterpart",
+        ):
+            with self.subTest(action=action):
+                self.assertIn(f'"{action}"', parameter_block)
+
+    def test_counterpart_targeting_is_bound_to_live_fixture_identities(self):
+        target_counterpart = function_body(
+            self.client_main, "bool performBackgroundTargetCounterpart()"
+        )
+        for object_id in ("44003778", "39008597"):
+            with self.subTest(object_id=object_id):
+                self.assertIn(f'"{object_id}"', target_counterpart)
+        self.assertIn('CuiCombatManager::setLookAtTarget(NetworkId("39008597"))', target_counterpart)
+        self.assertIn('CuiCombatManager::setLookAtTarget(NetworkId("44003778"))', target_counterpart)
+        self.assertNotIn("externalCommandHandler", target_counterpart)
+        self.assertNotIn("lParam", target_counterpart)
 
     def test_plain_key_sequence_accepts_no_modifiers(self):
         sequence = function_body(self.helper, "function Send-BridgeKeySequence")

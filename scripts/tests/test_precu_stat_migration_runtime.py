@@ -18,6 +18,10 @@ SHARED_IMAGE_DESIGNER_CPP = REPOSITORY_ROOT / (
     "src/engine/shared/library/sharedGame/src/shared/core/"
     "SharedImageDesignerManager.cpp"
 )
+IMAGE_DESIGN_CHANGE_CPP = REPOSITORY_ROOT / (
+    "src/engine/shared/library/sharedNetworkMessages/src/shared/"
+    "clientGameServer/ImageDesignChangeMessage.cpp"
+)
 
 
 class Publish14StatMigrationRuntimeTests(unittest.TestCase):
@@ -33,6 +37,7 @@ class Publish14StatMigrationRuntimeTests(unittest.TestCase):
         cls.shared_image_designer = SHARED_IMAGE_DESIGNER_CPP.read_text(
             encoding="utf-8"
         )
+        cls.image_design_change = IMAGE_DESIGN_CHANGE_CPP.read_text(encoding="utf-8")
 
     def test_authentic_widget_contract_is_bound_in_wire_order(self):
         match = re.search(
@@ -182,6 +187,21 @@ class Publish14StatMigrationRuntimeTests(unittest.TestCase):
         self.assertIn(
             "statMigrationRequested ? ImageDesignChangeMessage::DT_STAT_MIGRATION",
             self.shared_image_designer,
+        )
+
+    def test_image_designer_start_time_keeps_the_32_bit_retail_wire_width(self):
+        self.assertIn(
+            "int const startingTimeWire = static_cast<int>(msg->getStartingTime())",
+            self.image_design_change,
+        )
+        self.assertIn("Archive::put(target, startingTimeWire)", self.image_design_change)
+        self.assertIn("int tempTimeWire = 0", self.image_design_change)
+        self.assertIn(
+            "msg->setStartingTime(static_cast<time_t>(tempTimeWire))",
+            self.image_design_change,
+        )
+        self.assertNotIn(
+            "Archive::put(target, msg->getStartingTime())", self.image_design_change
         )
 
 
