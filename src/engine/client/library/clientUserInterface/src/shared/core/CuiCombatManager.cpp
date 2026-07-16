@@ -2115,6 +2115,11 @@ bool CuiCombatManager::getConMessage (const CreatureObject & enemy, Unicode::Str
 	int conIndex = 0;
 	const StringId * the_sid = &s_self_id;
 	const CreatureObject * const player = Game::getPlayerCreature ();
+	if (!player || s_conLevelData.empty ())
+	{
+		_message.clear ();
+		return false;
+	}
 
 	if(enemy.isInvulnerable())
 		conIndex = 0;
@@ -2124,6 +2129,11 @@ bool CuiCombatManager::getConMessage (const CreatureObject & enemy, Unicode::Str
 		int const levelTarget = enemy.getGroupLevel();
 
 		conIndex = getConIndex(levelSelf, levelTarget);
+	}
+	if (conIndex < 0 || conIndex >= static_cast<int>(s_conLevelData.size ()))
+	{
+		_message.clear ();
+		return false;
 	}
 
 	UIColor color = s_conLevelData[conIndex].second;
