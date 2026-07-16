@@ -10,6 +10,9 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CLIENT_MAIN_SOURCE = REPOSITORY_ROOT / (
     "src/game/client/application/SwgClient/src/win32/ClientMain.cpp"
 )
+CLIENT_PROJECT = REPOSITORY_ROOT / (
+    "src/game/client/application/SwgClient/build/win32/SwgClient.vcxproj"
+)
 HELPER_SOURCE = REPOSITORY_ROOT / "scripts/Invoke-PrecuBackgroundInput.ps1"
 
 
@@ -31,6 +34,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.client_main = CLIENT_MAIN_SOURCE.read_text(encoding="utf-8")
+        cls.client_project = CLIENT_PROJECT.read_text(encoding="utf-8")
         cls.helper = HELPER_SOURCE.read_text(encoding="utf-8")
 
     def test_bridge_is_explicitly_opt_in_and_disabled_by_default(self):
@@ -73,10 +77,13 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_openStatMigration",
             "BIC_startImageDesign",
             "BIC_targetCounterpart",
+            "BIC_queueCombatCanary",
+            "BIC_clearCombatQueue",
+            "BIC_combatQueueStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 6", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 7", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -310,6 +317,9 @@ $results | ConvertTo-Json -Compress
             "OpenStatMigration": 16,
             "StartImageDesign": 17,
             "TargetCounterpart": 18,
+            "QueueCombatCanary": 19,
+            "ClearCombatQueue": 20,
+            "CombatQueueStatus": 21,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -402,6 +412,77 @@ $results | ConvertTo-Json -Compress
         self.assertIn('CuiCombatManager::setLookAtTarget(NetworkId("44003778"))', target_counterpart)
         self.assertNotIn("externalCommandHandler", target_counterpart)
         self.assertNotIn("lParam", target_counterpart)
+
+    def test_combat_queue_live_actions_are_fixed_guarded_and_observable(self):
+        pair_guard = function_body(
+            self.client_main, "bool isBackgroundCombatCanaryPair("
+        )
+        for object_id in ("44003778", "39008597"):
+            with self.subTest(object_id=object_id):
+                self.assertIn(f'"{object_id}"', pair_guard)
+
+        queue_action = function_body(
+            self.client_main, "bool performBackgroundQueueCombatCanary(int const repeat)"
+        )
+        self.assertIn('NetworkId("39008597")', queue_action)
+        self.assertIn('NetworkId("44003778")', queue_action)
+        self.assertIn("isBackgroundCombatCanaryPair(*player, targetId)", queue_action)
+        self.assertIn("CuiCombatManager::setCombatTarget", queue_action)
+        self.assertIn("ClientCommandQueue::commandsAreNowFromToolbar(true)", queue_action)
+        self.assertIn("ClientCommandQueue::enqueueCommand", queue_action)
+        self.assertIn('"headShot1"', queue_action)
+        self.assertIn("targetId", queue_action)
+        self.assertIn("ClientCommandQueue::commandsAreNowFromToolbar(false)", queue_action)
+        self.assertIn("index < repeat", queue_action)
+        self.assertNotIn("Transceivers::added", queue_action)
+        self.assertIn(
+            r"game\shared\library\swgSharedUtility\include\public",
+            self.client_project,
+        )
+
+        window_proc = function_body(
+            self.client_main,
+            "LRESULT CALLBACK backgroundInputWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)",
+        )
+        self.assertIn("lParam < 1 || lParam > 16", window_proc)
+        self.assertIn("return getBackgroundCombatQueueStatus();", window_proc)
+
+        clear_action = function_body(
+            self.client_main, "bool performBackgroundClearCombatQueue()"
+        )
+        self.assertIn("SwgCuiActions::clearCombatQueue", clear_action)
+        self.assertNotIn("ClientCommandQueue::clear", clear_action)
+
+        status_query = function_body(
+            self.client_main, "LRESULT getBackgroundCombatQueueStatus()"
+        )
+        self.assertIn("getCombatCommandsFromQueue(sequenceIds)", status_query)
+        self.assertIn("CuiCombatManager::isInCombat", status_query)
+        self.assertIn("CuiCombatManager::getCombatTarget().isValid()", status_query)
+        for forbidden_mutation in (
+            "enqueueCommand",
+            "removeCommand",
+            "performAction",
+        ):
+            with self.subTest(forbidden_mutation=forbidden_mutation):
+                self.assertNotIn(forbidden_mutation, status_query)
+
+        helper_parameters = self.helper[: self.helper.index("Set-StrictMode")]
+        for action in (
+            "QueueCombatCanary",
+            "ClearCombatQueue",
+            "CombatQueueStatus",
+        ):
+            with self.subTest(action=action):
+                self.assertIn(f'"{action}"', helper_parameters)
+        helper_query = function_body(self.helper, "function Invoke-BridgeQuery")
+        self.assertIn("SendMessageTimeout", helper_query)
+        self.assertIn("[long]$Data = 0", helper_query)
+        self.assertIn("return $queryResult.ToInt64()", helper_query)
+        self.assertIn("0x43510000L", self.helper)
+        self.assertIn("count=$queueCount", self.helper)
+        self.assertIn("[ValidateRange(1, 16)]", helper_parameters)
+        self.assertIn("-Data $Repeat", self.helper)
 
     def test_plain_key_sequence_accepts_no_modifiers(self):
         sequence = function_body(self.helper, "function Send-BridgeKeySequence")

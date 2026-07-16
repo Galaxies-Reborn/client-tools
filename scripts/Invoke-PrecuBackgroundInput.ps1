@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "ClearCombatQueue", "CombatQueueStatus")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -55,6 +55,9 @@ param(
     [ValidateRange(0, 255)]
     [int[]]$ModifierDikCode,
 
+    [ValidateRange(1, 16)]
+    [int]$Repeat = 1,
+
     [AllowEmptyString()]
     [string]$Text
 )
@@ -64,7 +67,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 6
+$expectedProtocolVersion = 7
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -85,6 +88,9 @@ $command = @{
     OpenStatMigration = 16
     StartImageDesign = 17
     TargetCounterpart = 18
+    QueueCombatCanary = 19
+    ClearCombatQueue = 20
+    CombatQueueStatus = 21
 }
 $dikByName = @{
     Escape    = 0x01
@@ -270,6 +276,52 @@ function Test-BridgeProtocol {
     }
 
     return $protocolVersion
+}
+
+function Invoke-BridgeQuery {
+    param(
+        [Parameter(Mandatory = $true)]
+        [IntPtr]$Window,
+
+        [Parameter(Mandatory = $true)]
+        [uint32]$Message,
+
+        [Parameter(Mandatory = $true)]
+        [int]$Command,
+
+        [long]$Data = 0
+    )
+
+    [IntPtr]$queryResult = [IntPtr]::Zero
+    $sendResult = [PrecuBackgroundInput.NativeMethods]::SendMessageTimeout(
+        $Window,
+        $Message,
+        [IntPtr]::new([long]$Command),
+        [IntPtr]::new($Data),
+        0x0002,
+        1000,
+        [ref]$queryResult)
+    if ($sendResult -eq [IntPtr]::Zero) {
+        $errorCode = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw [ComponentModel.Win32Exception]::new($errorCode, "The client did not answer the background input bridge query.")
+    }
+
+    return $queryResult.ToInt64()
+}
+
+function ConvertTo-CombatQueueStatusDetail {
+    param(
+        [Parameter(Mandatory = $true)]
+        [long]$PackedStatus
+    )
+
+    if (($PackedStatus -band 0xffff0000L) -ne 0x43510000L) {
+        throw ("Unexpected combat-queue status marker 0x{0:x8}." -f $PackedStatus)
+    }
+    $queueCount = $PackedStatus -band 0x3fffL
+    $inCombat = ($PackedStatus -band 0x8000L) -ne 0
+    $hasTarget = ($PackedStatus -band 0x4000L) -ne 0
+    return "count=$queueCount inCombat=$($inCombat.ToString().ToLowerInvariant()) hasTarget=$($hasTarget.ToString().ToLowerInvariant()) packed=0x$($PackedStatus.ToString('x8'))"
 }
 
 function Send-BridgeKeySequence {
@@ -472,6 +524,21 @@ switch ($Action) {
     "TargetCounterpart" {
         Send-BridgeCommand -Window $window -Message $message -Command $command.TargetCounterpart
         $detail = "queued for the bound live-test counterpart"
+    }
+
+    "QueueCombatCanary" {
+        [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command.QueueCombatCanary -Data $Repeat
+        $detail = "repeat=$Repeat $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
+    }
+
+    "ClearCombatQueue" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.ClearCombatQueue
+        $detail = "queued through the production combat-queue clear action"
+    }
+
+    "CombatQueueStatus" {
+        [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command.CombatQueueStatus
+        $detail = ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus
     }
 }
 
