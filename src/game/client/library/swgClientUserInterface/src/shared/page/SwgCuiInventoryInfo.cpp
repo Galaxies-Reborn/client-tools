@@ -143,9 +143,10 @@ m_container(0)
 
 	if(isExamine)
 	{
-		getCodeDataObject (TUICheckbox,     m_hideAppearanceItems, "checkHideAppearance");
+		getCodeDataObject (TUICheckbox,     m_hideAppearanceItems, "checkHideAppearance", true);
 
-		registerMediatorObject(*m_hideAppearanceItems, true);
+		if (m_hideAppearanceItems)
+			registerMediatorObject(*m_hideAppearanceItems, true);
 	}
 
 	
