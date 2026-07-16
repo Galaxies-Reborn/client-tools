@@ -6,6 +6,8 @@
 #include "sharedFoundation/ExitChain.h"
 #include "sharedFoundation/NetworkId.h"
 #include "sharedIoWin/IoWin.h"
+#include "sharedUtility/CurrentUserOptionManager.h"
+#include "sharedUtility/LocalMachineOptionManager.h"
 
 #if defined(_WIN64)
 #include "clientAudio/ClientAudioMidi.h"
@@ -25,9 +27,15 @@ namespace PerformanceModeManagerNamespace
 	float s_flourishCooldown = 0.0f;
 	bool s_keyHeld[8] = {false, false, false, false, false, false, false, false};
 
-	int const s_flourishMidiNotes[8] = {60, 61, 62, 63, 64, 65, 66, 67};
-	int const s_flourishKeys[8] = {DIK_Q, DIK_W, DIK_E, DIK_R, DIK_T, DIK_Y, DIK_U, DIK_I};
+	int const s_defaultFlourishMidiNotes[8] = {60, 61, 62, 63, 64, 65, 66, 67};
+	int const s_defaultFlourishKeys[8] = {DIK_Q, DIK_W, DIK_E, DIK_R, DIK_T, DIK_Y, DIK_U, DIK_I};
+	int s_flourishMidiNotes[8] = {60, 61, 62, 63, 64, 65, 66, 67};
+	int s_flourishKeys[8] = {DIK_Q, DIK_W, DIK_E, DIK_R, DIK_T, DIK_Y, DIK_U, DIK_I};
+	int s_midiOctaveShift = 0;
 	float const s_minimumFlourishInterval = 0.12f;
+	int const s_optionVersion = 1;
+	char const * const s_userOptionSection = "ClientGame/EntertainerReborn";
+	char const * const s_machineOptionSection = "ClientGame/EntertainerRebornMidi";
 
 	void resetHeldKeys()
 	{
@@ -46,9 +54,21 @@ namespace PerformanceModeManagerNamespace
 	int findMidiFlourish(int note)
 	{
 		for (int i = 0; i < 8; ++i)
-			if (s_flourishMidiNotes[i] == note)
+			if (s_flourishMidiNotes[i] + s_midiOctaveShift * 12 == note)
 				return i + 1;
 		return 0;
+	}
+
+	void validateOptions()
+	{
+		for (int i = 0; i < 8; ++i)
+		{
+			if (s_flourishKeys[i] < 0 || s_flourishKeys[i] > 255)
+				s_flourishKeys[i] = s_defaultFlourishKeys[i];
+			if (s_flourishMidiNotes[i] < 0 || s_flourishMidiNotes[i] > 127)
+				s_flourishMidiNotes[i] = s_defaultFlourishMidiNotes[i];
+		}
+		s_midiOctaveShift = std::max(-4, std::min(4, s_midiOctaveShift));
 	}
 }
 
@@ -59,6 +79,27 @@ void PerformanceModeManager::install()
 	InstallTimer const installTimer("PerformanceModeManager::install");
 	DEBUG_FATAL(s_installed, ("PerformanceModeManager is already installed"));
 	s_installed = true;
+	char optionName[64];
+	for (int i = 0; i < 8; ++i)
+	{
+		snprintf(optionName, sizeof(optionName), "flourishKey%d", i + 1);
+		CurrentUserOptionManager::registerOption(s_flourishKeys[i], s_userOptionSection, optionName, s_optionVersion);
+		snprintf(optionName, sizeof(optionName), "flourishMidiNote%d", i + 1);
+		CurrentUserOptionManager::registerOption(s_flourishMidiNotes[i], s_userOptionSection, optionName, s_optionVersion);
+	}
+	CurrentUserOptionManager::registerOption(s_midiOctaveShift, s_userOptionSection, "midiOctaveShift", s_optionVersion);
+	LocalMachineOptionManager::registerOption(s_midiDeviceIdentifier, s_machineOptionSection, "inputIdentifier", s_optionVersion);
+	validateOptions();
+
+#if defined(_WIN64)
+	std::vector<MidiDevice> const devices = getMidiDevices();
+	for (std::vector<MidiDevice>::const_iterator i = devices.begin(); i != devices.end(); ++i)
+		if (i->identifier == s_midiDeviceIdentifier)
+		{
+			s_midiDeviceName = i->name;
+			break;
+		}
+#endif
 	ExitChain::add(PerformanceModeManager::remove, "PerformanceModeManager::remove", 0, false);
 }
 
@@ -247,6 +288,14 @@ std::vector<PerformanceModeManager::MidiDevice> PerformanceModeManager::getMidiD
 bool PerformanceModeManager::selectMidiDevice(std::string const &identifier, std::string &statusMessage)
 {
 #if defined(_WIN64)
+	if (identifier.empty())
+	{
+		ClientAudioMidi::closeInput();
+		s_midiDeviceName.clear();
+		s_midiDeviceIdentifier.clear();
+		statusMessage = "No MIDI input selected; performance keyboard remains available";
+		return true;
+	}
 	std::vector<MidiDevice> const devices = getMidiDevices();
 	for (std::vector<MidiDevice>::const_iterator i = devices.begin(); i != devices.end(); ++i)
 	{
@@ -266,4 +315,61 @@ bool PerformanceModeManager::selectMidiDevice(std::string const &identifier, std
 	statusMessage = "MIDI input requires the x64 client";
 #endif
 	return false;
+}
+
+int PerformanceModeManager::getFlourishKey(int flourishIndex)
+{
+	return flourishIndex >= 0 && flourishIndex < 8 ? s_flourishKeys[flourishIndex] : 0;
+}
+
+void PerformanceModeManager::setFlourishKey(int flourishIndex, int scanCode)
+{
+	if (flourishIndex >= 0 && flourishIndex < 8 && scanCode >= 0 && scanCode <= 255)
+		s_flourishKeys[flourishIndex] = scanCode;
+}
+
+int PerformanceModeManager::getDefaultFlourishKey(int flourishIndex)
+{
+	return flourishIndex >= 0 && flourishIndex < 8 ? s_defaultFlourishKeys[flourishIndex] : 0;
+}
+
+int PerformanceModeManager::getFlourishMidiNote(int flourishIndex)
+{
+	return flourishIndex >= 0 && flourishIndex < 8 ? s_flourishMidiNotes[flourishIndex] : 60;
+}
+
+void PerformanceModeManager::setFlourishMidiNote(int flourishIndex, int midiNote)
+{
+	if (flourishIndex >= 0 && flourishIndex < 8 && midiNote >= 0 && midiNote <= 127)
+		s_flourishMidiNotes[flourishIndex] = midiNote;
+}
+
+int PerformanceModeManager::getDefaultFlourishMidiNote(int flourishIndex)
+{
+	return flourishIndex >= 0 && flourishIndex < 8 ? s_defaultFlourishMidiNotes[flourishIndex] : 60;
+}
+
+int PerformanceModeManager::getMidiOctaveShift()
+{
+	return s_midiOctaveShift;
+}
+
+void PerformanceModeManager::setMidiOctaveShift(int octaveShift)
+{
+	s_midiOctaveShift = std::max(-4, std::min(4, octaveShift));
+}
+
+std::string const &PerformanceModeManager::getSelectedMidiDeviceIdentifier()
+{
+	return s_midiDeviceIdentifier;
+}
+
+void PerformanceModeManager::resetInputMappings()
+{
+	for (int i = 0; i < 8; ++i)
+	{
+		s_flourishKeys[i] = s_defaultFlourishKeys[i];
+		s_flourishMidiNotes[i] = s_defaultFlourishMidiNotes[i];
+	}
+	s_midiOctaveShift = 0;
 }

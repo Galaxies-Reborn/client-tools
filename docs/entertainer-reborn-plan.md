@@ -1,8 +1,9 @@
 # Entertainer Reborn Integration Plan
 
-Status: Phase 1 implementation is in progress. The first command-driven Midi to
-Flourish slice is implemented; the settings UI, HUD, live-note sampler/network
-protocol, and MIDI file player remain planned below.
+Status: Phase 1 implementation is in progress. Midi to Flourish now includes
+the command path, persistent input settings, native options page, and compact
+HUD; song selection, the live-note sampler/network protocol, and MIDI file
+player remain planned below.
 
 Baseline: `x64-dx9-vanilla` at commit
 `9fdf07779f9cfe93625ec19d42a0d4af82f81266`.
@@ -19,11 +20,19 @@ The first buildable vertical slice currently provides:
 - `/stopPerformanceMode`, Escape-to-stop, flourish debounce, text-input exclusion,
   and input-reset handling;
 - `/performanceMidiDevices`, `/selectPerformanceMidiDevice <index>`, and
-  `/performanceFlourish <1-8>` diagnostics.
+  `/performanceFlourish <1-8>` diagnostics;
+- versioned per-user flourish key, MIDI note, and octave persistence plus a
+  machine-local stable MIDI device identifier;
+- a native Performance options page with eight independent keyboard and MIDI
+  note mappings, device refresh/selection, octave shift, conflict feedback,
+  reset defaults, and normal Options Apply/Cancel behavior;
+- a movable compact Midi to Flourish HUD with song, device, octave, eight
+  clickable flourish controls, settings access, and a unified Stop control.
 
-This milestone intentionally has no new server protocol or asset dependency. It
-uses the existing `startMusic`, `flourish`, and `stopMusic` commands already in
-the vanilla command table. Device and key configuration UI is the next slice.
+This milestone intentionally has no new server protocol. It uses the existing
+`startMusic`, `flourish`, and `stopMusic` commands already in the vanilla
+command table. Its UI definitions are owned by the matching client-assets
+feature branch.
 
 ## Goals
 

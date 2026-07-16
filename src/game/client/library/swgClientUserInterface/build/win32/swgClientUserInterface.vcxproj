@@ -927,6 +927,14 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
     </ClCompile>
+    <ClCompile Include="..\..\src\shared\page\SwgCuiPerformanceHud.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shared\page\SwgCuiOptPerformance.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
+    </ClCompile>
     <ClCompile Include="..\..\src\shared\page\SwgCuiOptGraphics.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
@@ -1390,6 +1398,7 @@
     <ClInclude Include="..\..\src\shared\page\SwgCuiDebugInfoPage.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiDeleteAvatarConfirmation.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiDpsMeter.h" />
+    <ClInclude Include="..\..\src\shared\page\SwgCuiPerformanceHud.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiDroidCommand.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiExamine.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiExpertise.h" />
@@ -1462,6 +1471,7 @@
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptChatColors.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptCombat.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptControls.h" />
+    <ClInclude Include="..\..\src\shared\page\SwgCuiOptPerformance.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptGraphics.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptKeymap.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptMisc.h" />

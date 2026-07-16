@@ -33,6 +33,7 @@
 #include "swgClientUserInterface/SwgCuiOptGraphics.h"
 #include "swgClientUserInterface/SwgCuiOptKeymap.h"
 #include "swgClientUserInterface/SwgCuiOptMisc.h"
+#include "swgClientUserInterface/SwgCuiOptPerformance.h"
 #include "swgClientUserInterface/SwgCuiOptSound.h"
 #include "swgClientUserInterface/SwgCuiOptTerrain.h"
 #include "swgClientUserInterface/SwgCuiOptUi.h"
@@ -54,6 +55,7 @@ namespace SwgCuiOptNamespace
 		OT_controls,
 		OT_graphics,
 		OT_misc,
+		OT_performance,
 		OT_sound,
 		OT_terrain,
 		OT_ui,
@@ -121,6 +123,10 @@ m_standaloneKeymap (0)
 	optionPage = 0;
 	getCodeDataObject (TUIPage, optionPage,      "pageMisc", true);
 	if (optionPage) (*m_optionPages) [OT_misc] = new SwgCuiOptMisc       (*optionPage);
+
+	optionPage = 0;
+	getCodeDataObject (TUIPage, optionPage,      "pagePerformance", true);
+	if (optionPage) (*m_optionPages) [OT_performance] = new SwgCuiOptPerformance (*optionPage);
 
 	optionPage = 0;
 	getCodeDataObject (TUIPage, optionPage,      "pageSound", true);

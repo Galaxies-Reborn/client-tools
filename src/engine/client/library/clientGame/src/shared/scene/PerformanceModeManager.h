@@ -38,6 +38,17 @@ public:
 	static std::vector<MidiDevice> getMidiDevices();
 	static bool selectMidiDevice(std::string const &identifier, std::string &statusMessage);
 
+	static int getFlourishKey(int flourishIndex);
+	static void setFlourishKey(int flourishIndex, int scanCode);
+	static int getDefaultFlourishKey(int flourishIndex);
+	static int getFlourishMidiNote(int flourishIndex);
+	static void setFlourishMidiNote(int flourishIndex, int midiNote);
+	static int getDefaultFlourishMidiNote(int flourishIndex);
+	static int getMidiOctaveShift();
+	static void setMidiOctaveShift(int octaveShift);
+	static std::string const &getSelectedMidiDeviceIdentifier();
+	static void resetInputMappings();
+
 private:
 	static void remove();
 

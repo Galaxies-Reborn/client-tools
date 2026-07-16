@@ -96,6 +96,7 @@
 #include "swgClientUserInterface/SwgCuiOpt.h"
 #include "swgClientUserInterface/SwgCuiPersistentMessageBrowser.h"
 #include "swgClientUserInterface/SwgCuiPersistentMessageComposer.h"
+#include "swgClientUserInterface/SwgCuiPerformanceHud.h"
 #include "swgClientUserInterface/SwgCuiPlanetMap.h"
 #include "swgClientUserInterface/SwgCuiPlayerQuestConversation.h"
 #include "swgClientUserInterface/SwgCuiProfessionTemplateSelect.h"
@@ -249,6 +250,7 @@ void SwgCuiMediatorFactorySetup::install ()
 	MAKE_SWG_CTOR_WS (QuestHelper,                    "/GroundHUD.QuestHelper");
 	MAKE_SWG_CTOR_WS (LocationDisplay,                "/pda.LocationDisplay");
 	MAKE_SWG_CTOR_WS (DpsMeter,                       "/pda.dpsMeter");
+	MAKE_SWG_CTOR_WS (PerformanceHud,                 "/EntertainerReborn");
 	MAKE_SWG_CTOR_WS (Roadmap,                        "/pda.Roadmap");
 	MAKE_SWG_CTOR_WS (Skills,                         "/Skill.skills");
 	MAKE_SWG_CTOR_WS (LootBox,                        "/pda.lootbox");

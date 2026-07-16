@@ -1872,7 +1872,9 @@ bool SwgCuiCommandParserDefault::performParsing (const NetworkId & userId, const
 		}
 
 		std::string statusMessage;
-		IGNORE_RETURN(PerformanceModeManager::startMidiToFlourish(songName, statusMessage));
+		bool const started = PerformanceModeManager::startMidiToFlourish(songName, statusMessage);
+		if (started)
+			IGNORE_RETURN(CuiMediatorFactory::activateInWorkspace(CuiMediatorTypes::WS_PerformanceHud));
 		result += Unicode::narrowToWide(statusMessage);
 		return true;
 	}
