@@ -29,6 +29,8 @@ public:
 	static void        install();
 	static void        alter(float const deltaTime);
 	static void        queueFlourish(CreatureObject const *creatureObject, const int flourishIndex);
+	static void        beginMidiPerformance(CreatureObject const *creatureObject, int instrumentId);
+	static void        endMidiPerformance(CreatureObject const *creatureObject);
 	static void        startPerformance(CreatureObject &musician);
 	static void        stopPerformance(CreatureObject &musician);
 	static void        checkStatus(CreatureObject const * const creatureObject);

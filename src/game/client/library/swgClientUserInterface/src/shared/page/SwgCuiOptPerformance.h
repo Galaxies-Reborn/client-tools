@@ -6,6 +6,7 @@
 class UIButton;
 class UIComboBox;
 class UIText;
+class UIPage;
 
 class SwgCuiOptPerformance : public SwgCuiOptBase
 {
@@ -32,12 +33,17 @@ private:
 
 	UIComboBox *m_keyCombos[8];
 	UIComboBox *m_noteCombos[8];
+	UIComboBox *m_musicKeyCombos[24];
 	UIComboBox *m_midiDeviceCombo;
 	UIComboBox *m_octaveCombo;
+	UIComboBox *m_mappingModeCombo;
+	UIPage *m_flourishRows;
+	UIPage *m_musicRows;
 	UIButton *m_refreshButton;
 	UIText *m_statusText;
 	int m_revertKeys[8];
 	int m_revertNotes[8];
+	int m_revertMusicKeys[24];
 	int m_revertOctave;
 	std::string m_revertDeviceIdentifier;
 	bool m_updatingControls;

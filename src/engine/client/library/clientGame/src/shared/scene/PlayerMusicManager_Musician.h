@@ -28,6 +28,7 @@ public:
 	void nextFrame(bool const lowerVolume);
 	void startPlaying();
 	void addFlourish(int const flourishIndex);
+	void setMidiMode(bool enabled);
 	void startParticleSystem(std::string const &path);
 
 	CreatureObject const *getCreatureObject() const;
@@ -54,6 +55,7 @@ private:
 	SoundId                            m_soundId;
 	bool                               m_playingIntro;
 	bool                               m_playingOutro;
+	bool                               m_midiMode;
 	float                              m_timeSinceFlourish;
 	int                                m_consecutiveFlourishCount;
 	PlayerMusicManager::ParticleSystem m_particleSystem1;

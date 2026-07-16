@@ -773,6 +773,22 @@ uint32 ClientCommandQueue::enqueueCommand(std::string const &commandName, Networ
 
 // ----------------------------------------------------------------------
 
+void ClientCommandQueue::sendImmediateCommandToServer(std::string const &commandName, NetworkId const &targetId, Unicode::String const &params)
+{
+	if (!ms_installed || Game::getSinglePlayer())
+		return;
+
+	CreatureObject * const player = Game::getPlayerCreature();
+	if (!player)
+		return;
+
+	uint32 const sequenceId = nextSequenceId();
+	uint32 const commandHash = Crc::normalizeAndCalculate(commandName.c_str());
+	safe_cast<PlayerCreatureController *>(player->getController())->sendCommandQueueEnqueue(sequenceId, commandHash, targetId, params);
+}
+
+// ----------------------------------------------------------------------
+
 void ClientCommandQueue::clear()
 {
 	DEBUG_REPORT_LOG(cms_debug, ("ClientCommandQueue::clear()\n"));

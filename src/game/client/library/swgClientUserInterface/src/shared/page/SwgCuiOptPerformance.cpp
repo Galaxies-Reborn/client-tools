@@ -61,6 +61,9 @@ SwgCuiOptPerformance::SwgCuiOptPerformance(UIPage &page) :
 	SwgCuiOptBase("SwgCuiOptPerformance", page),
 	m_midiDeviceCombo(0),
 	m_octaveCombo(0),
+	m_mappingModeCombo(0),
+	m_flourishRows(0),
+	m_musicRows(0),
 	m_refreshButton(0),
 	m_statusText(0),
 	m_revertOctave(0),
@@ -89,9 +92,23 @@ SwgCuiOptPerformance::SwgCuiOptPerformance(UIPage &page) :
 		}
 		registerMediatorObject(*m_noteCombos[i], true);
 	}
+	for (int i = 0; i < 24; ++i)
+	{
+		m_musicKeyCombos[i] = 0;
+		m_revertMusicKeys[i] = PerformanceModeManager::getDefaultMusicKey(i);
+		char codeName[32];
+		snprintf(codeName, sizeof(codeName), "musicKey%d", i + 1);
+		getCodeDataObject(TUIComboBox, m_musicKeyCombos[i], codeName);
+		for (int choice = 0; choice < s_keyChoiceCount; ++choice)
+			m_musicKeyCombos[i]->AddItem(Unicode::narrowToWide(s_keyChoices[choice].name), s_keyChoices[choice].name);
+		registerMediatorObject(*m_musicKeyCombos[i], true);
+	}
 
 	getCodeDataObject(TUIComboBox, m_midiDeviceCombo, "midiDevice");
 	getCodeDataObject(TUIComboBox, m_octaveCombo, "midiOctave");
+	getCodeDataObject(TUIComboBox, m_mappingModeCombo, "mappingMode");
+	getCodeDataObject(TUIPage, m_flourishRows, "flourishRows");
+	getCodeDataObject(TUIPage, m_musicRows, "musicRows");
 	getCodeDataObject(TUIButton, m_refreshButton, "refreshMidi");
 	getCodeDataObject(TUIText, m_statusText, "midiStatus");
 
@@ -101,9 +118,13 @@ SwgCuiOptPerformance::SwgCuiOptPerformance(UIPage &page) :
 		snprintf(label, sizeof(label), "%+d octave%s", octave, octave == 1 || octave == -1 ? "" : "s");
 		m_octaveCombo->AddItem(Unicode::narrowToWide(label), label);
 	}
+	m_mappingModeCombo->AddItem(Unicode::narrowToWide("Flourish mappings"), "flourish");
+	m_mappingModeCombo->AddItem(Unicode::narrowToWide("Instrument keyboard"), "music");
+	m_mappingModeCombo->SetSelectedIndex(0);
 
 	registerMediatorObject(*m_midiDeviceCombo, true);
 	registerMediatorObject(*m_octaveCombo, true);
+	registerMediatorObject(*m_mappingModeCombo, true);
 	registerMediatorObject(*m_refreshButton, true);
 	m_statusText->SetPreLocalized(true);
 	refreshMidiDevices();
@@ -154,8 +175,24 @@ void SwgCuiOptPerformance::OnGenericSelectionChanged(UIWidget *context)
 			return;
 		}
 	}
+	for (int i = 0; i < 24; ++i)
+		if (context == m_musicKeyCombos[i])
+		{
+			int const selection = m_musicKeyCombos[i]->GetSelectedIndex();
+			if (selection >= 0 && selection < s_keyChoiceCount)
+				PerformanceModeManager::setMusicKey(i, s_keyChoices[selection].scanCode);
+			updateStatus();
+			return;
+		}
 
-	if (context == m_octaveCombo)
+	if (context == m_mappingModeCombo)
+	{
+		bool const music = m_mappingModeCombo->GetSelectedIndex() == 1;
+		m_flourishRows->SetVisible(!music);
+		m_musicRows->SetVisible(music);
+		updateStatus();
+	}
+	else if (context == m_octaveCombo)
 	{
 		PerformanceModeManager::setMidiOctaveShift(m_octaveCombo->GetSelectedIndex() - 4);
 		updateStatus();
@@ -178,6 +215,8 @@ void SwgCuiOptPerformance::storeRevertData()
 		m_revertKeys[i] = PerformanceModeManager::getFlourishKey(i);
 		m_revertNotes[i] = PerformanceModeManager::getFlourishMidiNote(i);
 	}
+	for (int i = 0; i < 24; ++i)
+		m_revertMusicKeys[i] = PerformanceModeManager::getMusicKey(i);
 	m_revertOctave = PerformanceModeManager::getMidiOctaveShift();
 	m_revertDeviceIdentifier = PerformanceModeManager::getSelectedMidiDeviceIdentifier();
 }
@@ -189,6 +228,8 @@ void SwgCuiOptPerformance::revert()
 		PerformanceModeManager::setFlourishKey(i, m_revertKeys[i]);
 		PerformanceModeManager::setFlourishMidiNote(i, m_revertNotes[i]);
 	}
+	for (int i = 0; i < 24; ++i)
+		PerformanceModeManager::setMusicKey(i, m_revertMusicKeys[i]);
 	PerformanceModeManager::setMidiOctaveShift(m_revertOctave);
 	std::string status;
 	PerformanceModeManager::selectMidiDevice(m_revertDeviceIdentifier, status);
@@ -235,7 +276,12 @@ void SwgCuiOptPerformance::updateControls()
 		m_keyCombos[i]->SetSelectedIndex(findKeyChoice(PerformanceModeManager::getFlourishKey(i)));
 		m_noteCombos[i]->SetSelectedIndex(PerformanceModeManager::getFlourishMidiNote(i));
 	}
+	for (int i = 0; i < 24; ++i)
+		m_musicKeyCombos[i]->SetSelectedIndex(findKeyChoice(PerformanceModeManager::getMusicKey(i)));
 	m_octaveCombo->SetSelectedIndex(PerformanceModeManager::getMidiOctaveShift() + 4);
+	bool const music = m_mappingModeCombo->GetSelectedIndex() == 1;
+	m_flourishRows->SetVisible(!music);
+	m_musicRows->SetVisible(music);
 	m_updatingControls = false;
 	updateStatus();
 }
@@ -248,6 +294,15 @@ void SwgCuiOptPerformance::updateStatus()
 			{
 				char warning[96];
 				snprintf(warning, sizeof(warning), "Keyboard conflict: Flourish %d and %d use the same key", i + 1, j + 1);
+				m_statusText->SetLocalText(Unicode::narrowToWide(warning));
+				return;
+			}
+	for (int i = 0; i < 24; ++i)
+		for (int j = i + 1; j < 24; ++j)
+			if (PerformanceModeManager::getMusicKey(i) != 0 && PerformanceModeManager::getMusicKey(i) == PerformanceModeManager::getMusicKey(j))
+			{
+				char warning[112];
+				snprintf(warning, sizeof(warning), "Instrument keyboard conflict: notes %d and %d use the same key", i + 1, j + 1);
 				m_statusText->SetLocalText(Unicode::narrowToWide(warning));
 				return;
 			}

@@ -1947,6 +1947,7 @@
     <ClInclude Include="..\..\src\shared\scene\MatchMakingResult.h" />
     <ClInclude Include="..\..\src\shared\scene\MissileManager.h" />
     <ClInclude Include="..\..\src\shared\scene\OverheadMap.h" />
+    <ClInclude Include="..\..\src\shared\scene\PerformanceMidiMessage.h" />
     <ClInclude Include="..\..\src\shared\scene\PerformanceModeManager.h" />
     <ClInclude Include="..\..\src\shared\scene\PlayerMusicManager.h" />
     <ClInclude Include="..\..\src\shared\scene\PlayerMusicManager_Musician.h" />

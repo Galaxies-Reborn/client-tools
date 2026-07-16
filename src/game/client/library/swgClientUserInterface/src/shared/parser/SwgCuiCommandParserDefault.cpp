@@ -136,6 +136,7 @@ namespace SwgCuiCommandParserDefaultNamespace
 		MAKE_COMMAND (copyCrashReportInformation);
 		MAKE_COMMAND (reloadTextures);
 		MAKE_COMMAND (startMidiToFlourish);
+		MAKE_COMMAND (startMidiToMusic);
 		MAKE_COMMAND (stopPerformanceMode);
 		MAKE_COMMAND (performanceMidiDevices);
 		MAKE_COMMAND (selectPerformanceMidiDevice);
@@ -208,6 +209,7 @@ namespace SwgCuiCommandParserDefaultNamespace
 		{ Commands::copyCrashReportInformation,  0, "",                                   "Copy the test that would be sent with a client crash to the windows clipboard"},
 		{ Commands::reloadTextures,              0, "",                                   "Reload all textures from disk"},
 		{ Commands::startMidiToFlourish,         0, "[song]",                             "Start Midi to Flourish for an existing entertainer song"},
+		{ Commands::startMidiToMusic,            0, "",                                   "Play the equipped entertainer instrument from MIDI input"},
 		{ Commands::stopPerformanceMode,         0, "",                                   "Stop the active Entertainer Reborn performance mode"},
 		{ Commands::performanceMidiDevices,      0, "",                                   "List available MIDI input devices"},
 		{ Commands::selectPerformanceMidiDevice, 1, "<index>",                            "Select a MIDI input listed by performanceMidiDevices"},
@@ -1880,6 +1882,18 @@ bool SwgCuiCommandParserDefault::performParsing (const NetworkId & userId, const
 
 		std::string statusMessage;
 		bool const started = PerformanceModeManager::startMidiToFlourish(songName, statusMessage);
+		if (started)
+			IGNORE_RETURN(CuiMediatorFactory::activateInWorkspace(CuiMediatorTypes::WS_PerformanceHud));
+		result += Unicode::narrowToWide(statusMessage);
+		return true;
+	}
+
+	//-----------------------------------------------------------------
+
+	else if (isCommand(argv[0], Commands::startMidiToMusic))
+	{
+		std::string statusMessage;
+		bool const started = PerformanceModeManager::startMidiToMusic(statusMessage);
 		if (started)
 			IGNORE_RETURN(CuiMediatorFactory::activateInWorkspace(CuiMediatorTypes::WS_PerformanceHud));
 		result += Unicode::narrowToWide(statusMessage);

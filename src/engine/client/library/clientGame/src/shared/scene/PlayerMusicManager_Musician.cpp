@@ -9,6 +9,9 @@
 #include "clientGame/PlayerMusicManager_Musician.h"
 
 #include "clientAudio/Audio.h"
+#if defined(_WIN64)
+#include "clientAudio/ClientAudioMidi.h"
+#endif
 #include "clientGame/CreatureObject.h"
 #include "clientGame/Game.h"
 #include "clientSkeletalAnimation/SkeletalAppearance2.h"
@@ -33,6 +36,7 @@ PlayerMusicManager::Musician::Musician()
  , m_soundId()
  , m_playingIntro(false)
  , m_playingOutro(false)
+ , m_midiMode(false)
  , m_timeSinceFlourish(0.0f)
  , m_consecutiveFlourishCount(0)
 {
@@ -48,6 +52,7 @@ PlayerMusicManager::Musician::Musician(CreatureObject *creatureObject)
  , m_soundId()
  , m_playingIntro(false)
  , m_playingOutro(false)
+ , m_midiMode(false)
  , m_timeSinceFlourish(0.0f)
  , m_consecutiveFlourishCount(0)
 {
@@ -58,6 +63,10 @@ PlayerMusicManager::Musician::Musician(CreatureObject *creatureObject)
 PlayerMusicManager::Musician::~Musician()
 {
 	Audio::stopSound(m_soundId);
+#if defined(_WIN64)
+	if (m_creatureObject)
+		ClientAudioMidi::stopSynthSession(static_cast<unsigned long long>(m_creatureObject->getNetworkId().getValue()));
+#endif
 
 	delete m_queudFlourishes;
 	m_queudFlourishes = NULL;
@@ -110,6 +119,11 @@ void PlayerMusicManager::Musician::startPlaying()
 	if ((m_creatureObject == NULL) ||
 	    isPlayingOutro())
 	{
+		return;
+	}
+	if (m_midiMode)
+	{
+		startParticleSystem(PlayerMusicManager::getMusicParticleSystemPath(PlayerMusicManager::PT_musicLoopEntertaining));
 		return;
 	}
 
@@ -181,7 +195,8 @@ void PlayerMusicManager::Musician::alter(float const deltaTime)
 void PlayerMusicManager::Musician::nextFrame(bool const lowerVolume)
 {
 	if ((m_creatureObject == NULL) ||
-	    isPlayingOutro())
+	    isPlayingOutro() ||
+	    m_midiMode)
 	{
 		return;
 	}
@@ -364,7 +379,8 @@ bool PlayerMusicManager::Musician::isAboutToPerformFlourish() const
 {
 	bool result = false;
 
-	if ((m_queudFlourishes->size() > 0) &&
+	if (!m_midiMode &&
+	    (m_queudFlourishes->size() > 0) &&
 	    (*m_queudFlourishes->begin() > 0))
 	{
 		result = true;
@@ -460,6 +476,9 @@ SoundId const &PlayerMusicManager::Musician::getSoundId() const
 //-----------------------------------------------------------------------------
 void PlayerMusicManager::Musician::addFlourish(int const flourishIndex)
 {
+	if (m_midiMode)
+		return;
+
 	if (flourishIndex == -1)
 	{
 		m_queudFlourishes->clear();
@@ -469,6 +488,23 @@ void PlayerMusicManager::Musician::addFlourish(int const flourishIndex)
 	{
 		m_queudFlourishes->push_back(flourishIndex);
 	}
+}
+
+//-----------------------------------------------------------------------------
+void PlayerMusicManager::Musician::setMidiMode(bool enabled)
+{
+	m_midiMode = enabled;
+	if (!enabled)
+		return;
+
+	m_playingIntro = false;
+	m_queudFlourishes->clear();
+	if (Audio::isSoundValid(m_soundId))
+	{
+		Audio::setAutoDelete(m_soundId, true);
+		Audio::stopSound(m_soundId);
+	}
+	startParticleSystem(PlayerMusicManager::getMusicParticleSystemPath(PlayerMusicManager::PT_musicLoopEntertaining));
 }
 
 //-----------------------------------------------------------------------------

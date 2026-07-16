@@ -28,10 +28,12 @@ public:
 	static bool processEvent(IoEvent const &event);
 
 	static bool startMidiToFlourish(std::string const &songName, std::string &statusMessage);
+	static bool startMidiToMusic(std::string &statusMessage);
 	static void stopPerformanceMode(bool sendServerStop = true);
 	static bool triggerFlourish(int flourishNumber);
 
 	static Mode getMode();
+	static Mode getRequestedMode();
 	static bool isActive();
 	static bool isPending();
 	static bool hasPerformanceMode();
@@ -39,6 +41,7 @@ public:
 	static std::string const &getStatusMessage();
 	static std::vector<std::string> getAvailableMusicSongs();
 	static std::string const &getMidiDeviceName();
+	static std::string const &getInstrumentName();
 	static std::vector<MidiDevice> getMidiDevices();
 	static bool selectMidiDevice(std::string const &identifier, std::string &statusMessage);
 
@@ -48,6 +51,9 @@ public:
 	static int getFlourishMidiNote(int flourishIndex);
 	static void setFlourishMidiNote(int flourishIndex, int midiNote);
 	static int getDefaultFlourishMidiNote(int flourishIndex);
+	static int getMusicKey(int noteIndex);
+	static void setMusicKey(int noteIndex, int scanCode);
+	static int getDefaultMusicKey(int noteIndex);
 	static int getMidiOctaveShift();
 	static void setMidiOctaveShift(int octaveShift);
 	static std::string const &getSelectedMidiDeviceIdentifier();

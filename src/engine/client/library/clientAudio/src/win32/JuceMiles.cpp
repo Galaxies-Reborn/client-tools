@@ -4,6 +4,7 @@
 #if defined(_WIN64)
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -154,6 +155,168 @@ std::unique_ptr<juce::MidiInput> s_midiInput;
 std::string s_midiInputIdentifier;
 MidiInputCallback s_midiInputCallback;
 size_t const s_maximumQueuedMidiEvents = 2048;
+
+enum SynthEnvelopeStage
+{
+	SES_attack,
+	SES_decay,
+	SES_sustain,
+	SES_release
+};
+
+struct SynthPatch
+{
+	char const *name;
+	float attackSeconds;
+	float decaySeconds;
+	float sustainLevel;
+	float releaseSeconds;
+	float harmonic2;
+	float harmonic3;
+	float harmonic4;
+	float detune;
+	float gain;
+};
+
+SynthPatch const s_synthPatches[14] =
+{
+	{"Traz Strings",       0.018f, 0.22f, 0.72f, 0.35f,  0.36f,  0.18f,  0.08f,  0.0020f, 0.115f},
+	{"Slitherhorn Reed",   0.035f, 0.16f, 0.82f, 0.24f,  0.55f,  0.23f,  0.11f, -0.0015f, 0.090f},
+	{"Fanfar Brass",       0.025f, 0.18f, 0.78f, 0.30f,  0.62f,  0.31f,  0.16f,  0.0010f, 0.080f},
+	{"Droopy Flute",       0.055f, 0.20f, 0.86f, 0.28f,  0.11f,  0.04f,  0.02f,  0.0030f, 0.150f},
+	{"Kloo Horn",          0.020f, 0.15f, 0.74f, 0.22f,  0.47f,  0.29f,  0.13f, -0.0020f, 0.095f},
+	{"Fizz Pluck",         0.004f, 0.12f, 0.42f, 0.16f, -0.28f,  0.20f, -0.11f,  0.0060f, 0.145f},
+	{"Bandfill Percussion",0.003f, 0.08f, 0.28f, 0.12f,  0.71f, -0.35f,  0.22f, -0.0040f, 0.080f},
+	{"Omni Box",           0.008f, 0.14f, 0.58f, 0.22f, -0.42f,  0.27f, -0.18f,  0.0040f, 0.110f},
+	{"Nalargon Organ",     0.045f, 0.24f, 0.90f, 0.45f,  0.48f,  0.32f,  0.20f,  0.0015f, 0.075f},
+	{"Mandoviol",          0.012f, 0.18f, 0.66f, 0.32f,  0.31f,  0.16f,  0.07f, -0.0030f, 0.125f},
+	{"Xantha Bells",       0.003f, 0.32f, 0.38f, 0.55f,  0.52f, -0.17f,  0.29f,  0.0080f, 0.100f},
+	{"Flanged Jessoon",    0.030f, 0.20f, 0.80f, 0.38f, -0.36f,  0.25f, -0.13f,  0.0050f, 0.105f},
+	{"Valahorn",           0.040f, 0.22f, 0.84f, 0.40f,  0.58f,  0.34f,  0.17f, -0.0010f, 0.082f},
+	{"Downey Box",         0.006f, 0.11f, 0.50f, 0.18f, -0.50f,  0.33f, -0.20f,  0.0070f, 0.105f}
+};
+
+struct SynthVoice
+{
+	bool active = false;
+	bool heldBySustain = false;
+	int channel = 0;
+	int note = 0;
+	float velocity = 0.0f;
+	double phase = 0.0;
+	double detunedPhase = 0.0;
+	float envelope = 0.0f;
+	SynthEnvelopeStage stage = SES_attack;
+	std::uint64_t age = 0;
+};
+
+struct SynthSession
+{
+	int instrumentId = 1;
+	std::array<bool, 16> sustain = {};
+	std::array<SynthVoice, 64> voices;
+	std::uint64_t nextVoiceAge = 1;
+};
+
+using SynthSessionMap = std::unordered_map<unsigned long long, SynthSession>;
+SynthSessionMap s_synthSessions;
+
+SynthPatch const &getSynthPatch(int instrumentId)
+{
+	int const index = (std::max)(1, (std::min)(14, instrumentId)) - 1;
+	return s_synthPatches[index];
+}
+
+void releaseSynthVoice(SynthVoice &voice)
+{
+	if (voice.active)
+	{
+		voice.heldBySustain = false;
+		voice.stage = SES_release;
+	}
+}
+
+void renderSynthSessions(DriverState const &driver, float *const *outputs, int outputChannels, int numSamples)
+{
+	if (s_synthSessions.empty() || !outputs[0])
+		return;
+
+	constexpr double twoPi = 6.28318530717958647692;
+	double const sampleRate = (std::max)(driver.sampleRate, 1.0);
+	for (SynthSessionMap::value_type &entry : s_synthSessions)
+	{
+		SynthSession &session = entry.second;
+		SynthPatch const &patch = getSynthPatch(session.instrumentId);
+		for (SynthVoice &voice : session.voices)
+		{
+			if (!voice.active)
+				continue;
+
+			double const frequency = 440.0 * std::pow(2.0, static_cast<double>(voice.note - 69) / 12.0);
+			double const phaseStep = twoPi * frequency / sampleRate;
+			double const detunedStep = phaseStep * (1.0 + patch.detune);
+			float const attackStep = 1.0f / static_cast<float>(sampleRate * (std::max)(patch.attackSeconds, 0.001f));
+			float const decayStep = (1.0f - patch.sustainLevel) / static_cast<float>(sampleRate * (std::max)(patch.decaySeconds, 0.001f));
+			float const releaseStep = 1.0f / static_cast<float>(sampleRate * (std::max)(patch.releaseSeconds, 0.001f));
+
+			for (int frame = 0; frame < numSamples; ++frame)
+			{
+				switch (voice.stage)
+				{
+				case SES_attack:
+					voice.envelope += attackStep;
+					if (voice.envelope >= 1.0f)
+					{
+						voice.envelope = 1.0f;
+						voice.stage = SES_decay;
+					}
+					break;
+				case SES_decay:
+					voice.envelope -= decayStep;
+					if (voice.envelope <= patch.sustainLevel)
+					{
+						voice.envelope = patch.sustainLevel;
+						voice.stage = SES_sustain;
+					}
+					break;
+				case SES_release:
+					voice.envelope -= releaseStep;
+					if (voice.envelope <= 0.0f)
+					{
+						voice.envelope = 0.0f;
+						voice.active = false;
+					}
+					break;
+				case SES_sustain:
+				default:
+					break;
+				}
+
+				if (!voice.active)
+					break;
+
+				double const phase = voice.phase;
+				float sample = static_cast<float>(
+					std::sin(phase) +
+					patch.harmonic2 * std::sin(phase * 2.0) +
+					patch.harmonic3 * std::sin(phase * 3.0) +
+					patch.harmonic4 * std::sin(phase * 4.0) +
+					0.18 * std::sin(voice.detunedPhase));
+				sample *= voice.envelope * voice.velocity * patch.gain * driver.masterVolume;
+				outputs[0][frame] += sample;
+				if (outputChannels > 1 && outputs[1])
+					outputs[1][frame] += sample;
+
+				voice.phase += phaseStep;
+				voice.detunedPhase += detunedStep;
+				if (voice.phase >= twoPi)
+					voice.phase = std::fmod(voice.phase, twoPi);
+				if (voice.detunedPhase >= twoPi)
+					voice.detunedPhase = std::fmod(voice.detunedPhase, twoPi);
+			}
+		}
+	}
+}
 
 template <typename T>
 T clampValue(T value, T low, T high)
@@ -685,6 +848,7 @@ void DriverState::audioDeviceIOCallbackWithContext(
 		if (entry.second->driver == handle)
 			mixSample(*this, *entry.second, outputChannelData, numOutputChannels, numSamples, wetLeft, wetRight);
 	}
+	renderSynthSessions(*this, outputChannelData, numOutputChannels, numSamples);
 
 	reverb.processStereo(wetLeft, wetRight, numSamples);
 	if (outputChannelData[0]) juce::FloatVectorOperations::add(outputChannelData[0], wetLeft, numSamples);
@@ -942,6 +1106,106 @@ void ClientAudioMidi::clearEvents()
 	s_midiEvents.clear();
 }
 
+void ClientAudioMidi::startSynthSession(unsigned long long performerId, int instrumentId)
+{
+	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	SynthSession &session = s_synthSessions[performerId];
+	session = SynthSession();
+	session.instrumentId = clampValue(instrumentId, 1, 14);
+}
+
+void ClientAudioMidi::stopSynthSession(unsigned long long performerId)
+{
+	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	s_synthSessions.erase(performerId);
+}
+
+void ClientAudioMidi::synthNoteOn(unsigned long long performerId, int channel, int note, int velocity)
+{
+	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	SynthSessionMap::iterator const sessionIterator = s_synthSessions.find(performerId);
+	if (sessionIterator == s_synthSessions.end())
+		return;
+
+	SynthSession &session = sessionIterator->second;
+	channel = clampValue(channel, 0, 15);
+	note = clampValue(note, 0, 127);
+	velocity = clampValue(velocity, 1, 127);
+	SynthVoice *selected = nullptr;
+	for (SynthVoice &voice : session.voices)
+	{
+		if (!voice.active)
+		{
+			selected = &voice;
+			break;
+		}
+		if (!selected || voice.age < selected->age)
+			selected = &voice;
+	}
+	if (!selected)
+		return;
+
+	*selected = SynthVoice();
+	selected->active = true;
+	selected->channel = channel;
+	selected->note = note;
+	selected->velocity = static_cast<float>(velocity) / 127.0f;
+	selected->age = session.nextVoiceAge++;
+}
+
+void ClientAudioMidi::synthNoteOff(unsigned long long performerId, int channel, int note)
+{
+	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	SynthSessionMap::iterator const sessionIterator = s_synthSessions.find(performerId);
+	if (sessionIterator == s_synthSessions.end())
+		return;
+
+	SynthSession &session = sessionIterator->second;
+	channel = clampValue(channel, 0, 15);
+	note = clampValue(note, 0, 127);
+	for (SynthVoice &voice : session.voices)
+	{
+		if (!voice.active || voice.channel != channel || voice.note != note || voice.stage == SES_release)
+			continue;
+		if (session.sustain[static_cast<size_t>(channel)])
+			voice.heldBySustain = true;
+		else
+			releaseSynthVoice(voice);
+	}
+}
+
+void ClientAudioMidi::synthSustain(unsigned long long performerId, int channel, bool enabled)
+{
+	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	SynthSessionMap::iterator const sessionIterator = s_synthSessions.find(performerId);
+	if (sessionIterator == s_synthSessions.end())
+		return;
+
+	SynthSession &session = sessionIterator->second;
+	channel = clampValue(channel, 0, 15);
+	session.sustain[static_cast<size_t>(channel)] = enabled;
+	if (!enabled)
+		for (SynthVoice &voice : session.voices)
+			if (voice.active && voice.channel == channel && voice.heldBySustain)
+				releaseSynthVoice(voice);
+}
+
+void ClientAudioMidi::synthAllNotesOff(unsigned long long performerId)
+{
+	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	SynthSessionMap::iterator const sessionIterator = s_synthSessions.find(performerId);
+	if (sessionIterator == s_synthSessions.end())
+		return;
+	for (SynthVoice &voice : sessionIterator->second.voices)
+		releaseSynthVoice(voice);
+	sessionIterator->second.sustain.fill(false);
+}
+
+char const *ClientAudioMidi::getSynthPatchName(int instrumentId)
+{
+	return getSynthPatch(instrumentId).name;
+}
+
 extern "C"
 {
 S32 AILCALL AIL_startup(void)
@@ -962,6 +1226,7 @@ void AILCALL AIL_shutdown(void)
 {
 	ClientAudioMidi::closeInput();
 	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	s_synthSessions.clear();
 	while (!s_streams.empty()) closeStream(s_streams.begin()->first);
 	while (!s_samples.empty()) releaseSample(s_samples.begin()->first);
 	while (!s_drivers.empty()) destroyDriver(s_drivers.begin()->first);

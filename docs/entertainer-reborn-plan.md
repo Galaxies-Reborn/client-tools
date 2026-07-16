@@ -1,14 +1,14 @@
 # Entertainer Reborn Integration Plan
 
-Status: Phase 1 implementation is in progress. Midi to Flourish now includes
-learned-song selection, server-confirmed activation, persistent input settings,
-a native options page, and a compact HUD. The live-note sampler/network
-protocol and MIDI file player remain planned below.
+Status: Midi to Flourish and the first complete Midi to Music vertical slice
+are implemented. Live keyboard and controller notes use procedural JUCE
+instrument patches and a server-authorized observer relay. The MIDI file player
+remains planned below.
 
 Baseline: `x64-dx9-vanilla` at commit
 `9fdf07779f9cfe93625ec19d42a0d4af82f81266`.
 
-## Implemented milestone
+## Implemented milestones
 
 The first buildable vertical slice currently provides:
 
@@ -33,10 +33,28 @@ The first buildable vertical slice currently provides:
   device, octave, eight clickable flourish controls, settings access, and a
   unified Stop control.
 
-This milestone intentionally has no new server protocol. It uses the existing
+Midi to Flourish intentionally adds no server protocol. It uses the existing
 `startMusic`, `flourish`, and `stopMusic` commands already in the vanilla
 command table. Its UI definitions are owned by the matching client-assets
 feature branch.
+
+Midi to Music additionally provides:
+
+- `/startMidiToMusic`, with the existing learned-song and equipped-instrument
+  checks retained as the server authorization gate;
+- 14 procedural JUCE instrument patches, 64-voice polyphony, velocity, sustain,
+  octave shifting, note release, and all-notes-off recovery;
+- controller note input and 24 separately persisted performance keyboard keys
+  that never replace normal gameplay bindings;
+- a server-validated `performanceMidiEvent` command with session, instrument,
+  event-shape, and 192-event-per-second validation;
+- observer note relay through the existing interest-filtered music message path,
+  while preserving normal performance posture, animation, and stop behavior;
+- a Midi to Music HUD state and a two-octave mapping view in Performance options.
+
+The current live-note protocol sends individual events immediately. Clocked
+batching, jitter buffering, and late-join snapshots remain future multiplayer
+polish, as described in Phase 3.
 
 ## Goals
 
@@ -107,16 +125,21 @@ and network behavior end to end.
 
 Display label: `Start Midi to Music`
 
-Internal command: `/startMidiToMusic [instrumentPatch]`
+Internal command: `/startMidiToMusic`
 
-1. Validate entertainer eligibility and the equipped instrument on the server.
+1. Start the character's first learned song through the existing performance
+   system so entertainer eligibility and the equipped instrument are validated.
 2. Open or reuse the configured MIDI input. Keyboard input is always available.
-3. Start a versioned note-performance session and show the performance HUD.
-4. Monitor the local performer's notes immediately through the JUCE sampler.
-5. Batch timestamped note events to the server. The server validates and relays
-   them to interested nearby clients.
-6. Remote clients render notes through the same instrument patch using a small
-   jitter buffer.
+3. Start the note session after replicated performance confirmation and show the
+   performance HUD with the selected procedural instrument patch.
+4. Monitor local notes immediately through the JUCE synth.
+5. Send note events to the server for session, instrument, shape, and rate
+   validation before relaying them through the existing music-interest path.
+6. Have interested remote clients render the notes through the same patch.
+
+The default performance keyboard covers two chromatic octaves beginning at C3.
+`[` and `]` shift the active octave. These keys are intercepted only while Midi
+to Music is active and are configurable on the Performance options page.
 
 Supported first-release events should be note on, note off, velocity, sustain,
 all-notes-off, octave shift, and semitone transpose. Pitch bend and additional
@@ -336,7 +359,7 @@ unchanged; a virtual and physical MIDI device can be selected and reconnected.
 Exit criteria: two clients observe identical original flourishes; normal keymaps
 remain byte-for-byte unchanged; chat input and focus loss cannot create notes.
 
-### Phase 2 - local note engine and first patch
+### Phase 2 - local note engine and first patch (implemented)
 
 - Implement the canonical note engine and JUCE sampler bridge.
 - Add one legally redistributable, multisampled entertainer instrument patch.
@@ -345,7 +368,7 @@ remain byte-for-byte unchanged; chat input and focus loss cannot create notes.
 Exit criteria: no stuck notes through device loss or mode changes; stable audio
 under the polyphony limit; local keyboard and MIDI produce equivalent notes.
 
-### Phase 3 - networked live music
+### Phase 3 - networked live music (initial vertical slice implemented)
 
 - Implement server-authorized note sessions and observer relaying.
 - Add batching, clock synchronization, jitter buffering, recovery snapshots,
@@ -357,7 +380,7 @@ Exit criteria: multiple nearby clients hear synchronized live notes, late join
 recovers correctly, out-of-range clients receive nothing, and hostile input is
 bounded by server limits.
 
-### Phase 4 - Music from Script
+### Phase 4 - Music from Script (next)
 
 - Add sandboxed file browsing and Standard MIDI File validation.
 - Implement deterministic tempo-map scheduling and transport controls.
@@ -393,10 +416,10 @@ licenses, multiplayer soak test, and signed release manifests.
 - Inspect release staging for logs, dumps, absolute paths, test MIDI files, and
   unlicensed sample content.
 
-## Decisions required before implementation
+## Remaining decisions
 
-1. Choose the first in-game instrument and the licensed sample source for the
-   Phase 2 patch.
+1. Decide whether procedural patches should remain the release default or be
+   supplemented by licensed multisampled instruments.
 2. Decide whether note sessions should grant normal entertainer XP/buffs. The
    conservative default is no rewards until server-side anti-automation rules
    and participation semantics are agreed.
@@ -408,10 +431,9 @@ licenses, multiplayer soak test, and signed release manifests.
 5. Confirm whether MIDI script tempo may be changed during multiplayer playback;
    the conservative first release locks tempo after the shared start.
 
-## Recommended first implementation slice
+## Next implementation slice
 
-Begin with Phase 0 and Phase 1 only. It proves command registration, UI asset
-delivery, isolated input ownership, MIDI enumeration, server validation, and the
-stop lifecycle while reusing the proven flourish audio path. Once that slice is
-stable, the sampler and new multiplayer note protocol can be added without
-mixing foundational input/UI defects with synthesis and timing defects.
+Implement Phase 4 as a bounded Standard MIDI File player rooted at the game's
+`midi` directory. Reuse the Midi to Music session/event path so scripted and
+live performances share validation, synthesis, observer playback, and stop
+recovery.

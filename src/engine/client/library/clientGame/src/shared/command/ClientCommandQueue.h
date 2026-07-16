@@ -75,6 +75,7 @@ public:
 	static uint32           enqueueCommand (Command const &command, NetworkId const &targetId, Unicode::String const &params);
 	static uint32           enqueueCommand (uint32 commandHash, NetworkId const &targetId, Unicode::String const &params);
 	static uint32           enqueueCommand (std::string const &commandName, NetworkId const &targetId, Unicode::String const &params);
+	static void             sendImmediateCommandToServer(std::string const &commandName, NetworkId const &targetId, Unicode::String const &params);
 	static void             clear          ();
 	static EntryMap const & get            ();
 	static const Entry *    findEntry      (uint32 sequenceId);

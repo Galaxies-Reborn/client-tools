@@ -129,13 +129,21 @@ void SwgCuiPerformanceHud::updateDisplay()
 {
 	bool const pending = PerformanceModeManager::isPending();
 	bool const failed = !PerformanceModeManager::hasPerformanceMode();
-	m_modeText->SetLocalText(Unicode::narrowToWide(failed ? "START FAILED" : (pending ? "STARTING..." : "MIDI TO FLOURISH")));
-	m_songText->SetLocalText(Unicode::narrowToWide(failed ? "Not started" : PerformanceModeManager::getSongName()));
+	PerformanceModeManager::Mode const mode = PerformanceModeManager::getRequestedMode();
+	bool const midiToMusic = mode == PerformanceModeManager::M_midiToMusic;
+	m_modeText->SetLocalText(Unicode::narrowToWide(failed ? "START FAILED" : (pending ? "STARTING..." : (midiToMusic ? "MIDI TO MUSIC" : "MIDI TO FLOURISH"))));
+	std::string const performanceName = midiToMusic && !PerformanceModeManager::getInstrumentName().empty()
+		? PerformanceModeManager::getInstrumentName()
+		: PerformanceModeManager::getSongName();
+	m_songText->SetLocalText(Unicode::narrowToWide(failed ? "Not started" : performanceName));
 	std::string const &device = PerformanceModeManager::getMidiDeviceName();
 	m_deviceText->SetLocalText(Unicode::narrowToWide(failed ? "Server rejected or timed out" : (pending ? PerformanceModeManager::getStatusMessage() : (device.empty() ? "Keyboard input" : device))));
 	char octave[32];
 	snprintf(octave, sizeof(octave), "Octave %+d", PerformanceModeManager::getMidiOctaveShift());
 	m_octaveText->SetLocalText(Unicode::narrowToWide(octave));
 	for (int i = 0; i < 8; ++i)
+	{
 		m_flourishButtons[i]->SetEnabled(!pending && !failed);
+		m_flourishButtons[i]->SetVisible(!midiToMusic);
+	}
 }
