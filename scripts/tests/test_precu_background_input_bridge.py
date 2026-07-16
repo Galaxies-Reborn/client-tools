@@ -66,6 +66,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_keyUp",
             "BIC_character",
             "BIC_inputReset",
+            "BIC_examineCharacterSheet",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
@@ -296,6 +297,7 @@ $results | ConvertTo-Json -Compress
             "KeyUp": 9,
             "Character": 10,
             "InputReset": 11,
+            "ExamineCharacterSheet": 12,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -318,6 +320,20 @@ $results | ConvertTo-Json -Compress
         self.assertIn("$pressedModifiers.Count - 1", sequence)
         self.assertIn("$command.InputReset", sequence)
         self.assertIn("$actionError", sequence)
+
+    def test_remote_character_sheet_action_is_narrow_and_target_guarded(self):
+        action = function_body(
+            self.client_main, "bool performBackgroundExamineCharacterSheet()"
+        )
+        self.assertIn("Game::getPlayer()", action)
+        self.assertIn("CuiAction::findObjectFromFirstParam", action)
+        self.assertIn("CuiActions::examineCharacterSheet", action)
+        self.assertIn("!target", action)
+        self.assertIn("target == player", action)
+        self.assertNotIn("externalCommandHandler", action)
+
+        parameter_block = self.helper[: self.helper.index("Set-StrictMode")]
+        self.assertIn('"ExamineCharacterSheet"', parameter_block)
 
     def test_plain_key_sequence_accepts_no_modifiers(self):
         sequence = function_body(self.helper, "function Send-BridgeKeySequence")
