@@ -15,6 +15,7 @@
 #include "clientBugReporting/SetupClientBugReporting.h"
 #include "clientDirectInput/DirectInput.h"
 #include "clientDirectInput/SetupClientDirectInput.h"
+#include "clientGame/ClientCommandQueue.h"
 #include "clientGame/Game.h"
 #include "clientGame/SetupClientGame.h"
 #include "clientGraphics/Graphics.h"
@@ -86,6 +87,7 @@
 #include "swgClientUserInterface/SwgCuiChatWindow.h"
 #include "swgClientUserInterface/SwgCuiG15Lcd.h"
 #include "swgClientUserInterface/SwgCuiManager.h"
+#include "swgClientUserInterface/SwgCuiActions.h"
 #include "swgClientUserInterface/SwgCuiMediatorTypes.h"
 #include "swgSharedNetworkMessages/SetupSwgSharedNetworkMessages.h"
 
@@ -94,6 +96,7 @@
 
 #include "sharedGame/PlatformFeatureBits.h"
 
+#include <algorithm>
 #include <dinput.h>
 #include <string>
 #include <ctime>
@@ -124,11 +127,18 @@ namespace ClientMainNamespace
 		BIC_disbandGroup,
 		BIC_openStatMigration,
 		BIC_startImageDesign,
-		BIC_targetCounterpart
+		BIC_targetCounterpart,
+		BIC_queueCombatCanary,
+		BIC_clearCombatQueue,
+		BIC_combatQueueStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 6;
+	LRESULT const cms_backgroundInputProtocolVersion = 7;
+	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
+	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
+	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
+	LRESULT const cms_backgroundCombatQueueStatusCountMask = 0x00003fff;
 	UINT s_backgroundInputMessage = 0;
 	HWND s_backgroundInputWindow = 0;
 	WNDPROC s_backgroundInputPreviousWindowProc = 0;
@@ -219,6 +229,77 @@ namespace ClientMainNamespace
 		return true;
 	}
 
+	bool isBackgroundCombatCanaryPair(Object const & player, NetworkId const & target)
+	{
+		std::string const playerId = player.getNetworkId().getValueString();
+		std::string const targetId = target.getValueString();
+		return (playerId == "44003778" && targetId == "39008597") ||
+			(playerId == "39008597" && targetId == "44003778");
+	}
+
+	bool performBackgroundQueueCombatCanary(int const repeat)
+	{
+		Object * const player = Game::getPlayer();
+		if (!player)
+			return false;
+
+		std::string const playerId = player->getNetworkId().getValueString();
+		NetworkId const targetId = playerId == "44003778" ? NetworkId("39008597") :
+			playerId == "39008597" ? NetworkId("44003778") : NetworkId::cms_invalid;
+		if (!targetId.isValid() || !isBackgroundCombatCanaryPair(*player, targetId))
+			return false;
+
+		// Exercise the same admission contract used by SwgCuiToolbar with an
+		// authentic Publish 14.1 command and the fixture target supplied explicitly. The
+		// synchronous status returned by the window procedure observes the real
+		// queue before the server can answer; no mediator row or result is forged.
+		CuiCombatManager::setCombatTarget(targetId);
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool queued = true;
+		for (int index = 0; index < repeat; ++index)
+		{
+			if (ClientCommandQueue::enqueueCommand(
+				"headShot1",
+				targetId,
+				Unicode::emptyString) == 0)
+			{
+				queued = false;
+				break;
+			}
+		}
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundClearCombatQueue()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		return CuiActionManager::performAction(
+			SwgCuiActions::clearCombatQueue,
+			Unicode::emptyString);
+	}
+
+	LRESULT getBackgroundCombatQueueStatus()
+	{
+		CuiCombatManager::IntVector sequenceIds;
+		CuiCombatManager::getCombatCommandsFromQueue(sequenceIds);
+
+		LRESULT result = cms_backgroundCombatQueueStatusMarker;
+		CachedNetworkId combatTarget;
+		if (CuiCombatManager::isInCombat(Game::getPlayerCreature(), combatTarget))
+			result |= cms_backgroundCombatQueueStatusInCombat;
+		if (CuiCombatManager::getCombatTarget().isValid())
+			result |= cms_backgroundCombatQueueStatusHasTarget;
+
+		size_t const count = sequenceIds.size();
+		result |= static_cast<LRESULT>(std::min(
+			count,
+			static_cast<size_t>(cms_backgroundCombatQueueStatusCountMask)));
+		return result;
+	}
+
 	LRESULT CALLBACK backgroundInputWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		if (s_backgroundInputInstalled && message == s_backgroundInputMessage)
@@ -298,6 +379,17 @@ namespace ClientMainNamespace
 
 			case BIC_targetCounterpart:
 				return performBackgroundTargetCounterpart() ? 1 : 0;
+
+			case BIC_queueCombatCanary:
+				if (lParam < 1 || lParam > 16 || !performBackgroundQueueCombatCanary(static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_clearCombatQueue:
+				return performBackgroundClearCombatQueue() ? 1 : 0;
+
+			case BIC_combatQueueStatus:
+				return getBackgroundCombatQueueStatus();
 
 			default:
 				return 0;

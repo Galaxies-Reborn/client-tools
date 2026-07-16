@@ -20,6 +20,29 @@ which also preserves the executing front command and its real wait/status
 payload. Removal callbacks copy only the sequence ID and wait time needed by
 the fade timer; they never retain the queue entry pointer after the callback.
 
+Protocol v7 of the opt-in background bridge provides a narrowly bound live
+gate for the two local fixture characters. `QueueCombatCanary` enqueues the
+authentic Publish 14.1 `headShot1` command through the normal toolbar admission
+contract and returns an atomic read of the actual combat queue. It accepts only
+the fixture pair and a bounded repeat count of 1 through 16. `ClearCombatQueue`
+uses the mediator's production clear action, while `CombatQueueStatus` is
+read-only. The July 16 live run observed add counts of 4 and 3 on the two
+clients, natural authoritative removal to zero, a sequence-specific clear of
+`12 -> 1 -> 0` in 300 ms, and `6 -> 0` across a client relog. The server still
+rejects `headShot1`; this gate validates the client queue lifecycle and does
+not claim that Pre-CU command execution or HAM damage is implemented.
+
+Example live probes against a loaded fixture client:
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueCombatCanary -ClientProcessId <pid> -Repeat 8
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action ClearCombatQueue -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action CombatQueueStatus -ClientProcessId <pid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
