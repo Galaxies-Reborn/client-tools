@@ -28,6 +28,9 @@
 #include "clientSkeletalAnimation/SetupClientSkeletalAnimation.h"
 #include "clientTerrain/SetupClientTerrain.h"
 #include "clientTextureRenderer/SetupClientTextureRenderer.h"
+#include "clientUserInterface/CuiAction.h"
+#include "clientUserInterface/CuiActionManager.h"
+#include "clientUserInterface/CuiActions.h"
 #include "clientUserInterface/CuiChatHistory.h"
 #include "clientUserInterface/CuiManager.h"
 #include "clientUserInterface/CuiSettings.h"
@@ -91,6 +94,7 @@
 #include <string>
 #include <ctime>
 #include <cstdio>
+#include <UnicodeUtils.h>
 
 extern void externalCommandHandler(const char*);
 
@@ -109,7 +113,8 @@ namespace ClientMainNamespace
 		BIC_keyDown,
 		BIC_keyUp,
 		BIC_character,
-		BIC_inputReset
+		BIC_inputReset,
+		BIC_examineCharacterSheet
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
@@ -138,6 +143,22 @@ namespace ClientMainNamespace
 			IoWinManager::queueKeyUp(0, key);
 
 		return true;
+	}
+
+	bool performBackgroundExamineCharacterSheet()
+	{
+		Object * const player = Game::getPlayer();
+		Object * const target = CuiAction::findObjectFromFirstParam(
+			Unicode::emptyString,
+			true,
+			false,
+			CuiActions::examineCharacterSheet);
+		if (!player || !target || target == player)
+			return false;
+
+		return CuiActionManager::performAction(
+			CuiActions::examineCharacterSheet,
+			Unicode::narrowToWide(target->getNetworkId().getValueString()));
 	}
 
 	LRESULT CALLBACK backgroundInputWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -198,6 +219,9 @@ namespace ClientMainNamespace
 			case BIC_inputReset:
 				IoWinManager::queueInputReset();
 				return 1;
+
+			case BIC_examineCharacterSheet:
+				return performBackgroundExamineCharacterSheet() ? 1 : 0;
 
 			default:
 				return 0;

@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -78,6 +78,7 @@ $command = @{
     KeyUp           = 9
     Character       = 10
     InputReset      = 11
+    ExamineCharacterSheet = 12
 }
 $dikByName = @{
     Escape    = 0x01
@@ -430,6 +431,11 @@ switch ($Action) {
     "Reset" {
         Send-BridgeCommand -Window $window -Message $message -Command $command.InputReset
         $detail = "queued"
+    }
+
+    "ExamineCharacterSheet" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.ExamineCharacterSheet
+        $detail = "queued for current targeted player"
     }
 }
 
