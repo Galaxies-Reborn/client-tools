@@ -53,6 +53,7 @@
 #include "clientGame/PauseGame.h"
 #include "clientGame/PlayerCreatureController.h"
 #include "clientGame/PlayerMusicManager.h"
+#include "clientGame/PerformanceModeManager.h"
 #include "clientGame/PlayerObject.h"
 #include "clientGame/PlayerShipController.h"
 #include "clientGame/PlotterManager.h"
@@ -1607,6 +1608,10 @@ void GroundScene::scanInputMapForSceneMessages (InputMap * inputMap)
 
 void GroundScene::handleInputMapEvent (IoEvent* event)
 {
+	bool const allowPerformanceInput = !CuiManager::getKeyboardInputActive() || event->type == IOET_InputReset;
+	if (allowPerformanceInput && PerformanceModeManager::processEvent(*event))
+		return;
+
 	//-- handle the cursor
 	m_mouseCursor->processEvent (event);
 
@@ -2066,6 +2071,7 @@ void GroundScene::update(float elapsedTime)
 	GameMusicManager::update (elapsedTime);
 
 	PlayerMusicManager::alter (elapsedTime);
+	PerformanceModeManager::alter(elapsedTime);
 	CommunityManager::alter (elapsedTime);
 	MatchMakingManager::alter (elapsedTime);
 	AlarmManager::alter (elapsedTime);

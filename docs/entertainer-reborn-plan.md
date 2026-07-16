@@ -1,10 +1,29 @@
 # Entertainer Reborn Integration Plan
 
-Status: planning only. No Entertainer Reborn runtime behavior is implemented by
-this document.
+Status: Phase 1 implementation is in progress. The first command-driven Midi to
+Flourish slice is implemented; the settings UI, HUD, live-note sampler/network
+protocol, and MIDI file player remain planned below.
 
 Baseline: `x64-dx9-vanilla` at commit
 `9fdf07779f9cfe93625ec19d42a0d4af82f81266`.
+
+## Implemented milestone
+
+The first buildable vertical slice currently provides:
+
+- JUCE MIDI input discovery, selection, hot callback queuing, and game-thread
+  event polling through the client audio library;
+- `PerformanceModeManager` lifecycle and performance-only keyboard interception;
+- `/startMidiToFlourish <song>` using the existing `/startMusic` authority path;
+- MIDI notes C4 through G4 and keys Q through I mapped to flourishes 1 through 8;
+- `/stopPerformanceMode`, Escape-to-stop, flourish debounce, text-input exclusion,
+  and input-reset handling;
+- `/performanceMidiDevices`, `/selectPerformanceMidiDevice <index>`, and
+  `/performanceFlourish <1-8>` diagnostics.
+
+This milestone intentionally has no new server protocol or asset dependency. It
+uses the existing `startMusic`, `flourish`, and `stopMusic` commands already in
+the vanilla command table. Device and key configuration UI is the next slice.
 
 ## Goals
 

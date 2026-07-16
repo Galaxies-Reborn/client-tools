@@ -1,4 +1,5 @@
 #include "clientAudio/FirstClientAudio.h"
+#include "clientAudio/ClientAudioMidi.h"
 
 #if defined(_WIN64)
 
@@ -8,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <deque>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -140,10 +142,58 @@ std::string s_lastError;
 S32 s_fileError = AIL_NO_ERROR;
 bool s_started = false;
 
+class MidiInputCallback final : public juce::MidiInputCallback
+{
+public:
+	void handleIncomingMidiMessage(juce::MidiInput *, juce::MidiMessage const &message) override;
+};
+
+std::mutex s_midiMutex;
+std::deque<ClientAudioMidiEvent> s_midiEvents;
+std::unique_ptr<juce::MidiInput> s_midiInput;
+std::string s_midiInputIdentifier;
+MidiInputCallback s_midiInputCallback;
+size_t const s_maximumQueuedMidiEvents = 2048;
+
 template <typename T>
 T clampValue(T value, T low, T high)
 {
 	return value < low ? low : (value > high ? high : value);
+}
+
+void MidiInputCallback::handleIncomingMidiMessage(juce::MidiInput *, juce::MidiMessage const &message)
+{
+	ClientAudioMidiEvent event = {};
+	if (message.isNoteOn())
+	{
+		event.type = ClientAudioMidiEvent::T_noteOn;
+		event.note = message.getNoteNumber();
+		event.value = message.getVelocity();
+	}
+	else if (message.isNoteOff())
+	{
+		event.type = ClientAudioMidiEvent::T_noteOff;
+		event.note = message.getNoteNumber();
+		event.value = message.getVelocity();
+	}
+	else if (message.isController())
+	{
+		event.type = ClientAudioMidiEvent::T_controlChange;
+		event.note = message.getControllerNumber();
+		event.value = message.getControllerValue();
+	}
+	else
+	{
+		return;
+	}
+
+	event.channel = message.getChannel();
+	event.timestampSeconds = message.getTimeStamp();
+
+	std::lock_guard<std::mutex> lock(s_midiMutex);
+	if (s_midiEvents.size() >= s_maximumQueuedMidiEvents)
+		s_midiEvents.pop_front();
+	s_midiEvents.push_back(event);
 }
 
 U16 readU16(U8 const *data)
@@ -794,6 +844,104 @@ bool readStreamFile(char const *filename, std::vector<U8> &data)
 
 using namespace JuceMilesNamespace;
 
+std::vector<ClientAudioMidiDevice> ClientAudioMidi::getInputDevices()
+{
+	std::vector<ClientAudioMidiDevice> result;
+	juce::Array<juce::MidiDeviceInfo> const devices = juce::MidiInput::getAvailableDevices();
+	result.reserve(static_cast<size_t>(devices.size()));
+	for (juce::MidiDeviceInfo const &device : devices)
+	{
+		ClientAudioMidiDevice item;
+		item.name = device.name.toStdString();
+		item.identifier = device.identifier.toStdString();
+		result.push_back(item);
+	}
+	return result;
+}
+
+bool ClientAudioMidi::openInput(std::string const &identifier, std::string &errorMessage)
+{
+	closeInput();
+	errorMessage.clear();
+	if (!s_started || !s_juceInitialiser)
+	{
+		errorMessage = "JUCE audio is not initialized";
+		return false;
+	}
+
+	std::unique_ptr<juce::MidiInput> input = juce::MidiInput::openDevice(identifier, &s_midiInputCallback);
+	if (!input)
+	{
+		errorMessage = "Unable to open the selected MIDI input";
+		return false;
+	}
+
+	input->start();
+	{
+		std::lock_guard<std::mutex> lock(s_midiMutex);
+		s_midiInputIdentifier = identifier;
+		s_midiInput = std::move(input);
+		s_midiEvents.clear();
+	}
+	return true;
+}
+
+bool ClientAudioMidi::openFirstAvailableInput(std::string &deviceName, std::string &errorMessage)
+{
+	std::vector<ClientAudioMidiDevice> const devices = getInputDevices();
+	if (devices.empty())
+	{
+		deviceName.clear();
+		errorMessage = "No MIDI input device was found; keyboard performance input remains available";
+		return false;
+	}
+
+	deviceName = devices.front().name;
+	return openInput(devices.front().identifier, errorMessage);
+}
+
+void ClientAudioMidi::closeInput()
+{
+	std::unique_ptr<juce::MidiInput> input;
+	{
+		std::lock_guard<std::mutex> lock(s_midiMutex);
+		input = std::move(s_midiInput);
+		s_midiInputIdentifier.clear();
+		s_midiEvents.clear();
+	}
+	if (input)
+		input->stop();
+	clearEvents();
+}
+
+bool ClientAudioMidi::isInputOpen()
+{
+	std::lock_guard<std::mutex> lock(s_midiMutex);
+	return s_midiInput.get() != nullptr;
+}
+
+std::string ClientAudioMidi::getOpenInputIdentifier()
+{
+	std::lock_guard<std::mutex> lock(s_midiMutex);
+	return s_midiInputIdentifier;
+}
+
+bool ClientAudioMidi::pollEvent(ClientAudioMidiEvent &event)
+{
+	std::lock_guard<std::mutex> lock(s_midiMutex);
+	if (s_midiEvents.empty())
+		return false;
+	event = s_midiEvents.front();
+	s_midiEvents.pop_front();
+	return true;
+}
+
+void ClientAudioMidi::clearEvents()
+{
+	std::lock_guard<std::mutex> lock(s_midiMutex);
+	s_midiEvents.clear();
+}
+
 extern "C"
 {
 S32 AILCALL AIL_startup(void)
@@ -812,6 +960,7 @@ S32 AILCALL AIL_startup(void)
 
 void AILCALL AIL_shutdown(void)
 {
+	ClientAudioMidi::closeInput();
 	std::lock_guard<std::recursive_mutex> lock(s_mutex);
 	while (!s_streams.empty()) closeStream(s_streams.begin()->first);
 	while (!s_samples.empty()) releaseSample(s_samples.begin()->first);

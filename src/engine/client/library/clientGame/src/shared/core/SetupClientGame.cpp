@@ -124,6 +124,7 @@
 #include "clientGame/PlayerCreationManagerClient.h"
 #include "clientGame/PlayerCreatureController.h"
 #include "clientGame/PlayerMusicManager.h"
+#include "clientGame/PerformanceModeManager.h"
 #include "clientGame/PlayerShipController.h"
 #include "clientGame/PlayerShipTurretController.h"
 #include "clientGame/PlotterManager.h"
@@ -661,6 +662,7 @@ void SetupClientGame::install (const Data &data)
 
 		ClientSecureTradeManager::install();
 		PlayerMusicManager::install();
+		PerformanceModeManager::install();
 		MatchMakingManager::install();
 		CustomerServiceManager::install();
 		AlarmManager::install();

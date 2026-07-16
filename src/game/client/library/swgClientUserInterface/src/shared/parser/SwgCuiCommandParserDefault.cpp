@@ -24,6 +24,7 @@
 #include "clientGame/MoodManagerClient.h"
 #include "clientGame/NetworkScene.h"
 #include "clientGame/PlayerObject.h"
+#include "clientGame/PerformanceModeManager.h"
 #include "clientGame/Species.h"
 #include "clientGame/WhoManager.h"
 #include "clientGraphics/Graphics.h"
@@ -134,6 +135,11 @@ namespace SwgCuiCommandParserDefaultNamespace
 		MAKE_COMMAND (flushGraphicsResources);
 		MAKE_COMMAND (copyCrashReportInformation);
 		MAKE_COMMAND (reloadTextures);
+		MAKE_COMMAND (startMidiToFlourish);
+		MAKE_COMMAND (stopPerformanceMode);
+		MAKE_COMMAND (performanceMidiDevices);
+		MAKE_COMMAND (selectPerformanceMidiDevice);
+		MAKE_COMMAND (performanceFlourish);
 		MAKE_COMMAND (createMail);
 #if PRODUCTION == 0
 		MAKE_COMMAND (cancelTickets);
@@ -201,6 +207,11 @@ namespace SwgCuiCommandParserDefaultNamespace
 		{ Commands::flushGraphicsResources,      1, "<fullReset>",                        "Flush the graphics resources, or perform a full reset"},
 		{ Commands::copyCrashReportInformation,  0, "",                                   "Copy the test that would be sent with a client crash to the windows clipboard"},
 		{ Commands::reloadTextures,              0, "",                                   "Reload all textures from disk"},
+		{ Commands::startMidiToFlourish,         0, "[song]",                             "Start Midi to Flourish for an existing entertainer song"},
+		{ Commands::stopPerformanceMode,         0, "",                                   "Stop the active Entertainer Reborn performance mode"},
+		{ Commands::performanceMidiDevices,      0, "",                                   "List available MIDI input devices"},
+		{ Commands::selectPerformanceMidiDevice, 1, "<index>",                            "Select a MIDI input listed by performanceMidiDevices"},
+		{ Commands::performanceFlourish,         1, "<1-8>",                              "Trigger a flourish in the active Midi to Flourish mode"},
 		{ "",                                    0, "",                                   ""} // this must be last
 	};
 
@@ -1846,6 +1857,85 @@ bool SwgCuiCommandParserDefault::performParsing (const NetworkId & userId, const
 	{
 		TextureList::reloadTextures();
 		return true; //lint !e527
+	}
+
+	//-----------------------------------------------------------------
+
+	else if (isCommand(argv[0], Commands::startMidiToFlourish))
+	{
+		std::string songName;
+		for (size_t i = 1; i < argv.size(); ++i)
+		{
+			if (!songName.empty())
+				songName += ' ';
+			songName += Unicode::wideToNarrow(argv[i]);
+		}
+
+		std::string statusMessage;
+		IGNORE_RETURN(PerformanceModeManager::startMidiToFlourish(songName, statusMessage));
+		result += Unicode::narrowToWide(statusMessage);
+		return true;
+	}
+
+	//-----------------------------------------------------------------
+
+	else if (isCommand(argv[0], Commands::stopPerformanceMode))
+	{
+		if (PerformanceModeManager::isActive())
+		{
+			PerformanceModeManager::stopPerformanceMode(true);
+			result += Unicode::narrowToWide("Performance mode stopped.");
+		}
+		else
+			result += Unicode::narrowToWide("No Entertainer Reborn performance mode is active.");
+		return true;
+	}
+
+	//-----------------------------------------------------------------
+
+	else if (isCommand(argv[0], Commands::performanceMidiDevices))
+	{
+		std::vector<PerformanceModeManager::MidiDevice> const devices = PerformanceModeManager::getMidiDevices();
+		if (devices.empty())
+			result += Unicode::narrowToWide("No MIDI input devices were found. Keyboard performance input remains available.");
+		else
+		{
+			result += Unicode::narrowToWide("MIDI input devices:\n");
+			for (size_t i = 0; i < devices.size(); ++i)
+			{
+				char indexBuffer[16];
+				snprintf(indexBuffer, sizeof(indexBuffer), "%u. ", static_cast<unsigned int>(i + 1));
+				result += Unicode::narrowToWide(indexBuffer + devices[i].name + "\n");
+			}
+		}
+		return true;
+	}
+
+	//-----------------------------------------------------------------
+
+	else if (isCommand(argv[0], Commands::selectPerformanceMidiDevice))
+	{
+		std::vector<PerformanceModeManager::MidiDevice> const devices = PerformanceModeManager::getMidiDevices();
+		int const deviceIndex = atoi(Unicode::wideToNarrow(argv[1]).c_str()) - 1;
+		std::string statusMessage;
+		if (deviceIndex < 0 || deviceIndex >= static_cast<int>(devices.size()))
+			statusMessage = "Invalid MIDI input index. Use /performanceMidiDevices to list available devices.";
+		else
+			IGNORE_RETURN(PerformanceModeManager::selectMidiDevice(devices[static_cast<size_t>(deviceIndex)].identifier, statusMessage));
+		result += Unicode::narrowToWide(statusMessage);
+		return true;
+	}
+
+	//-----------------------------------------------------------------
+
+	else if (isCommand(argv[0], Commands::performanceFlourish))
+	{
+		int const flourish = atoi(Unicode::wideToNarrow(argv[1]).c_str());
+		if (PerformanceModeManager::triggerFlourish(flourish))
+			result += Unicode::narrowToWide("Flourish queued.");
+		else
+			result += Unicode::narrowToWide("Flourish was not queued. Start Midi to Flourish and use a number from 1 through 8.");
+		return true;
 	}
 
 	//-----------------------------------------------------------------
