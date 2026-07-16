@@ -32,7 +32,10 @@
 #include "clientUserInterface/CuiActionManager.h"
 #include "clientUserInterface/CuiActions.h"
 #include "clientUserInterface/CuiChatHistory.h"
+#include "clientUserInterface/CuiCombatManager.h"
 #include "clientUserInterface/CuiManager.h"
+#include "clientUserInterface/CuiMediatorFactory.h"
+#include "clientUserInterface/CuiMessageQueueManager.h"
 #include "clientUserInterface/CuiSettings.h"
 #include "clientUserInterface/CuiWorkspace.h"
 #include "clientGraphics/IndexedTriangleListAppearance.h"
@@ -83,6 +86,7 @@
 #include "swgClientUserInterface/SwgCuiChatWindow.h"
 #include "swgClientUserInterface/SwgCuiG15Lcd.h"
 #include "swgClientUserInterface/SwgCuiManager.h"
+#include "swgClientUserInterface/SwgCuiMediatorTypes.h"
 #include "swgSharedNetworkMessages/SetupSwgSharedNetworkMessages.h"
 
 
@@ -114,11 +118,17 @@ namespace ClientMainNamespace
 		BIC_keyUp,
 		BIC_character,
 		BIC_inputReset,
-		BIC_examineCharacterSheet
+		BIC_examineCharacterSheet,
+		BIC_inviteTarget,
+		BIC_joinGroup,
+		BIC_disbandGroup,
+		BIC_openStatMigration,
+		BIC_startImageDesign,
+		BIC_targetCounterpart
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 1;
+	LRESULT const cms_backgroundInputProtocolVersion = 6;
 	UINT s_backgroundInputMessage = 0;
 	HWND s_backgroundInputWindow = 0;
 	WNDPROC s_backgroundInputPreviousWindowProc = 0;
@@ -159,6 +169,54 @@ namespace ClientMainNamespace
 		return CuiActionManager::performAction(
 			CuiActions::examineCharacterSheet,
 			Unicode::narrowToWide(target->getNetworkId().getValueString()));
+	}
+
+	bool performBackgroundTargetCommand(char const * const command)
+	{
+		Object * const player = Game::getPlayer();
+		Object * const target = CuiAction::findObjectFromFirstParam(
+			Unicode::emptyString,
+			true,
+			false,
+			CuiActions::radialMenu);
+		if (!player || !target || target == player)
+			return false;
+
+		return CuiMessageQueueManager::executeCommandByString(command, true);
+	}
+
+	bool performBackgroundSelfCommand(char const * const command)
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		return CuiMessageQueueManager::executeCommandByString(command, true);
+	}
+
+	bool performBackgroundOpenStatMigration()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		return CuiMediatorFactory::activateInWorkspace(
+			CuiMediatorTypes::WS_StatMigration) != 0;
+	}
+
+	bool performBackgroundTargetCounterpart()
+	{
+		Object * const player = Game::getPlayer();
+		if (!player)
+			return false;
+
+		std::string const playerId = player->getNetworkId().getValueString();
+		if (playerId == "44003778")
+			CuiCombatManager::setLookAtTarget(NetworkId("39008597"));
+		else if (playerId == "39008597")
+			CuiCombatManager::setLookAtTarget(NetworkId("44003778"));
+		else
+			return false;
+
+		return true;
 	}
 
 	LRESULT CALLBACK backgroundInputWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -222,6 +280,24 @@ namespace ClientMainNamespace
 
 			case BIC_examineCharacterSheet:
 				return performBackgroundExamineCharacterSheet() ? 1 : 0;
+
+			case BIC_inviteTarget:
+				return performBackgroundTargetCommand("/invite") ? 1 : 0;
+
+			case BIC_joinGroup:
+				return performBackgroundSelfCommand("/join") ? 1 : 0;
+
+			case BIC_disbandGroup:
+				return performBackgroundSelfCommand("/disband") ? 1 : 0;
+
+			case BIC_openStatMigration:
+				return performBackgroundOpenStatMigration() ? 1 : 0;
+
+			case BIC_startImageDesign:
+				return performBackgroundTargetCommand("/imagedesign") ? 1 : 0;
+
+			case BIC_targetCounterpart:
+				return performBackgroundTargetCounterpart() ? 1 : 0;
 
 			default:
 				return 0;
