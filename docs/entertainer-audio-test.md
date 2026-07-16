@@ -5,6 +5,11 @@ instrument patches, MIDI input callback, and Standard MIDI File parser used by
 the x64 gameplay client. It does not load the game, connect to a server, open a
 network socket, or require client assets.
 
+The 14 patches use distinct synthesis models for strings, reeds, brass, flute,
+horn, plucked strings, percussion, metallic boxes, organ, bells, and flanged
+voices. They are not General MIDI samples and are intended as a tunable first
+pass at recognizable Star Wars Galaxies instrument families.
+
 Build and launch it from PowerShell:
 
 ```powershell

@@ -164,36 +164,57 @@ enum SynthEnvelopeStage
 	SES_release
 };
 
+enum SynthToneModel
+{
+	STM_strings,
+	STM_reed,
+	STM_brass,
+	STM_flute,
+	STM_horn,
+	STM_pluck,
+	STM_percussion,
+	STM_metallicBox,
+	STM_organ,
+	STM_mandoviol,
+	STM_bells,
+	STM_flanged,
+	STM_valahorn,
+	STM_downeyBox
+};
+
 struct SynthPatch
 {
 	char const *name;
+	SynthToneModel toneModel;
 	float attackSeconds;
 	float decaySeconds;
 	float sustainLevel;
 	float releaseSeconds;
-	float harmonic2;
-	float harmonic3;
-	float harmonic4;
 	float detune;
 	float gain;
+	float filterCoefficient;
+	float noiseAmount;
+	float modulationRatio;
+	float modulationDepth;
+	bool oneShot;
 };
 
 SynthPatch const s_synthPatches[14] =
 {
-	{"Traz Strings",       0.018f, 0.22f, 0.72f, 0.35f,  0.36f,  0.18f,  0.08f,  0.0020f, 0.115f},
-	{"Slitherhorn Reed",   0.035f, 0.16f, 0.82f, 0.24f,  0.55f,  0.23f,  0.11f, -0.0015f, 0.090f},
-	{"Fanfar Brass",       0.025f, 0.18f, 0.78f, 0.30f,  0.62f,  0.31f,  0.16f,  0.0010f, 0.080f},
-	{"Droopy Flute",       0.055f, 0.20f, 0.86f, 0.28f,  0.11f,  0.04f,  0.02f,  0.0030f, 0.150f},
-	{"Kloo Horn",          0.020f, 0.15f, 0.74f, 0.22f,  0.47f,  0.29f,  0.13f, -0.0020f, 0.095f},
-	{"Fizz Pluck",         0.004f, 0.12f, 0.42f, 0.16f, -0.28f,  0.20f, -0.11f,  0.0060f, 0.145f},
-	{"Bandfill Percussion",0.003f, 0.08f, 0.28f, 0.12f,  0.71f, -0.35f,  0.22f, -0.0040f, 0.080f},
-	{"Omni Box",           0.008f, 0.14f, 0.58f, 0.22f, -0.42f,  0.27f, -0.18f,  0.0040f, 0.110f},
-	{"Nalargon Organ",     0.045f, 0.24f, 0.90f, 0.45f,  0.48f,  0.32f,  0.20f,  0.0015f, 0.075f},
-	{"Mandoviol",          0.012f, 0.18f, 0.66f, 0.32f,  0.31f,  0.16f,  0.07f, -0.0030f, 0.125f},
-	{"Xantha Bells",       0.003f, 0.32f, 0.38f, 0.55f,  0.52f, -0.17f,  0.29f,  0.0080f, 0.100f},
-	{"Flanged Jessoon",    0.030f, 0.20f, 0.80f, 0.38f, -0.36f,  0.25f, -0.13f,  0.0050f, 0.105f},
-	{"Valahorn",           0.040f, 0.22f, 0.84f, 0.40f,  0.58f,  0.34f,  0.17f, -0.0010f, 0.082f},
-	{"Downey Box",         0.006f, 0.11f, 0.50f, 0.18f, -0.50f,  0.33f, -0.20f,  0.0070f, 0.105f}
+	{"Traz Strings",        STM_strings,      0.025f, 0.34f, 0.68f, 0.55f,  0.0035f, 0.105f, 0.20f, 0.010f, 1.000f, 0.00f, false},
+	{"Slitherhorn Reed",    STM_reed,         0.032f, 0.18f, 0.80f, 0.26f, -0.0010f, 0.082f, 0.42f, 0.035f, 1.000f, 0.00f, false},
+	{"Fanfar Brass",        STM_brass,        0.018f, 0.16f, 0.76f, 0.34f,  0.0008f, 0.078f, 0.55f, 0.000f, 1.000f, 0.00f, false},
+	{"Droopy Flute",        STM_flute,        0.065f, 0.20f, 0.88f, 0.32f,  0.0015f, 0.145f, 0.16f, 0.045f, 1.000f, 0.00f, false},
+	{"Kloo Horn",           STM_horn,         0.028f, 0.22f, 0.74f, 0.30f, -0.0020f, 0.105f, 0.28f, 0.008f, 1.000f, 0.00f, false},
+	{"Fizz Pluck",          STM_pluck,        0.002f, 0.82f, 0.00f, 0.10f,  0.0060f, 0.180f, 0.58f, 0.080f, 2.010f, 0.60f, true },
+	{"Bandfill Percussion", STM_percussion,   0.001f, 0.42f, 0.00f, 0.08f, -0.0040f, 0.155f, 0.72f, 0.820f, 1.370f, 0.00f, true },
+	{"Omni Box",            STM_metallicBox,  0.003f, 1.05f, 0.00f, 0.14f,  0.0040f, 0.150f, 0.64f, 0.025f, 1.414f, 0.00f, true },
+	{"Nalargon Organ",      STM_organ,        0.040f, 0.18f, 0.92f, 0.62f,  0.0000f, 0.070f, 0.48f, 0.000f, 2.000f, 0.00f, false},
+	{"Mandoviol",           STM_mandoviol,    0.004f, 1.45f, 0.00f, 0.18f, -0.0035f, 0.155f, 0.46f, 0.025f, 2.000f, 0.00f, true },
+	{"Xantha Bells",        STM_bells,        0.002f, 2.80f, 0.00f, 0.70f,  0.0080f, 0.135f, 0.88f, 0.000f, 2.730f, 5.20f, true },
+	{"Flanged Jessoon",     STM_flanged,      0.030f, 0.24f, 0.78f, 0.48f,  0.0070f, 0.115f, 0.36f, 0.015f, 1.000f, 0.00f, false},
+	{"Valahorn",            STM_valahorn,     0.052f, 0.26f, 0.82f, 0.46f, -0.0012f, 0.086f, 0.18f, 0.004f, 0.500f, 0.00f, false},
+	{"Downey Box",          STM_downeyBox,    0.002f, 0.68f, 0.00f, 0.10f,  0.0090f, 0.165f, 0.50f, 0.180f, 1.510f, 0.00f, true }
 };
 
 struct SynthVoice
@@ -205,7 +226,10 @@ struct SynthVoice
 	float velocity = 0.0f;
 	double phase = 0.0;
 	double detunedPhase = 0.0;
+	double modulationPhase = 0.0;
 	float envelope = 0.0f;
+	float filterState = 0.0f;
+	std::uint32_t noiseState = 0x6d2b79f5u;
 	SynthEnvelopeStage stage = SES_attack;
 	std::uint64_t age = 0;
 };
@@ -234,6 +258,29 @@ void releaseSynthVoice(SynthVoice &voice)
 		voice.heldBySustain = false;
 		voice.stage = SES_release;
 	}
+}
+
+float nextSynthNoise(SynthVoice &voice)
+{
+	voice.noiseState ^= voice.noiseState << 13;
+	voice.noiseState ^= voice.noiseState >> 17;
+	voice.noiseState ^= voice.noiseState << 5;
+	return static_cast<float>(voice.noiseState & 0xffffu) / 32767.5f - 1.0f;
+}
+
+float synthTriangle(double phase)
+{
+	return static_cast<float>((2.0 / 3.14159265358979323846) * std::asin(std::sin(phase)));
+}
+
+float synthSaw(double phase)
+{
+	return static_cast<float>(0.56 * (std::sin(phase) + 0.50 * std::sin(phase * 2.0) + 0.33 * std::sin(phase * 3.0) + 0.25 * std::sin(phase * 4.0)));
+}
+
+float synthSquare(double phase)
+{
+	return static_cast<float>(0.72 * (std::sin(phase) + 0.33 * std::sin(phase * 3.0) + 0.20 * std::sin(phase * 5.0)));
 }
 
 void renderSynthSessions(DriverState const &driver, float *const *outputs, int outputChannels, int numSamples)
@@ -272,11 +319,23 @@ void renderSynthSessions(DriverState const &driver, float *const *outputs, int o
 					}
 					break;
 				case SES_decay:
-					voice.envelope -= decayStep;
-					if (voice.envelope <= patch.sustainLevel)
+					if (patch.oneShot)
 					{
-						voice.envelope = patch.sustainLevel;
-						voice.stage = SES_sustain;
+						voice.envelope -= 1.0f / static_cast<float>(sampleRate * (std::max)(patch.decaySeconds, 0.001f));
+						if (voice.envelope <= 0.0f)
+						{
+							voice.envelope = 0.0f;
+							voice.active = false;
+						}
+					}
+					else
+					{
+						voice.envelope -= decayStep;
+						if (voice.envelope <= patch.sustainLevel)
+						{
+							voice.envelope = patch.sustainLevel;
+							voice.stage = SES_sustain;
+						}
 					}
 					break;
 				case SES_release:
@@ -296,12 +355,61 @@ void renderSynthSessions(DriverState const &driver, float *const *outputs, int o
 					break;
 
 				double const phase = voice.phase;
-				float sample = static_cast<float>(
-					std::sin(phase) +
-					patch.harmonic2 * std::sin(phase * 2.0) +
-					patch.harmonic3 * std::sin(phase * 3.0) +
-					patch.harmonic4 * std::sin(phase * 4.0) +
-					0.18 * std::sin(voice.detunedPhase));
+				double const detunedPhase = voice.detunedPhase;
+				float const noise = nextSynthNoise(voice);
+				float const sine = static_cast<float>(std::sin(phase));
+				float sample = 0.0f;
+				switch (patch.toneModel)
+				{
+				case STM_strings:
+					sample = 0.62f * synthSaw(phase) + 0.38f * synthSaw(detunedPhase) + patch.noiseAmount * noise;
+					break;
+				case STM_reed:
+					sample = 0.72f * synthSquare(phase) + 0.18f * sine + patch.noiseAmount * noise;
+					break;
+				case STM_brass:
+					sample = std::tanh((1.25f + voice.envelope) * (0.78f * synthSaw(phase) + 0.32f * sine));
+					break;
+				case STM_flute:
+					sample = 0.94f * sine + 0.08f * static_cast<float>(std::sin(phase * 2.0)) + patch.noiseAmount * noise;
+					break;
+				case STM_horn:
+					sample = 0.74f * synthTriangle(phase) + 0.26f * static_cast<float>(std::sin(phase * 2.0)) + patch.noiseAmount * noise;
+					break;
+				case STM_pluck:
+					sample = 0.58f * synthTriangle(phase) + 0.32f * synthSaw(detunedPhase) + patch.noiseAmount * noise;
+					break;
+				case STM_percussion:
+					sample = patch.noiseAmount * noise + 0.42f * static_cast<float>(std::sin(phase * (1.0 + 2.8 * voice.envelope)));
+					break;
+				case STM_metallicBox:
+					sample = 0.88f * sine * static_cast<float>(std::sin(voice.modulationPhase)) + 0.22f * synthSquare(phase) + patch.noiseAmount * noise;
+					break;
+				case STM_organ:
+					sample = static_cast<float>(0.62 * std::sin(phase) + 0.30 * std::sin(phase * 2.0) + 0.20 * std::sin(phase * 3.0) + 0.13 * std::sin(phase * 4.0) + 0.09 * std::sin(phase * 6.0));
+					break;
+				case STM_mandoviol:
+					sample = 0.72f * synthSaw(phase) + 0.25f * synthSaw(detunedPhase) + patch.noiseAmount * noise;
+					break;
+				case STM_bells:
+					sample = static_cast<float>(std::sin(phase + patch.modulationDepth * voice.envelope * std::sin(voice.modulationPhase)) + 0.18 * std::sin(phase * 3.01));
+					break;
+				case STM_flanged:
+					sample = 0.72f * synthSaw(phase) - 0.52f * synthSaw(detunedPhase) + 0.28f * sine + patch.noiseAmount * noise;
+					break;
+				case STM_valahorn:
+					sample = std::tanh(1.35f * static_cast<float>(std::sin(phase) + 0.52 * std::sin(phase * 2.0) + 0.22 * std::sin(phase * 3.0)));
+					break;
+				case STM_downeyBox:
+					sample = 0.58f * synthSquare(phase) + 0.30f * sine * static_cast<float>(std::sin(voice.modulationPhase)) + patch.noiseAmount * noise;
+					break;
+				}
+
+				float filterCoefficient = patch.filterCoefficient;
+				if (patch.oneShot && patch.toneModel != STM_bells)
+					filterCoefficient *= 0.18f + 0.82f * voice.envelope;
+				voice.filterState += filterCoefficient * (sample - voice.filterState);
+				sample = voice.filterState;
 				sample *= voice.envelope * voice.velocity * patch.gain * driver.masterVolume;
 				outputs[0][frame] += sample;
 				if (outputChannels > 1 && outputs[1])
@@ -309,10 +417,13 @@ void renderSynthSessions(DriverState const &driver, float *const *outputs, int o
 
 				voice.phase += phaseStep;
 				voice.detunedPhase += detunedStep;
+				voice.modulationPhase += phaseStep * patch.modulationRatio;
 				if (voice.phase >= twoPi)
 					voice.phase = std::fmod(voice.phase, twoPi);
 				if (voice.detunedPhase >= twoPi)
 					voice.detunedPhase = std::fmod(voice.detunedPhase, twoPi);
+				if (voice.modulationPhase >= twoPi)
+					voice.modulationPhase = std::fmod(voice.modulationPhase, twoPi);
 			}
 		}
 	}
@@ -1275,6 +1386,7 @@ void ClientAudioMidi::synthNoteOn(unsigned long long performerId, int channel, i
 	selected->note = note;
 	selected->velocity = static_cast<float>(velocity) / 127.0f;
 	selected->age = session.nextVoiceAge++;
+	selected->noiseState ^= static_cast<std::uint32_t>(note * 2654435761u) ^ static_cast<std::uint32_t>(selected->age);
 }
 
 void ClientAudioMidi::synthNoteOff(unsigned long long performerId, int channel, int note)
