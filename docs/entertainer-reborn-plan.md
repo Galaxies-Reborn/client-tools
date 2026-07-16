@@ -1,9 +1,9 @@
 # Entertainer Reborn Integration Plan
 
 Status: Phase 1 implementation is in progress. Midi to Flourish now includes
-the command path, persistent input settings, native options page, and compact
-HUD; song selection, the live-note sampler/network protocol, and MIDI file
-player remain planned below.
+learned-song selection, server-confirmed activation, persistent input settings,
+a native options page, and a compact HUD. The live-note sampler/network
+protocol and MIDI file player remain planned below.
 
 Baseline: `x64-dx9-vanilla` at commit
 `9fdf07779f9cfe93625ec19d42a0d4af82f81266`.
@@ -15,7 +15,10 @@ The first buildable vertical slice currently provides:
 - JUCE MIDI input discovery, selection, hot callback queuing, and game-thread
   event polling through the client audio library;
 - `PerformanceModeManager` lifecycle and performance-only keyboard interception;
-- `/startMidiToFlourish <song>` using the existing `/startMusic` authority path;
+- `/startMidiToFlourish` with a localized picker populated from the character's
+  learned `startMusic+...` commands, plus the explicit `<song>` form for macros;
+- pending, confirmed, stopped, and timed-out lifecycle states driven by the
+  local character's server-replicated performance type;
 - MIDI notes C4 through G4 and keys Q through I mapped to flourishes 1 through 8;
 - `/stopPerformanceMode`, Escape-to-stop, flourish debounce, text-input exclusion,
   and input-reset handling;
@@ -26,8 +29,9 @@ The first buildable vertical slice currently provides:
 - a native Performance options page with eight independent keyboard and MIDI
   note mappings, device refresh/selection, octave shift, conflict feedback,
   reset defaults, and normal Options Apply/Cancel behavior;
-- a movable compact Midi to Flourish HUD with song, device, octave, eight
-  clickable flourish controls, settings access, and a unified Stop control.
+- a movable compact Midi to Flourish HUD with starting/failure feedback, song,
+  device, octave, eight clickable flourish controls, settings access, and a
+  unified Stop control.
 
 This milestone intentionally has no new server protocol. It uses the existing
 `startMusic`, `flourish`, and `stopMusic` commands already in the vanilla

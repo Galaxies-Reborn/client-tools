@@ -21,7 +21,8 @@ SwgCuiPerformanceHud::SwgCuiPerformanceHud(UIPage &page) :
 	m_octaveText(0),
 	m_settingsButton(0),
 	m_stopButton(0),
-	m_updateTimer(0.0f)
+	m_updateTimer(0.0f),
+	m_failureTimer(0.0f)
 {
 	getCodeDataObject(TUIText, m_modeText, "mode");
 	getCodeDataObject(TUIText, m_songText, "song");
@@ -56,7 +57,7 @@ SwgCuiPerformanceHud::~SwgCuiPerformanceHud()
 
 void SwgCuiPerformanceHud::performActivate()
 {
-	if (!PerformanceModeManager::isActive())
+	if (!PerformanceModeManager::hasPerformanceMode())
 	{
 		deactivate();
 		return;
@@ -64,6 +65,7 @@ void SwgCuiPerformanceHud::performActivate()
 	setIsUpdating(true);
 	CuiManager::requestPointer(true);
 	m_updateTimer = 0.0f;
+	m_failureTimer = 0.0f;
 	updateDisplay();
 }
 
@@ -76,9 +78,21 @@ void SwgCuiPerformanceHud::performDeactivate()
 void SwgCuiPerformanceHud::update(float deltaTimeSecs)
 {
 	CuiMediator::update(deltaTimeSecs);
-	if (!PerformanceModeManager::isActive())
+	if (!PerformanceModeManager::hasPerformanceMode())
 	{
-		closeThroughWorkspace();
+		if (PerformanceModeManager::getStatusMessage().find("Server did not start") == 0)
+		{
+			if (m_failureTimer <= 0.0f)
+			{
+				m_failureTimer = 4.0f;
+				updateDisplay();
+			}
+			m_failureTimer -= deltaTimeSecs;
+			if (m_failureTimer <= 0.0f)
+				closeThroughWorkspace();
+		}
+		else
+			closeThroughWorkspace();
 		return;
 	}
 
@@ -113,11 +127,15 @@ void SwgCuiPerformanceHud::OnButtonPressed(UIWidget *context)
 
 void SwgCuiPerformanceHud::updateDisplay()
 {
-	m_modeText->SetLocalText(Unicode::narrowToWide("MIDI TO FLOURISH"));
-	m_songText->SetLocalText(Unicode::narrowToWide(PerformanceModeManager::getSongName()));
+	bool const pending = PerformanceModeManager::isPending();
+	bool const failed = !PerformanceModeManager::hasPerformanceMode();
+	m_modeText->SetLocalText(Unicode::narrowToWide(failed ? "START FAILED" : (pending ? "STARTING..." : "MIDI TO FLOURISH")));
+	m_songText->SetLocalText(Unicode::narrowToWide(failed ? "Not started" : PerformanceModeManager::getSongName()));
 	std::string const &device = PerformanceModeManager::getMidiDeviceName();
-	m_deviceText->SetLocalText(Unicode::narrowToWide(device.empty() ? "Keyboard input" : device));
+	m_deviceText->SetLocalText(Unicode::narrowToWide(failed ? "Server rejected or timed out" : (pending ? PerformanceModeManager::getStatusMessage() : (device.empty() ? "Keyboard input" : device))));
 	char octave[32];
 	snprintf(octave, sizeof(octave), "Octave %+d", PerformanceModeManager::getMidiOctaveShift());
 	m_octaveText->SetLocalText(Unicode::narrowToWide(octave));
+	for (int i = 0; i < 8; ++i)
+		m_flourishButtons[i]->SetEnabled(!pending && !failed);
 }

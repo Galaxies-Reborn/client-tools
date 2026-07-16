@@ -2,6 +2,8 @@
 #include "clientGame/PerformanceModeManager.h"
 
 #include "clientGame/ClientCommandQueue.h"
+#include "clientGame/CreatureObject.h"
+#include "clientGame/Game.h"
 #include "sharedDebug/InstallTimer.h"
 #include "sharedFoundation/ExitChain.h"
 #include "sharedFoundation/NetworkId.h"
@@ -21,10 +23,13 @@ namespace PerformanceModeManagerNamespace
 {
 	bool s_installed = false;
 	PerformanceModeManager::Mode s_mode = PerformanceModeManager::M_none;
+	PerformanceModeManager::Mode s_pendingMode = PerformanceModeManager::M_none;
 	std::string s_songName;
+	std::string s_statusMessage;
 	std::string s_midiDeviceName;
 	std::string s_midiDeviceIdentifier;
 	float s_flourishCooldown = 0.0f;
+	float s_pendingTimeout = 0.0f;
 	bool s_keyHeld[8] = {false, false, false, false, false, false, false, false};
 
 	int const s_defaultFlourishMidiNotes[8] = {60, 61, 62, 63, 64, 65, 66, 67};
@@ -33,6 +38,7 @@ namespace PerformanceModeManagerNamespace
 	int s_flourishKeys[8] = {DIK_Q, DIK_W, DIK_E, DIK_R, DIK_T, DIK_Y, DIK_U, DIK_I};
 	int s_midiOctaveShift = 0;
 	float const s_minimumFlourishInterval = 0.12f;
+	float const s_serverConfirmationTimeout = 8.0f;
 	int const s_optionVersion = 1;
 	char const * const s_userOptionSection = "ClientGame/EntertainerReborn";
 	char const * const s_machineOptionSection = "ClientGame/EntertainerRebornMidi";
@@ -69,6 +75,53 @@ namespace PerformanceModeManagerNamespace
 				s_flourishMidiNotes[i] = s_defaultFlourishMidiNotes[i];
 		}
 		s_midiOctaveShift = std::max(-4, std::min(4, s_midiOctaveShift));
+	}
+
+	void closeMidiInput()
+	{
+#if defined(_WIN64)
+		ClientAudioMidi::closeInput();
+#endif
+	}
+
+	void clearModeState()
+	{
+		closeMidiInput();
+		s_mode = PerformanceModeManager::M_none;
+		s_pendingMode = PerformanceModeManager::M_none;
+		s_songName.clear();
+		s_pendingTimeout = 0.0f;
+		s_flourishCooldown = 0.0f;
+		resetHeldKeys();
+	}
+
+	void activatePendingMode()
+	{
+		s_mode = s_pendingMode;
+		s_pendingMode = PerformanceModeManager::M_none;
+		s_pendingTimeout = 0.0f;
+		s_flourishCooldown = 0.0f;
+		resetHeldKeys();
+
+#if defined(_WIN64)
+		std::string midiStatus;
+		bool midiOpened = false;
+		if (!s_midiDeviceIdentifier.empty())
+			midiOpened = ClientAudioMidi::openInput(s_midiDeviceIdentifier, midiStatus);
+		if (!midiOpened)
+		{
+			midiOpened = ClientAudioMidi::openFirstAvailableInput(s_midiDeviceName, midiStatus);
+			if (midiOpened)
+				s_midiDeviceIdentifier = ClientAudioMidi::getOpenInputIdentifier();
+		}
+		if (midiOpened)
+			s_statusMessage = "Midi to Flourish active with " + s_midiDeviceName + ".";
+		else
+			s_statusMessage = "Midi to Flourish active. " + midiStatus + ". Keyboard input remains available.";
+#else
+		s_midiDeviceName.clear();
+		s_statusMessage = "Midi to Flourish active. Keyboard input is available; MIDI requires the x64 client.";
+#endif
 	}
 }
 
@@ -113,8 +166,35 @@ void PerformanceModeManager::remove()
 
 void PerformanceModeManager::alter(float elapsedTime)
 {
-	if (!s_installed || s_mode == M_none)
+	if (!s_installed)
 		return;
+
+	CreatureObject const * const player = Game::getPlayerCreature();
+	if (s_pendingMode != M_none)
+	{
+		if (player && player->getPerformanceType() > 0)
+			activatePendingMode();
+		else
+		{
+			s_pendingTimeout -= elapsedTime;
+			if (s_pendingTimeout <= 0.0f)
+			{
+				clearModeState();
+				s_statusMessage = "Server did not start the selected performance. Check your instrument, skill, and current state.";
+			}
+			return;
+		}
+	}
+
+	if (s_mode == M_none)
+		return;
+
+	if (!player || player->getPerformanceType() == 0)
+	{
+		clearModeState();
+		s_statusMessage = "Performance ended.";
+		return;
+	}
 
 	s_flourishCooldown = std::max(0.0f, s_flourishCooldown - elapsedTime);
 
@@ -189,52 +269,53 @@ bool PerformanceModeManager::startMidiToFlourish(std::string const &songName, st
 		return false;
 	}
 
-	if (s_mode != M_none)
-		stopPerformanceMode(true);
+	CreatureObject const * const player = Game::getPlayerCreature();
+	if (!player)
+	{
+		statusMessage = "Enter the game before starting a performance";
+		return false;
+	}
+	if (hasPerformanceMode() || player->getPerformanceType() != 0)
+	{
+		statusMessage = "Stop the current performance before starting Midi to Flourish";
+		return false;
+	}
 
-	IGNORE_RETURN(ClientCommandQueue::enqueueCommand("startMusic", NetworkId::cms_invalid, Unicode::narrowToWide(songName)));
-	s_mode = M_midiToFlourish;
-	s_songName = songName;
+	std::vector<std::string> const songs = getAvailableMusicSongs();
+	std::string selectedSong;
+	for (std::vector<std::string>::const_iterator i = songs.begin(); i != songs.end(); ++i)
+		if (_stricmp(i->c_str(), songName.c_str()) == 0)
+		{
+			selectedSong = *i;
+			break;
+		}
+	if (selectedSong.empty())
+	{
+		statusMessage = "That character has not learned the selected music song";
+		return false;
+	}
+
+	IGNORE_RETURN(ClientCommandQueue::enqueueCommand("startMusic", NetworkId::cms_invalid, Unicode::narrowToWide(selectedSong)));
+	s_pendingMode = M_midiToFlourish;
+	s_songName = selectedSong;
+	s_pendingTimeout = s_serverConfirmationTimeout;
 	s_flourishCooldown = 0.0f;
 	resetHeldKeys();
-
-#if defined(_WIN64)
-	std::string midiStatus;
-	bool midiOpened = false;
-	if (!s_midiDeviceIdentifier.empty())
-		midiOpened = ClientAudioMidi::openInput(s_midiDeviceIdentifier, midiStatus);
-	if (!midiOpened)
-	{
-		midiOpened = ClientAudioMidi::openFirstAvailableInput(s_midiDeviceName, midiStatus);
-		if (midiOpened)
-			s_midiDeviceIdentifier = ClientAudioMidi::getOpenInputIdentifier();
-	}
-	if (midiOpened)
-		statusMessage = "Midi to Flourish started with " + s_midiDeviceName + ". MIDI C4-G4 and keys Q-I trigger flourishes 1-8.";
-	else
-		statusMessage = "Midi to Flourish started. " + midiStatus + ". Keys Q-I trigger flourishes 1-8.";
-#else
-	s_midiDeviceName.clear();
-	statusMessage = "Midi to Flourish started. Keys Q-I trigger flourishes 1-8; MIDI requires the x64 client.";
-#endif
+	s_statusMessage = "Waiting for the server to start " + selectedSong + "...";
+	statusMessage = s_statusMessage;
 	return true;
 }
 
 void PerformanceModeManager::stopPerformanceMode(bool sendServerStop)
 {
-	if (s_mode == M_none)
+	if (!hasPerformanceMode())
 		return;
 
-#if defined(_WIN64)
-	ClientAudioMidi::closeInput();
-#endif
 	if (sendServerStop)
 		IGNORE_RETURN(ClientCommandQueue::enqueueCommand("stopMusic", NetworkId::cms_invalid, Unicode::emptyString));
 
-	s_mode = M_none;
-	s_songName.clear();
-	s_flourishCooldown = 0.0f;
-	resetHeldKeys();
+	clearModeState();
+	s_statusMessage = "Performance mode stopped.";
 }
 
 bool PerformanceModeManager::triggerFlourish(int flourishNumber)
@@ -259,9 +340,42 @@ bool PerformanceModeManager::isActive()
 	return s_mode != M_none;
 }
 
+bool PerformanceModeManager::isPending()
+{
+	return s_pendingMode != M_none;
+}
+
+bool PerformanceModeManager::hasPerformanceMode()
+{
+	return isActive() || isPending();
+}
+
 std::string const &PerformanceModeManager::getSongName()
 {
 	return s_songName;
+}
+
+std::string const &PerformanceModeManager::getStatusMessage()
+{
+	return s_statusMessage;
+}
+
+std::vector<std::string> PerformanceModeManager::getAvailableMusicSongs()
+{
+	std::vector<std::string> result;
+	CreatureObject const * const player = Game::getPlayerCreature();
+	if (!player)
+		return result;
+
+	std::string const prefix = "startmusic+";
+	std::map<std::string, int> const &commands = player->getCommands();
+	for (std::map<std::string, int>::const_iterator i = commands.begin(); i != commands.end(); ++i)
+	{
+		std::string const lowerCommand = Unicode::toLower(i->first);
+		if (lowerCommand.compare(0, prefix.size(), prefix) == 0 && i->first.size() > prefix.size())
+			result.push_back(i->first.substr(prefix.size()));
+	}
+	return result;
 }
 
 std::string const &PerformanceModeManager::getMidiDeviceName()

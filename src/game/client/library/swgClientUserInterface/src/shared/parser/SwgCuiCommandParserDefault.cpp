@@ -1863,6 +1863,13 @@ bool SwgCuiCommandParserDefault::performParsing (const NetworkId & userId, const
 
 	else if (isCommand(argv[0], Commands::startMidiToFlourish))
 	{
+		if (argv.size() == 1)
+		{
+			IGNORE_RETURN(CuiMediatorFactory::activateInWorkspace(CuiMediatorTypes::WS_PerformanceSongPicker));
+			result += Unicode::narrowToWide("Choose a learned song to start Midi to Flourish.");
+			return true;
+		}
+
 		std::string songName;
 		for (size_t i = 1; i < argv.size(); ++i)
 		{
@@ -1883,7 +1890,7 @@ bool SwgCuiCommandParserDefault::performParsing (const NetworkId & userId, const
 
 	else if (isCommand(argv[0], Commands::stopPerformanceMode))
 	{
-		if (PerformanceModeManager::isActive())
+		if (PerformanceModeManager::hasPerformanceMode())
 		{
 			PerformanceModeManager::stopPerformanceMode(true);
 			result += Unicode::narrowToWide("Performance mode stopped.");

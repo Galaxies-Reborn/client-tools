@@ -33,7 +33,11 @@ public:
 
 	static Mode getMode();
 	static bool isActive();
+	static bool isPending();
+	static bool hasPerformanceMode();
 	static std::string const &getSongName();
+	static std::string const &getStatusMessage();
+	static std::vector<std::string> getAvailableMusicSongs();
 	static std::string const &getMidiDeviceName();
 	static std::vector<MidiDevice> getMidiDevices();
 	static bool selectMidiDevice(std::string const &identifier, std::string &statusMessage);

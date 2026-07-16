@@ -34,6 +34,7 @@ private:
 	UIButton *m_settingsButton;
 	UIButton *m_stopButton;
 	float m_updateTimer;
+	float m_failureTimer;
 };
 
 #endif

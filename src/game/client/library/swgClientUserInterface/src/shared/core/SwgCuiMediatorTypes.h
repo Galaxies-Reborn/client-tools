@@ -98,6 +98,7 @@ namespace CuiMediatorTypes
 	MAKE_MEDIATOR_TYPE (WS_LocationDisplay);
 	MAKE_MEDIATOR_TYPE (WS_DpsMeter);
 	MAKE_MEDIATOR_TYPE (WS_PerformanceHud);
+	MAKE_MEDIATOR_TYPE (WS_PerformanceSongPicker);
 	MAKE_MEDIATOR_TYPE (WS_KillMeter);
 	MAKE_MEDIATOR_TYPE (WS_BuffBuilderBuffer);
 	MAKE_MEDIATOR_TYPE (WS_BuffBuilderBuffee);
