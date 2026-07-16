@@ -1106,6 +1106,130 @@ void ClientAudioMidi::clearEvents()
 	s_midiEvents.clear();
 }
 
+bool ClientAudioMidi::loadMidiSequence(std::string const &filePath, std::vector<ClientAudioMidiEvent> &events, ClientAudioMidiSequenceInfo &info, std::string &errorMessage)
+{
+	events.clear();
+	info = ClientAudioMidiSequenceInfo();
+	errorMessage.clear();
+
+	int64 const maximumFileBytes = 4 * 1024 * 1024;
+	int const maximumTracks = 64;
+	size_t const maximumEvents = 50000;
+	double const maximumDurationSeconds = 30.0 * 60.0;
+	size_t const maximumEventsPerSecond = 160;
+
+	juce::File const file(juce::String::fromUTF8(filePath.c_str()));
+	juce::FileInputStream input(file);
+	if (!input.openedOk())
+	{
+		errorMessage = "Could not open the MIDI file";
+		return false;
+	}
+	if (input.getTotalLength() <= 0 || input.getTotalLength() > maximumFileBytes)
+	{
+		errorMessage = "MIDI files must be between 1 byte and 4 MiB";
+		return false;
+	}
+
+	juce::MidiFile midiFile;
+	int fileType = -1;
+	if (!midiFile.readFrom(input, true, &fileType))
+	{
+		errorMessage = "The file is not a valid Standard MIDI File";
+		return false;
+	}
+	if (fileType != 0 && fileType != 1)
+	{
+		errorMessage = "Only Standard MIDI File formats 0 and 1 are supported";
+		return false;
+	}
+	if (midiFile.getNumTracks() < 1 || midiFile.getNumTracks() > maximumTracks)
+	{
+		errorMessage = "MIDI files must contain between 1 and 64 tracks";
+		return false;
+	}
+
+	midiFile.convertTimestampTicksToSeconds();
+	bool hasNoteOn = false;
+	for (int trackIndex = 0; trackIndex < midiFile.getNumTracks(); ++trackIndex)
+	{
+		juce::MidiMessageSequence const * const track = midiFile.getTrack(trackIndex);
+		if (!track)
+			continue;
+		for (int eventIndex = 0; eventIndex < track->getNumEvents(); ++eventIndex)
+		{
+			juce::MidiMessage const &message = track->getEventPointer(eventIndex)->message;
+			ClientAudioMidiEvent event = {};
+			if (message.isNoteOn())
+			{
+				event.type = ClientAudioMidiEvent::T_noteOn;
+				event.note = message.getNoteNumber();
+				event.value = message.getVelocity();
+				hasNoteOn = true;
+			}
+			else if (message.isNoteOff())
+			{
+				event.type = ClientAudioMidiEvent::T_noteOff;
+				event.note = message.getNoteNumber();
+				event.value = message.getVelocity();
+			}
+			else if (message.isController() && (message.getControllerNumber() == 64 || message.getControllerNumber() == 120 || message.getControllerNumber() == 123))
+			{
+				event.type = ClientAudioMidiEvent::T_controlChange;
+				event.note = message.getControllerNumber();
+				event.value = message.getControllerValue();
+			}
+			else
+				continue;
+
+			event.channel = message.getChannel();
+			event.timestampSeconds = message.getTimeStamp();
+			if (!std::isfinite(event.timestampSeconds) || event.timestampSeconds < 0.0 || event.timestampSeconds > maximumDurationSeconds)
+			{
+				errorMessage = "MIDI duration must not exceed 30 minutes";
+				events.clear();
+				return false;
+			}
+			events.push_back(event);
+			if (events.size() > maximumEvents)
+			{
+				errorMessage = "MIDI files may contain at most 50,000 playable events";
+				events.clear();
+				return false;
+			}
+		}
+	}
+
+	if (!hasNoteOn)
+	{
+		errorMessage = "The MIDI file does not contain any playable notes";
+		events.clear();
+		return false;
+	}
+
+	std::stable_sort(events.begin(), events.end(), [](ClientAudioMidiEvent const &a, ClientAudioMidiEvent const &b)
+	{
+		return a.timestampSeconds < b.timestampSeconds;
+	});
+	for (size_t first = 0, current = 0; current < events.size(); ++current)
+	{
+		while (first < current && events[current].timestampSeconds - events[first].timestampSeconds >= 1.0)
+			++first;
+		if (current - first + 1 > maximumEventsPerSecond)
+		{
+			errorMessage = "MIDI event density exceeds the multiplayer limit of 160 events per second";
+			events.clear();
+			return false;
+		}
+	}
+
+	info.fileType = fileType;
+	info.trackCount = midiFile.getNumTracks();
+	info.eventCount = static_cast<int>(events.size());
+	info.durationSeconds = events.back().timestampSeconds;
+	return true;
+}
+
 void ClientAudioMidi::startSynthSession(unsigned long long performerId, int instrumentId)
 {
 	std::lock_guard<std::recursive_mutex> lock(s_mutex);

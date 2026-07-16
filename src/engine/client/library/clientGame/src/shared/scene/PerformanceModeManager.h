@@ -29,8 +29,10 @@ public:
 
 	static bool startMidiToFlourish(std::string const &songName, std::string &statusMessage);
 	static bool startMidiToMusic(std::string &statusMessage);
+	static bool startMusicFromScript(std::string const &fileName, std::string &statusMessage);
 	static void stopPerformanceMode(bool sendServerStop = true);
 	static bool triggerFlourish(int flourishNumber);
+	static bool toggleScriptPaused();
 
 	static Mode getMode();
 	static Mode getRequestedMode();
@@ -40,8 +42,14 @@ public:
 	static std::string const &getSongName();
 	static std::string const &getStatusMessage();
 	static std::vector<std::string> getAvailableMusicSongs();
+	static std::vector<std::string> getAvailableMidiScripts();
+	static std::string getMidiDirectory();
 	static std::string const &getMidiDeviceName();
 	static std::string const &getInstrumentName();
+	static std::string const &getScriptFileName();
+	static double getScriptPositionSeconds();
+	static double getScriptDurationSeconds();
+	static bool isScriptPaused();
 	static std::vector<MidiDevice> getMidiDevices();
 	static bool selectMidiDevice(std::string const &identifier, std::string &statusMessage);
 

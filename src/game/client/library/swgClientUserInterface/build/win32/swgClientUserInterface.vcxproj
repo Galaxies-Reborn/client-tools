@@ -931,6 +931,10 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
     </ClCompile>
+    <ClCompile Include="..\..\src\shared\page\SwgCuiPerformanceScriptPicker.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
+    </ClCompile>
     <ClCompile Include="..\..\src\shared\page\SwgCuiPerformanceSongPicker.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
@@ -1403,6 +1407,7 @@
     <ClInclude Include="..\..\src\shared\page\SwgCuiDeleteAvatarConfirmation.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiDpsMeter.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiPerformanceHud.h" />
+    <ClInclude Include="..\..\src\shared\page\SwgCuiPerformanceScriptPicker.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiPerformanceSongPicker.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiDroidCommand.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiExamine.h" />

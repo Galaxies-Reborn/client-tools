@@ -188,6 +188,9 @@ foreach ($file in $runtimeFiles) {
     Copy-Item -LiteralPath $file.Source -Destination (Join-Path $clientRootPath $file.Name) -Force
 }
 
+$midiDirectory = Join-Path $clientRootPath "midi"
+New-Item -ItemType Directory -Path $midiDirectory -Force | Out-Null
+
 $gitCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $gitBranch = (& git -C $repoRoot branch --show-current).Trim()
 $workingTreeDirty = @(& git -C $repoRoot status --porcelain).Count -gt 0
@@ -216,6 +219,7 @@ $manifest = [ordered]@{
     rootTreCount     = $treFiles.Count
     inputBackend     = "SDL 3.4.10 multi-device controller input"
     audioBackend     = "JUCE 8.0.14 with WASAPI and WAV/MP3/Ogg decoders"
+    midiDirectory    = $midiDirectory
     backupDirectory  = $backupDirectory
     removedIncompatibleLocalFiles = @($incompatibleLocalPaths | ForEach-Object { [IO.Path]::GetFileName($_) })
     removedObsoleteRuntimeFiles = @($obsoleteRuntimePaths | ForEach-Object { [IO.Path]::GetFileName($_) })

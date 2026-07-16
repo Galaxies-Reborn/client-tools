@@ -8,6 +8,7 @@
 #include "sharedDebug/InstallTimer.h"
 #include "sharedFoundation/ExitChain.h"
 #include "sharedFoundation/NetworkId.h"
+#include "sharedFoundation/Os.h"
 #include "sharedIoWin/IoWin.h"
 #include "sharedUtility/CurrentUserOptionManager.h"
 #include "sharedUtility/LocalMachineOptionManager.h"
@@ -19,6 +20,8 @@
 #include "UnicodeUtils.h"
 #include "PerformanceMidiMessage.h"
 
+#include <algorithm>
+#include <cstdio>
 #include <dinput.h>
 
 namespace PerformanceModeManagerNamespace
@@ -31,7 +34,16 @@ namespace PerformanceModeManagerNamespace
 	std::string s_midiDeviceName;
 	std::string s_midiDeviceIdentifier;
 	std::string s_instrumentName;
+	std::string s_scriptFileName;
 	int s_instrumentId = 0;
+	double s_scriptPositionSeconds = 0.0;
+	double s_scriptDurationSeconds = 0.0;
+	float s_scriptEventBudget = 0.0f;
+	bool s_scriptPaused = false;
+#if defined(_WIN64)
+	std::vector<ClientAudioMidiEvent> s_scriptEvents;
+	size_t s_scriptEventIndex = 0;
+#endif
 	float s_flourishCooldown = 0.0f;
 	float s_pendingTimeout = 0.0f;
 	bool s_keyHeld[8] = {false, false, false, false, false, false, false, false};
@@ -60,6 +72,76 @@ namespace PerformanceModeManagerNamespace
 	int const s_optionVersion = 1;
 	char const * const s_userOptionSection = "ClientGame/EntertainerReborn";
 	char const * const s_machineOptionSection = "ClientGame/EntertainerRebornMidi";
+	float const s_scriptEventsPerSecond = 160.0f;
+
+	bool isSynthMode(PerformanceModeManager::Mode mode)
+	{
+		return mode == PerformanceModeManager::M_midiToMusic || mode == PerformanceModeManager::M_musicFromScript;
+	}
+
+	std::string midiDirectoryPath()
+	{
+		std::string path = Os::getProgramStartupDirectory() ? Os::getProgramStartupDirectory() : ".";
+		while (!path.empty() && (path[path.size() - 1] == '\\' || path[path.size() - 1] == '/'))
+			path.erase(path.size() - 1);
+		return path + "\\midi";
+	}
+
+	bool ensureMidiDirectory(std::string &errorMessage)
+	{
+		std::string const path = midiDirectoryPath();
+		DWORD const attributes = GetFileAttributesA(path.c_str());
+		if (attributes != INVALID_FILE_ATTRIBUTES)
+		{
+			if ((attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 || (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+			{
+				errorMessage = "The client midi path must be a normal directory: " + path;
+				return false;
+			}
+			return true;
+		}
+		if (!CreateDirectoryA(path.c_str(), NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+		{
+			errorMessage = "Could not create the client midi directory: " + path;
+			return false;
+		}
+		return true;
+	}
+
+	bool isMidiFileName(std::string const &fileName)
+	{
+		if (fileName.empty() || fileName.size() > 180 || fileName.find_first_of("\\/:") != std::string::npos)
+			return false;
+		size_t const extension = fileName.find_last_of('.');
+		if (extension == std::string::npos)
+			return false;
+		char const * const value = fileName.c_str() + extension;
+		return _stricmp(value, ".mid") == 0 || _stricmp(value, ".midi") == 0;
+	}
+
+	bool resolveMidiFile(std::string const &fileName, std::string &path, std::string &errorMessage)
+	{
+		if (!isMidiFileName(fileName))
+		{
+			errorMessage = "Choose a .mid or .midi file directly from the client midi directory";
+			return false;
+		}
+		if (!ensureMidiDirectory(errorMessage))
+			return false;
+		path = midiDirectoryPath() + "\\" + fileName;
+		DWORD const attributes = GetFileAttributesA(path.c_str());
+		if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+		{
+			errorMessage = "MIDI file not found: " + fileName;
+			return false;
+		}
+		if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+		{
+			errorMessage = "Linked MIDI files are not allowed";
+			return false;
+		}
+		return true;
+	}
 
 	void resetHeldKeys()
 	{
@@ -127,8 +209,10 @@ namespace PerformanceModeManagerNamespace
 	{
 #if defined(_WIN64)
 		CreatureObject const * const player = Game::getPlayerCreature();
-		if (player && (s_mode == PerformanceModeManager::M_midiToMusic || s_pendingMode == PerformanceModeManager::M_midiToMusic))
+		if (player && (isSynthMode(s_mode) || isSynthMode(s_pendingMode)))
 			PlayerMusicManager::endMidiPerformance(player);
+		s_scriptEvents.clear();
+		s_scriptEventIndex = 0;
 #endif
 		closeMidiInput();
 		s_mode = PerformanceModeManager::M_none;
@@ -138,6 +222,11 @@ namespace PerformanceModeManagerNamespace
 		s_flourishCooldown = 0.0f;
 		s_instrumentId = 0;
 		s_instrumentName.clear();
+		s_scriptFileName.clear();
+		s_scriptPositionSeconds = 0.0;
+		s_scriptDurationSeconds = 0.0;
+		s_scriptEventBudget = 0.0f;
+		s_scriptPaused = false;
 		resetHeldKeys();
 	}
 
@@ -175,6 +264,57 @@ namespace PerformanceModeManagerNamespace
 		sendMidiMessage(PerformanceMidiMessage::T_noteOff, channel, note, 0);
 	}
 
+	void sendAllNotesOff()
+	{
+#if defined(_WIN64)
+		CreatureObject const * const player = Game::getPlayerCreature();
+		if (player)
+			ClientAudioMidi::synthAllNotesOff(static_cast<unsigned long long>(player->getNetworkId().getValue()));
+#endif
+		sendMidiMessage(PerformanceMidiMessage::T_allNotesOff, 0, 0, 0);
+		for (int channel = 0; channel < 16; ++channel)
+			for (int note = 0; note < 128; ++note)
+				s_activeMidiNotes[channel][note] = -1;
+	}
+
+#if defined(_WIN64)
+	void dispatchMidiEvent(ClientAudioMidiEvent const &event)
+	{
+		CreatureObject const * const player = Game::getPlayerCreature();
+		if (!player)
+			return;
+
+		int const channel = std::max(0, std::min(15, event.channel - 1));
+		int const sourceNote = std::max(0, std::min(127, event.note));
+		if (event.type == ClientAudioMidiEvent::T_noteOn && event.value > 0)
+		{
+			int const shiftedNote = std::max(0, std::min(127, sourceNote + s_midiOctaveShift * 12));
+			int const activeNote = s_activeMidiNotes[channel][sourceNote];
+			if (activeNote >= 0 && s_mode != PerformanceModeManager::M_musicFromScript)
+				releaseLocalNote(channel, activeNote);
+			s_activeMidiNotes[channel][sourceNote] = shiftedNote;
+			playLocalNote(channel, shiftedNote, event.value);
+		}
+		else if (event.type == ClientAudioMidiEvent::T_noteOff || (event.type == ClientAudioMidiEvent::T_noteOn && event.value == 0))
+		{
+			int const activeNote = s_activeMidiNotes[channel][sourceNote];
+			if (activeNote >= 0)
+			{
+				releaseLocalNote(channel, activeNote);
+				s_activeMidiNotes[channel][sourceNote] = -1;
+			}
+		}
+		else if (event.type == ClientAudioMidiEvent::T_controlChange && event.note == 64)
+		{
+			unsigned long long const performerId = static_cast<unsigned long long>(player->getNetworkId().getValue());
+			ClientAudioMidi::synthSustain(performerId, channel, event.value >= 64);
+			sendMidiMessage(PerformanceMidiMessage::T_sustain, channel, 0, event.value);
+		}
+		else if (event.type == ClientAudioMidiEvent::T_controlChange && (event.note == 120 || event.note == 123))
+			sendAllNotesOff();
+	}
+#endif
+
 	bool activatePendingMode()
 	{
 		s_mode = s_pendingMode;
@@ -186,15 +326,23 @@ namespace PerformanceModeManagerNamespace
 #if defined(_WIN64)
 		std::string midiStatus;
 		bool midiOpened = false;
-		if (!s_midiDeviceIdentifier.empty())
-			midiOpened = ClientAudioMidi::openInput(s_midiDeviceIdentifier, midiStatus);
-		if (!midiOpened)
+		if (s_mode != PerformanceModeManager::M_musicFromScript)
 		{
-			midiOpened = ClientAudioMidi::openFirstAvailableInput(s_midiDeviceName, midiStatus);
-			if (midiOpened)
-				s_midiDeviceIdentifier = ClientAudioMidi::getOpenInputIdentifier();
+			if (!s_midiDeviceIdentifier.empty())
+				midiOpened = ClientAudioMidi::openInput(s_midiDeviceIdentifier, midiStatus);
+			if (!midiOpened)
+			{
+				midiOpened = ClientAudioMidi::openFirstAvailableInput(s_midiDeviceName, midiStatus);
+				if (midiOpened)
+					s_midiDeviceIdentifier = ClientAudioMidi::getOpenInputIdentifier();
+			}
 		}
-		if (s_mode == PerformanceModeManager::M_midiToMusic)
+		else
+		{
+			ClientAudioMidi::closeInput();
+			ClientAudioMidi::clearEvents();
+		}
+		if (isSynthMode(s_mode))
 		{
 			CreatureObject const * const player = Game::getPlayerCreature();
 			s_instrumentId = PlayerMusicManager::getInstrumentId(player);
@@ -207,7 +355,15 @@ namespace PerformanceModeManagerNamespace
 			s_instrumentName = ClientAudioMidi::getSynthPatchName(s_instrumentId);
 			PlayerMusicManager::beginMidiPerformance(player, s_instrumentId);
 			sendMidiMessage(PerformanceMidiMessage::T_sessionStart, 0, 0, s_instrumentId);
-			if (midiOpened)
+			if (s_mode == PerformanceModeManager::M_musicFromScript)
+			{
+				s_scriptPositionSeconds = 0.0;
+				s_scriptEventIndex = 0;
+				s_scriptEventBudget = s_scriptEventsPerSecond;
+				s_scriptPaused = false;
+				s_statusMessage = "Playing " + s_scriptFileName + " with " + s_instrumentName + ".";
+			}
+			else if (midiOpened)
 				s_statusMessage = "Midi to Music active: " + s_instrumentName + " with " + s_midiDeviceName + ".";
 			else
 				s_statusMessage = "Midi to Music active: " + s_instrumentName + ". " + midiStatus + ".";
@@ -218,7 +374,9 @@ namespace PerformanceModeManagerNamespace
 			s_statusMessage = "Midi to Flourish active. " + midiStatus + ". Keyboard input remains available.";
 #else
 		s_midiDeviceName.clear();
-		s_statusMessage = "Midi to Flourish active. Keyboard input is available; MIDI requires the x64 client.";
+		s_statusMessage = s_mode == PerformanceModeManager::M_midiToFlourish
+			? "Midi to Flourish active. Keyboard input is available; MIDI requires the x64 client."
+			: "This performance mode requires the x64 client.";
 #endif
 		return true;
 	}
@@ -247,6 +405,9 @@ void PerformanceModeManager::install()
 	CurrentUserOptionManager::registerOption(s_midiOctaveShift, s_userOptionSection, "midiOctaveShift", s_optionVersion);
 	LocalMachineOptionManager::registerOption(s_midiDeviceIdentifier, s_machineOptionSection, "inputIdentifier", s_optionVersion);
 	validateOptions();
+	std::string midiDirectoryError;
+	if (!ensureMidiDirectory(midiDirectoryError))
+		s_statusMessage = midiDirectoryError;
 
 #if defined(_WIN64)
 	std::vector<MidiDevice> const devices = getMidiDevices();
@@ -306,6 +467,28 @@ void PerformanceModeManager::alter(float elapsedTime)
 	s_flourishCooldown = std::max(0.0f, s_flourishCooldown - elapsedTime);
 
 #if defined(_WIN64)
+	if (s_mode == M_musicFromScript)
+	{
+		if (!s_scriptPaused)
+		{
+			s_scriptPositionSeconds += std::max(0.0f, elapsedTime);
+			s_scriptEventBudget = std::min(s_scriptEventsPerSecond, s_scriptEventBudget + std::max(0.0f, elapsedTime) * s_scriptEventsPerSecond);
+			int dispatchBudget = 128;
+			while (dispatchBudget-- > 0 && s_scriptEventBudget >= 1.0f && s_scriptEventIndex < s_scriptEvents.size() && s_scriptEvents[s_scriptEventIndex].timestampSeconds <= s_scriptPositionSeconds)
+			{
+				dispatchMidiEvent(s_scriptEvents[s_scriptEventIndex++]);
+				s_scriptEventBudget -= 1.0f;
+			}
+		}
+		if (s_scriptEventIndex >= s_scriptEvents.size() && s_scriptPositionSeconds >= s_scriptDurationSeconds + 0.05)
+		{
+			std::string const completedFile = s_scriptFileName;
+			stopPerformanceMode(true);
+			s_statusMessage = "Completed MIDI script: " + completedFile;
+		}
+		return;
+	}
+
 	ClientAudioMidiEvent event;
 	int eventBudget = 128;
 	while (eventBudget-- > 0 && ClientAudioMidi::pollEvent(event))
@@ -317,36 +500,7 @@ void PerformanceModeManager::alter(float elapsedTime)
 				triggerFlourish(flourish);
 		}
 		else if (s_mode == M_midiToMusic)
-		{
-			CreatureObject const * const localPlayer = Game::getPlayerCreature();
-			if (!localPlayer)
-				continue;
-			int const channel = std::max(0, std::min(15, event.channel - 1));
-			if (event.type == ClientAudioMidiEvent::T_noteOn && event.value > 0)
-			{
-				int const shiftedNote = std::max(0, std::min(127, event.note + s_midiOctaveShift * 12));
-				int const activeNote = s_activeMidiNotes[channel][event.note];
-				if (activeNote >= 0)
-					releaseLocalNote(channel, activeNote);
-				s_activeMidiNotes[channel][event.note] = shiftedNote;
-				playLocalNote(channel, shiftedNote, event.value);
-			}
-			else if (event.type == ClientAudioMidiEvent::T_noteOff || (event.type == ClientAudioMidiEvent::T_noteOn && event.value == 0))
-			{
-				int const activeNote = s_activeMidiNotes[channel][event.note];
-				if (activeNote >= 0)
-				{
-					releaseLocalNote(channel, activeNote);
-					s_activeMidiNotes[channel][event.note] = -1;
-				}
-			}
-			else if (event.type == ClientAudioMidiEvent::T_controlChange && event.note == 64)
-			{
-				unsigned long long const performerId = static_cast<unsigned long long>(localPlayer->getNetworkId().getValue());
-				ClientAudioMidi::synthSustain(performerId, channel, event.value >= 64);
-				sendMidiMessage(PerformanceMidiMessage::T_sustain, channel, 0, event.value);
-			}
-		}
+			dispatchMidiEvent(event);
 	}
 #endif
 }
@@ -528,13 +682,73 @@ bool PerformanceModeManager::startMidiToMusic(std::string &statusMessage)
 	return true;
 }
 
+bool PerformanceModeManager::startMusicFromScript(std::string const &fileName, std::string &statusMessage)
+{
+	statusMessage.clear();
+#if !defined(_WIN64)
+	UNREF(fileName);
+	statusMessage = "Music from Script requires the x64 client";
+	return false;
+#else
+	if (!s_installed)
+	{
+		statusMessage = "The performance system is not installed";
+		return false;
+	}
+	CreatureObject const * const player = Game::getPlayerCreature();
+	if (!player)
+	{
+		statusMessage = "Enter the game before starting a performance";
+		return false;
+	}
+	if (hasPerformanceMode() || player->getPerformanceType() != 0)
+	{
+		statusMessage = "Stop the current performance before starting Music from Script";
+		return false;
+	}
+
+	std::string filePath;
+	if (!resolveMidiFile(fileName, filePath, statusMessage))
+		return false;
+	std::vector<ClientAudioMidiEvent> events;
+	ClientAudioMidiSequenceInfo info = {};
+	if (!ClientAudioMidi::loadMidiSequence(filePath, events, info, statusMessage))
+		return false;
+
+	std::vector<std::string> const songs = getAvailableMusicSongs();
+	if (songs.empty())
+	{
+		statusMessage = "This character has not learned a music song";
+		return false;
+	}
+
+	s_scriptEvents.swap(events);
+	s_scriptEventIndex = 0;
+	s_scriptFileName = fileName;
+	s_scriptPositionSeconds = 0.0;
+	s_scriptDurationSeconds = info.durationSeconds;
+	s_scriptEventBudget = s_scriptEventsPerSecond;
+	s_scriptPaused = false;
+	s_songName = songs.front();
+	IGNORE_RETURN(ClientCommandQueue::enqueueCommand("startMusic", NetworkId::cms_invalid, Unicode::narrowToWide(s_songName)));
+	s_pendingMode = M_musicFromScript;
+	s_pendingTimeout = s_serverConfirmationTimeout;
+	resetHeldKeys();
+	char details[256];
+	snprintf(details, sizeof(details), "Waiting for the server to authorize %s (format %d, %d tracks, %d events, %.1f seconds)...", fileName.c_str(), info.fileType, info.trackCount, info.eventCount, info.durationSeconds);
+	s_statusMessage = details;
+	statusMessage = s_statusMessage;
+	return true;
+#endif
+}
+
 void PerformanceModeManager::stopPerformanceMode(bool sendServerStop)
 {
 	if (!hasPerformanceMode())
 		return;
 
 	CreatureObject const * const player = Game::getPlayerCreature();
-	if (s_mode == M_midiToMusic && player)
+	if (isSynthMode(s_mode) && player)
 	{
 #if defined(_WIN64)
 		unsigned long long const performerId = static_cast<unsigned long long>(player->getNetworkId().getValue());
@@ -564,6 +778,21 @@ bool PerformanceModeManager::triggerFlourish(int flourishNumber)
 	snprintf(parameter, sizeof(parameter), "%d", flourishNumber);
 	IGNORE_RETURN(ClientCommandQueue::enqueueCommand("flourish", NetworkId::cms_invalid, Unicode::narrowToWide(parameter)));
 	s_flourishCooldown = s_minimumFlourishInterval;
+	return true;
+}
+
+bool PerformanceModeManager::toggleScriptPaused()
+{
+	if (s_mode != M_musicFromScript)
+		return false;
+	s_scriptPaused = !s_scriptPaused;
+	if (s_scriptPaused)
+	{
+		sendAllNotesOff();
+		s_statusMessage = "MIDI script paused: " + s_scriptFileName;
+	}
+	else
+		s_statusMessage = "Playing MIDI script: " + s_scriptFileName;
 	return true;
 }
 
@@ -620,6 +849,40 @@ std::vector<std::string> PerformanceModeManager::getAvailableMusicSongs()
 	return result;
 }
 
+std::vector<std::string> PerformanceModeManager::getAvailableMidiScripts()
+{
+	std::vector<std::string> result;
+	std::string errorMessage;
+	if (!ensureMidiDirectory(errorMessage))
+		return result;
+
+	WIN32_FIND_DATAA data = {};
+	std::string const pattern = midiDirectoryPath() + "\\*";
+	HANDLE const search = FindFirstFileA(pattern.c_str(), &data);
+	if (search == INVALID_HANDLE_VALUE)
+		return result;
+	do
+	{
+		std::string const fileName = data.cFileName;
+		if ((data.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) == 0 && isMidiFileName(fileName))
+			result.push_back(fileName);
+	}
+	while (FindNextFileA(search, &data));
+	FindClose(search);
+	std::sort(result.begin(), result.end(), [](std::string const &a, std::string const &b)
+	{
+		return _stricmp(a.c_str(), b.c_str()) < 0;
+	});
+	return result;
+}
+
+std::string PerformanceModeManager::getMidiDirectory()
+{
+	std::string errorMessage;
+	IGNORE_RETURN(ensureMidiDirectory(errorMessage));
+	return midiDirectoryPath();
+}
+
 std::string const &PerformanceModeManager::getMidiDeviceName()
 {
 	return s_midiDeviceName;
@@ -628,6 +891,26 @@ std::string const &PerformanceModeManager::getMidiDeviceName()
 std::string const &PerformanceModeManager::getInstrumentName()
 {
 	return s_instrumentName;
+}
+
+std::string const &PerformanceModeManager::getScriptFileName()
+{
+	return s_scriptFileName;
+}
+
+double PerformanceModeManager::getScriptPositionSeconds()
+{
+	return s_scriptPositionSeconds;
+}
+
+double PerformanceModeManager::getScriptDurationSeconds()
+{
+	return s_scriptDurationSeconds;
+}
+
+bool PerformanceModeManager::isScriptPaused()
+{
+	return s_scriptPaused;
 }
 
 std::vector<PerformanceModeManager::MidiDevice> PerformanceModeManager::getMidiDevices()

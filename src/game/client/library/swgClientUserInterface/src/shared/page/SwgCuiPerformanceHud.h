@@ -31,6 +31,7 @@ private:
 	UIText *m_deviceText;
 	UIText *m_octaveText;
 	UIButton *m_flourishButtons[8];
+	UIButton *m_pauseButton;
 	UIButton *m_settingsButton;
 	UIButton *m_stopButton;
 	float m_updateTimer;

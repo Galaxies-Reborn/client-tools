@@ -26,6 +26,14 @@ struct ClientAudioMidiEvent
 	double timestampSeconds;
 };
 
+struct ClientAudioMidiSequenceInfo
+{
+	int fileType;
+	int trackCount;
+	int eventCount;
+	double durationSeconds;
+};
+
 class ClientAudioMidi
 {
 public:
@@ -37,6 +45,7 @@ public:
 	static std::string getOpenInputIdentifier();
 	static bool pollEvent(ClientAudioMidiEvent &event);
 	static void clearEvents();
+	static bool loadMidiSequence(std::string const &filePath, std::vector<ClientAudioMidiEvent> &events, ClientAudioMidiSequenceInfo &info, std::string &errorMessage);
 
 	static void startSynthSession(unsigned long long performerId, int instrumentId);
 	static void stopSynthSession(unsigned long long performerId);

@@ -1,9 +1,8 @@
 # Entertainer Reborn Integration Plan
 
-Status: Midi to Flourish and the first complete Midi to Music vertical slice
-are implemented. Live keyboard and controller notes use procedural JUCE
-instrument patches and a server-authorized observer relay. The MIDI file player
-remains planned below.
+Status: Initial vertical slices for Midi to Flourish, Midi to Music, and Music
+from Script are implemented. Live and scripted notes use procedural JUCE
+instrument patches and the same server-authorized observer relay.
 
 Baseline: `x64-dx9-vanilla` at commit
 `9fdf07779f9cfe93625ec19d42a0d4af82f81266`.
@@ -380,12 +379,20 @@ Exit criteria: multiple nearby clients hear synchronized live notes, late join
 recovers correctly, out-of-range clients receive nothing, and hostile input is
 bounded by server limits.
 
-### Phase 4 - Music from Script (next)
+### Phase 4 - Music from Script (initial vertical slice implemented)
 
 - Add sandboxed file browsing and Standard MIDI File validation.
 - Implement deterministic tempo-map scheduling and transport controls.
 - Add track selection/muting and per-track channel-to-patch mapping where the
   first patch set supports it.
+
+The implemented slice accepts root-level format 0 and format 1 `.mid`/`.midi`
+files from `<game root>\midi`, converts tempo maps through JUCE, schedules note,
+velocity, sustain, and all-notes-off events, and provides pause/resume, progress,
+completion, and stop recovery. Files are limited to 4 MiB, 64 tracks, 50,000
+playable events, 30 minutes, and 160 events per rolling second. Linked files,
+subdirectories, format 2 files, and malformed input are rejected. Track mixing
+and per-track patch assignment remain future work.
 
 Exit criteria: format 0 and format 1 MIDI files play consistently across clients;
 malformed and oversized files fail safely; pause/resume/stop never leaves notes
@@ -433,7 +440,6 @@ licenses, multiplayer soak test, and signed release manifests.
 
 ## Next implementation slice
 
-Implement Phase 4 as a bounded Standard MIDI File player rooted at the game's
-`midi` directory. Reuse the Midi to Music session/event path so scripted and
-live performances share validation, synthesis, observer playback, and stop
-recovery.
+Run multi-client gameplay validation for all three modes, then add late-join
+state recovery and optional script track controls without changing the validated
+event/session contract.

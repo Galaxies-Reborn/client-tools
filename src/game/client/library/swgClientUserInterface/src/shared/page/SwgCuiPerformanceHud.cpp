@@ -19,6 +19,7 @@ SwgCuiPerformanceHud::SwgCuiPerformanceHud(UIPage &page) :
 	m_songText(0),
 	m_deviceText(0),
 	m_octaveText(0),
+	m_pauseButton(0),
 	m_settingsButton(0),
 	m_stopButton(0),
 	m_updateTimer(0.0f),
@@ -28,6 +29,7 @@ SwgCuiPerformanceHud::SwgCuiPerformanceHud(UIPage &page) :
 	getCodeDataObject(TUIText, m_songText, "song");
 	getCodeDataObject(TUIText, m_deviceText, "device");
 	getCodeDataObject(TUIText, m_octaveText, "octave");
+	getCodeDataObject(TUIButton, m_pauseButton, "pause");
 	getCodeDataObject(TUIButton, m_settingsButton, "settings");
 	getCodeDataObject(TUIButton, m_stopButton, "stop");
 
@@ -35,6 +37,7 @@ SwgCuiPerformanceHud::SwgCuiPerformanceHud(UIPage &page) :
 	m_songText->SetPreLocalized(true);
 	m_deviceText->SetPreLocalized(true);
 	m_octaveText->SetPreLocalized(true);
+	registerMediatorObject(*m_pauseButton, true);
 	registerMediatorObject(*m_settingsButton, true);
 	registerMediatorObject(*m_stopButton, true);
 
@@ -117,6 +120,12 @@ void SwgCuiPerformanceHud::OnButtonPressed(UIWidget *context)
 		IGNORE_RETURN(CuiMediatorFactory::activateInWorkspace(CuiMediatorTypes::WS_Opt));
 		return;
 	}
+	if (context == m_pauseButton)
+	{
+		IGNORE_RETURN(PerformanceModeManager::toggleScriptPaused());
+		updateDisplay();
+		return;
+	}
 	for (int i = 0; i < 8; ++i)
 		if (context == m_flourishButtons[i])
 		{
@@ -131,19 +140,35 @@ void SwgCuiPerformanceHud::updateDisplay()
 	bool const failed = !PerformanceModeManager::hasPerformanceMode();
 	PerformanceModeManager::Mode const mode = PerformanceModeManager::getRequestedMode();
 	bool const midiToMusic = mode == PerformanceModeManager::M_midiToMusic;
-	m_modeText->SetLocalText(Unicode::narrowToWide(failed ? "START FAILED" : (pending ? "STARTING..." : (midiToMusic ? "MIDI TO MUSIC" : "MIDI TO FLOURISH"))));
-	std::string const performanceName = midiToMusic && !PerformanceModeManager::getInstrumentName().empty()
+	bool const musicFromScript = mode == PerformanceModeManager::M_musicFromScript;
+	m_modeText->SetLocalText(Unicode::narrowToWide(failed ? "START FAILED" : (pending ? "STARTING..." : (musicFromScript ? "MUSIC FROM SCRIPT" : (midiToMusic ? "MIDI TO MUSIC" : "MIDI TO FLOURISH")))));
+	std::string const performanceName = musicFromScript
+		? PerformanceModeManager::getScriptFileName()
+		: (midiToMusic && !PerformanceModeManager::getInstrumentName().empty()
 		? PerformanceModeManager::getInstrumentName()
-		: PerformanceModeManager::getSongName();
+		: PerformanceModeManager::getSongName());
 	m_songText->SetLocalText(Unicode::narrowToWide(failed ? "Not started" : performanceName));
 	std::string const &device = PerformanceModeManager::getMidiDeviceName();
-	m_deviceText->SetLocalText(Unicode::narrowToWide(failed ? "Server rejected or timed out" : (pending ? PerformanceModeManager::getStatusMessage() : (device.empty() ? "Keyboard input" : device))));
+	if (musicFromScript && !pending && !failed)
+	{
+		int const position = static_cast<int>(PerformanceModeManager::getScriptPositionSeconds());
+		int const duration = static_cast<int>(PerformanceModeManager::getScriptDurationSeconds());
+		char progress[96];
+		snprintf(progress, sizeof(progress), "%s%d:%02d / %d:%02d", PerformanceModeManager::isScriptPaused() ? "Paused  " : "Playing  ", position / 60, position % 60, duration / 60, duration % 60);
+		m_deviceText->SetLocalText(Unicode::narrowToWide(progress));
+	}
+	else
+		m_deviceText->SetLocalText(Unicode::narrowToWide(failed ? "Server rejected or timed out" : (pending ? PerformanceModeManager::getStatusMessage() : (device.empty() ? "Keyboard input" : device))));
 	char octave[32];
 	snprintf(octave, sizeof(octave), "Octave %+d", PerformanceModeManager::getMidiOctaveShift());
 	m_octaveText->SetLocalText(Unicode::narrowToWide(octave));
 	for (int i = 0; i < 8; ++i)
 	{
 		m_flourishButtons[i]->SetEnabled(!pending && !failed);
-		m_flourishButtons[i]->SetVisible(!midiToMusic);
+		m_flourishButtons[i]->SetVisible(mode == PerformanceModeManager::M_midiToFlourish);
 	}
+	m_pauseButton->SetVisible(musicFromScript);
+	m_pauseButton->SetEnabled(musicFromScript && !pending && !failed);
+	m_pauseButton->SetLocalText(Unicode::narrowToWide(PerformanceModeManager::isScriptPaused() ? "Resume" : "Pause"));
+	m_settingsButton->SetVisible(!musicFromScript);
 }

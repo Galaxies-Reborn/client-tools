@@ -97,6 +97,7 @@
 #include "swgClientUserInterface/SwgCuiPersistentMessageBrowser.h"
 #include "swgClientUserInterface/SwgCuiPersistentMessageComposer.h"
 #include "swgClientUserInterface/SwgCuiPerformanceHud.h"
+#include "swgClientUserInterface/SwgCuiPerformanceScriptPicker.h"
 #include "swgClientUserInterface/SwgCuiPerformanceSongPicker.h"
 #include "swgClientUserInterface/SwgCuiPlanetMap.h"
 #include "swgClientUserInterface/SwgCuiPlayerQuestConversation.h"
@@ -252,6 +253,7 @@ void SwgCuiMediatorFactorySetup::install ()
 	MAKE_SWG_CTOR_WS (LocationDisplay,                "/pda.LocationDisplay");
 	MAKE_SWG_CTOR_WS (DpsMeter,                       "/pda.dpsMeter");
 	MAKE_SWG_CTOR_WS (PerformanceHud,                 "/EntertainerReborn");
+	MAKE_SWG_CTOR_WS (PerformanceScriptPicker,        "/EntertainerRebornScriptPicker");
 	MAKE_SWG_CTOR_WS (PerformanceSongPicker,          "/EntertainerRebornSongPicker");
 	MAKE_SWG_CTOR_WS (Roadmap,                        "/pda.Roadmap");
 	MAKE_SWG_CTOR_WS (Skills,                         "/Skill.skills");
