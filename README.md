@@ -4,6 +4,8 @@ This repository contains the source for the SWG Client as well as the tools that
 ## Build Instructions
 The legacy Win32 projects were originally configured for **Visual Studio 2013**. The regular gameplay client and Qt-based God client now have modern `Release|x64` builds. See the [x64 gameplay client guide](docs/x64-gameplay-client.md) and [God client guide](docs/god-client.md) for prerequisites, commands, outputs, and current runtime limitations.
 
+The proposed MIDI-driven entertainer feature is specified in the [Entertainer Reborn integration plan](docs/entertainer-reborn-plan.md). The plan defines the command, input, audio, asset, and multiplayer contracts; implementation has not started.
+
 The project has 3 configurations for building the applications:
 * **Release** which is the version intended for public dissemination and gameplay. You may recognize this as the `_r` in the client name `SwgClient_r.exe`. 
 * **Optimized** which is similar to the release client but has additional options and displays in-game for testing and is ideal for Quality Assurance or Support related activities. For example, this configuration allows for additional options like targeting static world objects, printing object information in the user interface, and releasing the camera from player attachment for custom views.
