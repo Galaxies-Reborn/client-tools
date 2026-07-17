@@ -90,10 +90,15 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_combatQueueStatus",
             "BIC_equipCdefRifle",
             "BIC_stand",
+            "BIC_queueBodyShot1",
+            "BIC_queueLegShot1",
+            "BIC_equipCdefPistol",
+            "BIC_equipCdefCarbine",
+            "BIC_combatTimerStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 11", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 12", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -336,6 +341,7 @@ $results | ConvertTo-Json -Compress
             "QueueLegShot1": 25,
             "EquipCdefPistol": 26,
             "EquipCdefCarbine": 27,
+            "CombatTimerStatus": 28,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -490,6 +496,7 @@ $results | ConvertTo-Json -Compress
             "QueueCombatCanary",
             "ClearCombatQueue",
             "CombatQueueStatus",
+            "CombatTimerStatus",
             "EquipCdefRifle",
             "QueueBodyShot1",
             "QueueLegShot1",
@@ -507,6 +514,10 @@ $results | ConvertTo-Json -Compress
         self.assertIn("count=$queueCount", self.helper)
         self.assertIn("lastStatus=$lastStatus($lastStatusName)", self.helper)
         self.assertIn("lastDetail=$lastDetail", self.helper)
+        self.assertIn("0x544d0000L", self.helper)
+        self.assertIn("available=true command=$commandName", self.helper)
+        self.assertIn("currentMs=$currentMilliseconds", self.helper)
+        self.assertIn("maxMs=$maxMilliseconds", self.helper)
         self.assertIn("[ValidateRange(1, 16)]", helper_parameters)
         self.assertIn("-Data $Repeat", self.helper)
 
@@ -531,7 +542,8 @@ $results | ConvertTo-Json -Compress
             self.client_main,
             "bool performBackgroundEquipCdefWeapon(char const * const templateSuffix)",
         )
-        self.assertIn('getValueString() != "44003778"', generic_equip)
+        self.assertIn('playerId != "44003778"', generic_equip)
+        self.assertIn('playerId != "39008597"', generic_equip)
         self.assertIn("ContainerInterface::getContainer", generic_equip)
         self.assertIn("strstr(templateName, templateSuffix)", generic_equip)
         self.assertIn("CuiInventoryManager::equipObject", generic_equip)
@@ -540,6 +552,21 @@ $results | ConvertTo-Json -Compress
 
         self.assertIn('performBackgroundSelfCommand("/stand")', window_proc)
         self.assertIn("queued through the production stand command", self.helper)
+
+        timer_query = function_body(
+            self.client_main, "LRESULT getBackgroundCombatTimerStatus()"
+        )
+        self.assertIn("s_backgroundCombatTimerCapture.executeCurrent", timer_query)
+        self.assertIn("s_backgroundCombatTimerCapture.executeMax", timer_query)
+        self.assertNotIn("m_execTime", timer_query)
+        self.assertIn(
+            "PlayerCreatureController::Messages::CommandTimerDataReceived",
+            self.client_main,
+        )
+        self.assertIn(
+            "commandTimerData.getMaxTime(MessageQueueCommandTimer::F_execute)",
+            self.client_main,
+        )
 
     def test_command_queue_preserves_the_last_authoritative_removal_result(self):
         self.assertIn("clearLastCommandRemoval()", self.command_queue_header)
