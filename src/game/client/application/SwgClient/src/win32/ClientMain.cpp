@@ -19,6 +19,7 @@
 #include "clientGame/ClientObject.h"
 #include "clientGame/ContainerInterface.h"
 #include "clientGame/Game.h"
+#include "clientGame/PlayerCreatureController.h"
 #include "clientGame/SetupClientGame.h"
 #include "clientGraphics/Graphics.h"
 #include "clientGraphics/ScreenShotHelper.h"
@@ -53,6 +54,7 @@
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/Branch.h"
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/Binary.h"
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/ConfigFile.h"
+#include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/Crc.h"
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/CrashReportInformation.h"
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/ExitChain.h"
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation//Os.h"
@@ -70,7 +72,9 @@
 #include "sharedMath/VectorArgb.h"
 #include "sharedMemoryManager/MemoryManager.h"
 #include "sharedNetwork/SetupSharedNetwork.h"
+#include "sharedNetworkMessages/MessageQueueCommandTimer.h"
 #include "sharedNetworkMessages/SetupSharedNetworkMessages.h"
+#include "sharedMessageDispatch/Transceiver.h"
 #include "sharedObject/CellProperty.h"
 #include "sharedObject/Container.h"
 #include "sharedObject/Object.h"
@@ -141,20 +145,111 @@ namespace ClientMainNamespace
 		BIC_queueBodyShot1,
 		BIC_queueLegShot1,
 		BIC_equipCdefPistol,
-		BIC_equipCdefCarbine
+		BIC_equipCdefCarbine,
+		BIC_combatTimerStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 11;
+	LRESULT const cms_backgroundInputProtocolVersion = 12;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
 	LRESULT const cms_backgroundCombatQueueStatusCountMask = 0x00003fff;
 	LRESULT const cms_backgroundCombatQueueStatusLastResult = static_cast<LRESULT>(0x0100000000000000LL);
+	LRESULT const cms_backgroundCombatTimerStatusMarker = 0x544d0000;
+	LRESULT const cms_backgroundCombatTimerStatusValid = 0x00000100;
+	enum BackgroundCombatTimerCommand
+	{
+		BCTC_none = 0,
+		BCTC_headShot1,
+		BCTC_bodyShot1,
+		BCTC_legShot1
+	};
+	struct BackgroundCombatTimerCapture
+	{
+		BackgroundCombatTimerCapture() :
+			valid(false),
+			command(BCTC_none),
+			executeCurrent(0.0f),
+			executeMax(0.0f)
+		{
+		}
+
+		bool valid;
+		BackgroundCombatTimerCommand command;
+		float executeCurrent;
+		float executeMax;
+	};
+	class BackgroundCombatTimerReceiver
+	{
+	public:
+		BackgroundCombatTimerReceiver() :
+			m_callback(new MessageDispatch::Callback)
+		{
+			m_callback->connect(
+				*this,
+				&BackgroundCombatTimerReceiver::onCommandTimerDataReceived,
+				static_cast<PlayerCreatureController::Messages::CommandTimerDataReceived *>(0));
+		}
+
+		~BackgroundCombatTimerReceiver()
+		{
+			m_callback->disconnect(
+				*this,
+				&BackgroundCombatTimerReceiver::onCommandTimerDataReceived,
+				static_cast<PlayerCreatureController::Messages::CommandTimerDataReceived *>(0));
+			delete m_callback;
+		}
+
+		void onCommandTimerDataReceived(MessageQueueCommandTimer const & commandTimerData);
+
+	private:
+		BackgroundCombatTimerReceiver(BackgroundCombatTimerReceiver const &);
+		BackgroundCombatTimerReceiver & operator=(BackgroundCombatTimerReceiver const &);
+
+		MessageDispatch::Callback * m_callback;
+	};
 	UINT s_backgroundInputMessage = 0;
 	HWND s_backgroundInputWindow = 0;
 	WNDPROC s_backgroundInputPreviousWindowProc = 0;
 	bool s_backgroundInputInstalled = false;
+	BackgroundCombatTimerCapture s_backgroundCombatTimerCapture;
+	BackgroundCombatTimerReceiver * s_backgroundCombatTimerReceiver = 0;
+
+	void clearBackgroundCombatTimerCapture()
+	{
+		s_backgroundCombatTimerCapture = BackgroundCombatTimerCapture();
+	}
+
+	void BackgroundCombatTimerReceiver::onCommandTimerDataReceived(
+		MessageQueueCommandTimer const & commandTimerData)
+	{
+		if (!s_backgroundInputInstalled ||
+			!commandTimerData.hasTime(MessageQueueCommandTimer::F_execute))
+			return;
+
+		uint32 const commandCrc = commandTimerData.getCommandNameCrc();
+		BackgroundCombatTimerCommand command = BCTC_none;
+		if (commandCrc == Crc::normalizeAndCalculate("headShot1"))
+			command = BCTC_headShot1;
+		else if (commandCrc == Crc::normalizeAndCalculate("bodyShot1"))
+			command = BCTC_bodyShot1;
+		else if (commandCrc == Crc::normalizeAndCalculate("legShot1"))
+			command = BCTC_legShot1;
+		else
+			return;
+
+		float const executeMax =
+			commandTimerData.getMaxTime(MessageQueueCommandTimer::F_execute);
+		if (executeMax <= 0.0f)
+			return;
+
+		s_backgroundCombatTimerCapture.valid = true;
+		s_backgroundCombatTimerCapture.command = command;
+		s_backgroundCombatTimerCapture.executeCurrent =
+			commandTimerData.getCurrentTime(MessageQueueCommandTimer::F_execute);
+		s_backgroundCombatTimerCapture.executeMax = executeMax;
+	}
 
 	void queueBackgroundMousePosition(LPARAM lParam)
 	{
@@ -266,6 +361,7 @@ namespace ClientMainNamespace
 		// synchronous status returned by the window procedure observes the real
 		// queue before the server can answer; no mediator row or result is forged.
 		CuiCombatManager::setCombatTarget(targetId);
+		clearBackgroundCombatTimerCapture();
 		ClientCommandQueue::clearLastCommandRemoval();
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool queued = true;
@@ -298,6 +394,7 @@ namespace ClientMainNamespace
 		// The fixture owns only reversible world preparation. Admission and
 		// dispatch remain the production toolbar/client command queue path.
 		CuiCombatManager::setCombatTarget(targetId);
+		clearBackgroundCombatTimerCapture();
 		ClientCommandQueue::clearLastCommandRemoval();
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool queued = true;
@@ -329,8 +426,9 @@ namespace ClientMainNamespace
 	bool performBackgroundEquipCdefWeapon(char const * const templateSuffix)
 	{
 		Object * const player = Game::getPlayer();
+		std::string const playerId = Game::getPlayerNetworkId().getValueString();
 		if (!player || !templateSuffix ||
-			Game::getPlayerNetworkId().getValueString() != "44003778")
+			(playerId != "44003778" && playerId != "39008597"))
 			return false;
 
 		ClientObject * const inventory = CuiInventoryManager::getPlayerInventory();
@@ -394,6 +492,31 @@ namespace ClientMainNamespace
 			result |= static_cast<LRESULT>(static_cast<int>(status) & 0xff) << 32;
 			result |= static_cast<LRESULT>(static_cast<unsigned int>(statusDetail) & 0xffffu) << 40;
 		}
+		return result;
+	}
+
+	LRESULT getBackgroundCombatTimerStatus()
+	{
+		LRESULT result = cms_backgroundCombatTimerStatusMarker;
+		if (!s_backgroundCombatTimerCapture.valid)
+			return result;
+
+		int const currentMilliseconds = std::max(
+			0,
+			std::min(
+				65535,
+				static_cast<int>(
+					s_backgroundCombatTimerCapture.executeCurrent * 1000.0f + 0.5f)));
+		int const maxMilliseconds = std::max(
+			0,
+			std::min(
+				65535,
+				static_cast<int>(
+					s_backgroundCombatTimerCapture.executeMax * 1000.0f + 0.5f)));
+		result |= cms_backgroundCombatTimerStatusValid;
+		result |= static_cast<LRESULT>(s_backgroundCombatTimerCapture.command) & 0xff;
+		result |= static_cast<LRESULT>(maxMilliseconds & 0xffff) << 32;
+		result |= static_cast<LRESULT>(currentMilliseconds & 0xffff) << 48;
 		return result;
 	}
 
@@ -512,6 +635,9 @@ namespace ClientMainNamespace
 			case BIC_equipCdefCarbine:
 				return performBackgroundEquipCdefCarbine() ? 1 : 0;
 
+			case BIC_combatTimerStatus:
+				return getBackgroundCombatTimerStatus();
+
 			default:
 				return 0;
 			}
@@ -560,6 +686,8 @@ namespace ClientMainNamespace
 		s_backgroundInputWindow = window;
 		s_backgroundInputPreviousWindowProc = reinterpret_cast<WNDPROC>(previousWindowProc);
 		s_backgroundInputInstalled = true;
+		clearBackgroundCombatTimerCapture();
+		s_backgroundCombatTimerReceiver = new BackgroundCombatTimerReceiver;
 
 		REPORT_LOG(true, ("Pre-CU background input bridge enabled (message=0x%04x, protocol=%d)\n",
 			static_cast<unsigned int>(s_backgroundInputMessage),
@@ -595,6 +723,9 @@ namespace ClientMainNamespace
 		}
 
 		s_backgroundInputInstalled = false;
+		delete s_backgroundCombatTimerReceiver;
+		s_backgroundCombatTimerReceiver = 0;
+		clearBackgroundCombatTimerCapture();
 		s_backgroundInputPreviousWindowProc = 0;
 		s_backgroundInputWindow = 0;
 		s_backgroundInputMessage = 0;

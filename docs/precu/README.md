@@ -43,12 +43,15 @@ Example live probes against a loaded fixture client:
   -Action CombatQueueStatus -ClientProcessId <pid>
 ```
 
-Protocol v11 extends that identity-bound path for the first complete Marksman
-tier-I matrix. `EquipCdefPistol` and `EquipCdefCarbine` locate only the fixture
-weapons in the bound attacker's inventory and use the production inventory
-equip request. `QueueBodyShot1` and `QueueLegShot1` then enter the same toolbar
-admission and authoritative combat-queue path as the existing headShot1 canary;
-the client never fabricates a hit, damage, HAM cost, or command result.
+Protocol v12 extends that identity-bound path for the first complete Marksman
+tier-I matrix. `EquipCdefRifle`, `EquipCdefPistol`, and `EquipCdefCarbine`
+locate only fixture weapons in either bound player's inventory and use the
+production inventory equip request. `QueueBodyShot1` and `QueueLegShot1` then
+enter the same toolbar admission and authoritative combat-queue path as the
+existing headShot1 canary. `CombatTimerStatus` reports only the latest
+server-origin execute timer for those three commands, including its current and
+maximum milliseconds. The client never derives a timer or fabricates a hit,
+damage, HAM cost, defense roll, or command result.
 
 Run the source-contract and skill-data tests with:
 

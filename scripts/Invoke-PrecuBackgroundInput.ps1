@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "ClearCombatQueue", "CombatQueueStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -67,7 +67,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 11
+$expectedProtocolVersion = 12
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -97,6 +97,7 @@ $command = @{
     QueueLegShot1   = 25
     EquipCdefPistol = 26
     EquipCdefCarbine = 27
+    CombatTimerStatus = 28
 }
 $dikByName = @{
     Escape    = 0x01
@@ -342,6 +343,33 @@ function ConvertTo-CombatQueueStatusDetail {
     return "count=$queueCount inCombat=$($inCombat.ToString().ToLowerInvariant()) hasTarget=$($hasTarget.ToString().ToLowerInvariant()) $lastResult packed=0x$($PackedStatus.ToString('x16'))"
 }
 
+function ConvertTo-CombatTimerStatusDetail {
+    param(
+        [Parameter(Mandatory = $true)]
+        [long]$PackedStatus
+    )
+
+    if (($PackedStatus -band 0xffff0000L) -ne 0x544d0000L) {
+        throw ("Unexpected combat-timer status marker 0x{0:x8}." -f $PackedStatus)
+    }
+    $valid = ($PackedStatus -band 0x100L) -ne 0
+    if (-not $valid) {
+        return "available=false packed=0x$($PackedStatus.ToString('x16'))"
+    }
+
+    $commandValue = $PackedStatus -band 0xffL
+    $commandNames = @("none", "headShot1", "bodyShot1", "legShot1")
+    $commandName = if ($commandValue -lt $commandNames.Count) {
+        $commandNames[$commandValue]
+    }
+    else {
+        "unknown"
+    }
+    $maxMilliseconds = ($PackedStatus -shr 32) -band 0xffffL
+    $currentMilliseconds = ($PackedStatus -shr 48) -band 0xffffL
+    return "available=true command=$commandName currentMs=$currentMilliseconds maxMs=$maxMilliseconds packed=0x$($PackedStatus.ToString('x16'))"
+}
+
 function Send-BridgeKeySequence {
     param(
         [Parameter(Mandatory = $true)]
@@ -564,14 +592,19 @@ switch ($Action) {
         $detail = ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus
     }
 
+    "CombatTimerStatus" {
+        [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command.CombatTimerStatus
+        $detail = ConvertTo-CombatTimerStatusDetail -PackedStatus $packedStatus
+    }
+
     "EquipCdefRifle" {
         Send-BridgeCommand -Window $window -Message $message -Command $command.EquipCdefRifle
-        $detail = "queued for the bound combat fixture attacker"
+        $detail = "queued for the bound combat fixture player"
     }
 
     { $_ -in @("EquipCdefPistol", "EquipCdefCarbine") } {
         Send-BridgeCommand -Window $window -Message $message -Command $command[$Action]
-        $detail = "queued for the bound combat fixture attacker"
+        $detail = "queued for the bound combat fixture player"
     }
 
     "Stand" {
