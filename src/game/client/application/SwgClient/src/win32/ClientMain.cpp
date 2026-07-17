@@ -150,11 +150,12 @@ namespace ClientMainNamespace
 		BIC_queueDurationControl,
 		BIC_equipFixtureLightsaber,
 		BIC_equipFixtureFallbackSword,
-		BIC_queueHealWound
+		BIC_queueHealWound,
+		BIC_queueHealDamage
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 15;
+	LRESULT const cms_backgroundInputProtocolVersion = 16;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -479,6 +480,37 @@ namespace ClientMainNamespace
 		return queued;
 	}
 
+	bool performBackgroundQueueHealDamage(LPARAM const targetValue)
+	{
+		Object * const player = Game::getPlayer();
+		if (!player || targetValue <= 0)
+			return false;
+
+		char targetBuffer[32];
+		_snprintf(
+			targetBuffer,
+			sizeof(targetBuffer) - 1,
+			"%lld",
+			static_cast<long long>(targetValue));
+		targetBuffer[sizeof(targetBuffer) - 1] = '\0';
+		NetworkId const targetId(targetBuffer);
+		if (!targetId.isValid())
+			return false;
+
+		// Admit the authentic five-second Publish 14.1 healDamage command
+		// through the normal toolbar queue. Patient and medicine state remain
+		// authoritative on the server.
+		CuiCombatManager::setLookAtTarget(targetId);
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"healDamage",
+			targetId,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -726,6 +758,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueHealWound:
 				if (!performBackgroundQueueHealWound(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueHealDamage:
+				if (!performBackgroundQueueHealDamage(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
