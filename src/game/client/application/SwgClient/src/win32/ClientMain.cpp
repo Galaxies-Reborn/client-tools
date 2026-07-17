@@ -137,11 +137,15 @@ namespace ClientMainNamespace
 		BIC_clearCombatQueue,
 		BIC_combatQueueStatus,
 		BIC_equipCdefRifle,
-		BIC_stand
+		BIC_stand,
+		BIC_queueBodyShot1,
+		BIC_queueLegShot1,
+		BIC_equipCdefPistol,
+		BIC_equipCdefCarbine
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 10;
+	LRESULT const cms_backgroundInputProtocolVersion = 11;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -280,6 +284,38 @@ namespace ClientMainNamespace
 		return queued;
 	}
 
+	bool performBackgroundQueueMarksmanTier1(char const * const command, int const repeat)
+	{
+		Object * const player = Game::getPlayer();
+		if (!player || !command ||
+			Game::getPlayerNetworkId().getValueString() != "44003778")
+			return false;
+
+		NetworkId const targetId("39008597");
+		if (!isBackgroundCombatCanaryPair(*player, targetId))
+			return false;
+
+		// The fixture owns only reversible world preparation. Admission and
+		// dispatch remain the production toolbar/client command queue path.
+		CuiCombatManager::setCombatTarget(targetId);
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool queued = true;
+		for (int index = 0; index < repeat; ++index)
+		{
+			if (ClientCommandQueue::enqueueCommand(
+				command,
+				targetId,
+				Unicode::emptyString) == 0)
+			{
+				queued = false;
+				break;
+			}
+		}
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -290,10 +326,11 @@ namespace ClientMainNamespace
 			Unicode::emptyString);
 	}
 
-	bool performBackgroundEquipCdefRifle()
+	bool performBackgroundEquipCdefWeapon(char const * const templateSuffix)
 	{
 		Object * const player = Game::getPlayer();
-		if (!player || Game::getPlayerNetworkId().getValueString() != "44003778")
+		if (!player || !templateSuffix ||
+			Game::getPlayerNetworkId().getValueString() != "44003778")
 			return false;
 
 		ClientObject * const inventory = CuiInventoryManager::getPlayerInventory();
@@ -305,7 +342,7 @@ namespace ClientMainNamespace
 		{
 			ClientObject * const object = dynamic_cast<ClientObject *>((*iterator).getObject());
 			char const * const templateName = object ? object->getObjectTemplateName() : 0;
-			if (!templateName || !strstr(templateName, "rifle_cdef.iff"))
+			if (!templateName || !strstr(templateName, templateSuffix))
 				continue;
 
 			CuiInventoryManager::equipObject(object->getNetworkId());
@@ -313,6 +350,21 @@ namespace ClientMainNamespace
 		}
 
 		return false;
+	}
+
+	bool performBackgroundEquipCdefRifle()
+	{
+		return performBackgroundEquipCdefWeapon("rifle_cdef.iff");
+	}
+
+	bool performBackgroundEquipCdefPistol()
+	{
+		return performBackgroundEquipCdefWeapon("pistol_cdef.iff");
+	}
+
+	bool performBackgroundEquipCdefCarbine()
+	{
+		return performBackgroundEquipCdefWeapon("carbine_cdef.iff");
 	}
 
 	LRESULT getBackgroundCombatQueueStatus()
@@ -441,6 +493,24 @@ namespace ClientMainNamespace
 
 			case BIC_stand:
 				return performBackgroundSelfCommand("/stand") ? 1 : 0;
+
+			case BIC_queueBodyShot1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1("bodyShot1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueLegShot1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1("legShot1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_equipCdefPistol:
+				return performBackgroundEquipCdefPistol() ? 1 : 0;
+
+			case BIC_equipCdefCarbine:
+				return performBackgroundEquipCdefCarbine() ? 1 : 0;
 
 			default:
 				return 0;

@@ -93,7 +93,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 10", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 11", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -332,6 +332,10 @@ $results | ConvertTo-Json -Compress
             "CombatQueueStatus": 21,
             "EquipCdefRifle": 22,
             "Stand": 23,
+            "QueueBodyShot1": 24,
+            "QueueLegShot1": 25,
+            "EquipCdefPistol": 26,
+            "EquipCdefCarbine": 27,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -487,6 +491,10 @@ $results | ConvertTo-Json -Compress
             "ClearCombatQueue",
             "CombatQueueStatus",
             "EquipCdefRifle",
+            "QueueBodyShot1",
+            "QueueLegShot1",
+            "EquipCdefPistol",
+            "EquipCdefCarbine",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -505,10 +513,30 @@ $results | ConvertTo-Json -Compress
         equip_action = function_body(
             self.client_main, "bool performBackgroundEquipCdefRifle()"
         )
-        self.assertIn('getValueString() != "44003778"', equip_action)
-        self.assertIn("ContainerInterface::getContainer", equip_action)
-        self.assertIn('strstr(templateName, "rifle_cdef.iff")', equip_action)
-        self.assertIn("CuiInventoryManager::equipObject", equip_action)
+        self.assertIn(
+            'performBackgroundEquipCdefWeapon("rifle_cdef.iff")', equip_action
+        )
+
+        tier_one_queue = function_body(
+            self.client_main,
+            "bool performBackgroundQueueMarksmanTier1(char const * const command, int const repeat)",
+        )
+        self.assertIn('getValueString() != "44003778"', tier_one_queue)
+        self.assertIn('NetworkId const targetId("39008597")', tier_one_queue)
+        self.assertIn("ClientCommandQueue::commandsAreNowFromToolbar(true)", tier_one_queue)
+        self.assertIn("ClientCommandQueue::enqueueCommand(", tier_one_queue)
+        self.assertNotIn("doDamage", tier_one_queue)
+
+        generic_equip = function_body(
+            self.client_main,
+            "bool performBackgroundEquipCdefWeapon(char const * const templateSuffix)",
+        )
+        self.assertIn('getValueString() != "44003778"', generic_equip)
+        self.assertIn("ContainerInterface::getContainer", generic_equip)
+        self.assertIn("strstr(templateName, templateSuffix)", generic_equip)
+        self.assertIn("CuiInventoryManager::equipObject", generic_equip)
+        for suffix in ("rifle_cdef.iff", "pistol_cdef.iff", "carbine_cdef.iff"):
+            self.assertIn(f'"{suffix}"', self.client_main)
 
         self.assertIn('performBackgroundSelfCommand("/stand")', window_proc)
         self.assertIn("queued through the production stand command", self.helper)

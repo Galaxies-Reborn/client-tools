@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "ClearCombatQueue", "CombatQueueStatus", "EquipCdefRifle", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "ClearCombatQueue", "CombatQueueStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -67,7 +67,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 10
+$expectedProtocolVersion = 11
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -93,6 +93,10 @@ $command = @{
     CombatQueueStatus = 21
     EquipCdefRifle = 22
     Stand           = 23
+    QueueBodyShot1  = 24
+    QueueLegShot1   = 25
+    EquipCdefPistol = 26
+    EquipCdefCarbine = 27
 }
 $dikByName = @{
     Escape    = 0x01
@@ -545,6 +549,11 @@ switch ($Action) {
         $detail = "repeat=$Repeat $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
     }
 
+    { $_ -in @("QueueBodyShot1", "QueueLegShot1") } {
+        [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command[$Action] -Data $Repeat
+        $detail = "command=$($Action.Replace('Queue', '')) repeat=$Repeat $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
+    }
+
     "ClearCombatQueue" {
         Send-BridgeCommand -Window $window -Message $message -Command $command.ClearCombatQueue
         $detail = "queued through the production combat-queue clear action"
@@ -557,6 +566,11 @@ switch ($Action) {
 
     "EquipCdefRifle" {
         Send-BridgeCommand -Window $window -Message $message -Command $command.EquipCdefRifle
+        $detail = "queued for the bound combat fixture attacker"
+    }
+
+    { $_ -in @("EquipCdefPistol", "EquipCdefCarbine") } {
+        Send-BridgeCommand -Window $window -Message $message -Command $command[$Action]
         $detail = "queued for the bound combat fixture attacker"
     }
 
