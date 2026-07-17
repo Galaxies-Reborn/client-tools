@@ -151,11 +151,13 @@ namespace ClientMainNamespace
 		BIC_equipFixtureLightsaber,
 		BIC_equipFixtureFallbackSword,
 		BIC_queueHealWound,
-		BIC_queueHealDamage
+		BIC_queueHealDamage,
+		BIC_queueTendDamage,
+		BIC_queueTendWound
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 16;
+	LRESULT const cms_backgroundInputProtocolVersion = 17;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -511,6 +513,49 @@ namespace ClientMainNamespace
 		return queued;
 	}
 
+	bool performBackgroundQueueTending(
+		char const * const commandName,
+		LPARAM const targetValue)
+	{
+		Object * const player = Game::getPlayer();
+		if (!player || !commandName || targetValue <= 0)
+			return false;
+
+		char targetBuffer[32];
+		_snprintf(
+			targetBuffer,
+			sizeof(targetBuffer) - 1,
+			"%lld",
+			static_cast<long long>(targetValue));
+		targetBuffer[sizeof(targetBuffer) - 1] = '\0';
+		NetworkId const targetId(targetBuffer);
+		if (!targetId.isValid())
+			return false;
+
+		// The bridge supplies only the disposable patient OID. The normal
+		// toolbar queue and server-owned organic tending handlers retain all
+		// timing, treatment, HAM, wound, battle-fatigue, and XP authority.
+		CuiCombatManager::setLookAtTarget(targetId);
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			commandName,
+			targetId,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueTendDamage(LPARAM const targetValue)
+	{
+		return performBackgroundQueueTending("tendDamage", targetValue);
+	}
+
+	bool performBackgroundQueueTendWound(LPARAM const targetValue)
+	{
+		return performBackgroundQueueTending("tendWound", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -763,6 +808,16 @@ namespace ClientMainNamespace
 
 			case BIC_queueHealDamage:
 				if (!performBackgroundQueueHealDamage(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueTendDamage:
+				if (!performBackgroundQueueTendDamage(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueTendWound:
+				if (!performBackgroundQueueTendWound(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 

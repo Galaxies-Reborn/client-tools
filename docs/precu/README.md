@@ -101,6 +101,29 @@ selection, treatment recovery, HAM changes, cost, charges, and medical XP.
   -TargetOid <fixture-patient-oid>
 ```
 
+Protocol v17 adds `QueueTendDamage` and `QueueTendWound`. Both accept only an
+explicit patient OID and admit the authentic five-second commands through
+`ClientCommandQueue`. Tending is organic treatment: the bridge creates no
+medicine and mutates no HAM, wounds, battle fatigue, or XP.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueTendDamage `
+  -ClientProcessId <pid> `
+  -TargetOid <fixture-patient-oid>
+
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueTendWound `
+  -ClientProcessId <pid> `
+  -TargetOid <fixture-patient-oid>
+```
+
+The accepted protocol-17 lifecycle admitted both commands at local queue count
+one and later reported count zero. Server telemetry independently proved exact
+Mind and secondary-wound costs, Health/Action damage treatment, Health-wound
+treatment, and the asynchronous medical-XP result; the bridge remained queue
+admission only.
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
