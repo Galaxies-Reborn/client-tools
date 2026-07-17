@@ -90,7 +90,7 @@ public:
 	static ClientObject * getPlayerAppearanceInventory ();
 	
 	static void           pickupObject        (const NetworkId & id);
-	static void           equipObject         (const NetworkId & id);
+	static bool           equipObject         (const NetworkId & id);
 	static void           unequipObject       (const NetworkId & id);
 	static void           dropObject          (const NetworkId & id);
 	static void           destroyObject       (const NetworkId & id, bool confirmed);

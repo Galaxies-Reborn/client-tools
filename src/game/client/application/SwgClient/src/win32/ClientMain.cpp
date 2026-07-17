@@ -147,11 +147,13 @@ namespace ClientMainNamespace
 		BIC_equipCdefPistol,
 		BIC_equipCdefCarbine,
 		BIC_combatTimerStatus,
-		BIC_queueDurationControl
+		BIC_queueDurationControl,
+		BIC_equipFixtureLightsaber,
+		BIC_equipFixtureFallbackSword
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 13;
+	LRESULT const cms_backgroundInputProtocolVersion = 14;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -474,8 +476,7 @@ namespace ClientMainNamespace
 			if (!templateName || !strstr(templateName, templateSuffix))
 				continue;
 
-			CuiInventoryManager::equipObject(object->getNetworkId());
-			return true;
+			return CuiInventoryManager::equipObject(object->getNetworkId());
 		}
 
 		return false;
@@ -494,6 +495,16 @@ namespace ClientMainNamespace
 	bool performBackgroundEquipCdefCarbine()
 	{
 		return performBackgroundEquipCdefWeapon("carbine_cdef.iff");
+	}
+
+	bool performBackgroundEquipFixtureLightsaber()
+	{
+		return performBackgroundEquipCdefWeapon("pistol_dl44.iff");
+	}
+
+	bool performBackgroundEquipFixtureFallbackSword()
+	{
+		return performBackgroundEquipCdefWeapon("pistol_dl44_metal.iff");
 	}
 
 	LRESULT getBackgroundCombatQueueStatus()
@@ -673,6 +684,12 @@ namespace ClientMainNamespace
 				if (!performBackgroundQueueDurationControl())
 					return 0;
 				return getBackgroundCombatQueueStatus();
+
+			case BIC_equipFixtureLightsaber:
+				return performBackgroundEquipFixtureLightsaber() ? 1 : 0;
+
+			case BIC_equipFixtureFallbackSword:
+				return performBackgroundEquipFixtureFallbackSword() ? 1 : 0;
 
 			default:
 				return 0;
