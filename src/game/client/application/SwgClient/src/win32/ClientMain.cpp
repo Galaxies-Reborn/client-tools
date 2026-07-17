@@ -16,6 +16,8 @@
 #include "clientDirectInput/DirectInput.h"
 #include "clientDirectInput/SetupClientDirectInput.h"
 #include "clientGame/ClientCommandQueue.h"
+#include "clientGame/ClientObject.h"
+#include "clientGame/ContainerInterface.h"
 #include "clientGame/Game.h"
 #include "clientGame/SetupClientGame.h"
 #include "clientGraphics/Graphics.h"
@@ -34,6 +36,7 @@
 #include "clientUserInterface/CuiActions.h"
 #include "clientUserInterface/CuiChatHistory.h"
 #include "clientUserInterface/CuiCombatManager.h"
+#include "clientUserInterface/CuiInventoryManager.h"
 #include "clientUserInterface/CuiManager.h"
 #include "clientUserInterface/CuiMediatorFactory.h"
 #include "clientUserInterface/CuiMessageQueueManager.h"
@@ -69,6 +72,7 @@
 #include "sharedNetwork/SetupSharedNetwork.h"
 #include "sharedNetworkMessages/SetupSharedNetworkMessages.h"
 #include "sharedObject/CellProperty.h"
+#include "sharedObject/Container.h"
 #include "sharedObject/Object.h"
 #include "sharedObject/ObjectTemplate.h"
 #include "sharedObject/SetupSharedObject.h"
@@ -101,6 +105,7 @@
 #include <string>
 #include <ctime>
 #include <cstdio>
+#include <cstring>
 #include <UnicodeUtils.h>
 
 extern void externalCommandHandler(const char*);
@@ -130,15 +135,18 @@ namespace ClientMainNamespace
 		BIC_targetCounterpart,
 		BIC_queueCombatCanary,
 		BIC_clearCombatQueue,
-		BIC_combatQueueStatus
+		BIC_combatQueueStatus,
+		BIC_equipCdefRifle,
+		BIC_stand
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 7;
+	LRESULT const cms_backgroundInputProtocolVersion = 10;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
 	LRESULT const cms_backgroundCombatQueueStatusCountMask = 0x00003fff;
+	LRESULT const cms_backgroundCombatQueueStatusLastResult = static_cast<LRESULT>(0x0100000000000000LL);
 	UINT s_backgroundInputMessage = 0;
 	HWND s_backgroundInputWindow = 0;
 	WNDPROC s_backgroundInputPreviousWindowProc = 0;
@@ -254,6 +262,7 @@ namespace ClientMainNamespace
 		// synchronous status returned by the window procedure observes the real
 		// queue before the server can answer; no mediator row or result is forged.
 		CuiCombatManager::setCombatTarget(targetId);
+		ClientCommandQueue::clearLastCommandRemoval();
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool queued = true;
 		for (int index = 0; index < repeat; ++index)
@@ -281,6 +290,31 @@ namespace ClientMainNamespace
 			Unicode::emptyString);
 	}
 
+	bool performBackgroundEquipCdefRifle()
+	{
+		Object * const player = Game::getPlayer();
+		if (!player || Game::getPlayerNetworkId().getValueString() != "44003778")
+			return false;
+
+		ClientObject * const inventory = CuiInventoryManager::getPlayerInventory();
+		Container const * const container = inventory ? ContainerInterface::getContainer(*inventory) : 0;
+		if (!container)
+			return false;
+
+		for (ContainerConstIterator iterator = container->begin(); iterator != container->end(); ++iterator)
+		{
+			ClientObject * const object = dynamic_cast<ClientObject *>((*iterator).getObject());
+			char const * const templateName = object ? object->getObjectTemplateName() : 0;
+			if (!templateName || !strstr(templateName, "rifle_cdef.iff"))
+				continue;
+
+			CuiInventoryManager::equipObject(object->getNetworkId());
+			return true;
+		}
+
+		return false;
+	}
+
 	LRESULT getBackgroundCombatQueueStatus()
 	{
 		CuiCombatManager::IntVector sequenceIds;
@@ -297,6 +331,17 @@ namespace ClientMainNamespace
 		result |= static_cast<LRESULT>(std::min(
 			count,
 			static_cast<size_t>(cms_backgroundCombatQueueStatusCountMask)));
+
+		uint32 sequenceId = 0;
+		Command::ErrorCode status = Command::CEC_Success;
+		int statusDetail = 0;
+		if (ClientCommandQueue::getLastCommandRemoval(sequenceId, status, statusDetail))
+		{
+			UNREF(sequenceId);
+			result |= cms_backgroundCombatQueueStatusLastResult;
+			result |= static_cast<LRESULT>(static_cast<int>(status) & 0xff) << 32;
+			result |= static_cast<LRESULT>(static_cast<unsigned int>(statusDetail) & 0xffffu) << 40;
+		}
 		return result;
 	}
 
@@ -390,6 +435,12 @@ namespace ClientMainNamespace
 
 			case BIC_combatQueueStatus:
 				return getBackgroundCombatQueueStatus();
+
+			case BIC_equipCdefRifle:
+				return performBackgroundEquipCdefRifle() ? 1 : 0;
+
+			case BIC_stand:
+				return performBackgroundSelfCommand("/stand") ? 1 : 0;
 
 			default:
 				return 0;
