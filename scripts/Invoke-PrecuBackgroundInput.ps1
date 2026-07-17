@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -58,6 +58,9 @@ param(
     [ValidateRange(1, 16)]
     [int]$Repeat = 1,
 
+    [ValidateRange(1, [long]::MaxValue)]
+    [long]$TargetOid,
+
     [AllowEmptyString()]
     [string]$Text
 )
@@ -67,7 +70,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 14
+$expectedProtocolVersion = 15
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -101,6 +104,7 @@ $command = @{
     QueueDurationControl = 29
     EquipFixtureLightsaber = 30
     EquipFixtureFallbackSword = 31
+    QueueHealWound = 32
 }
 $dikByName = @{
     Escape    = 0x01
@@ -603,6 +607,18 @@ switch ($Action) {
     "QueueDurationControl" {
         [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command.QueueDurationControl
         $detail = "command=headShot2 $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
+    }
+
+    "QueueHealWound" {
+        if (-not $PSBoundParameters.ContainsKey("TargetOid")) {
+            throw "QueueHealWound requires -TargetOid."
+        }
+        [long]$packedStatus = Invoke-BridgeQuery `
+            -Window $window `
+            -Message $message `
+            -Command $command.QueueHealWound `
+            -Data $TargetOid
+        $detail = "target=$TargetOid $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
     }
 
     "EquipCdefRifle" {

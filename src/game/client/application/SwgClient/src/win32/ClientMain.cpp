@@ -149,11 +149,12 @@ namespace ClientMainNamespace
 		BIC_combatTimerStatus,
 		BIC_queueDurationControl,
 		BIC_equipFixtureLightsaber,
-		BIC_equipFixtureFallbackSword
+		BIC_equipFixtureFallbackSword,
+		BIC_queueHealWound
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 14;
+	LRESULT const cms_backgroundInputProtocolVersion = 15;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -446,6 +447,38 @@ namespace ClientMainNamespace
 		return queued;
 	}
 
+	bool performBackgroundQueueHealWound(LPARAM const targetValue)
+	{
+		Object * const player = Game::getPlayer();
+		if (!player || targetValue <= 0)
+			return false;
+
+		char targetBuffer[32];
+		_snprintf(
+			targetBuffer,
+			sizeof(targetBuffer) - 1,
+			"%lld",
+			static_cast<long long>(targetValue));
+		targetBuffer[sizeof(targetBuffer) - 1] = '\0';
+		NetworkId const targetId(targetBuffer);
+		if (!targetId.isValid())
+			return false;
+
+		// Admit the authentic Publish 14.1 command through the same client
+		// queue path used by the toolbar. The server fixture supplies only a
+		// disposable patient OID; medicine selection remains in the production
+		// healWound adapter so no item result is forged here.
+		CuiCombatManager::setLookAtTarget(targetId);
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"healWound",
+			targetId,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -690,6 +723,11 @@ namespace ClientMainNamespace
 
 			case BIC_equipFixtureFallbackSword:
 				return performBackgroundEquipFixtureFallbackSword() ? 1 : 0;
+
+			case BIC_queueHealWound:
+				if (!performBackgroundQueueHealWound(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
 
 			default:
 				return 0;
