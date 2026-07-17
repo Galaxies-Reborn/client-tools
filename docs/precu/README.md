@@ -124,6 +124,24 @@ Mind and secondary-wound costs, Health/Action damage treatment, Health-wound
 treatment, and the asynchronous medical-XP result; the bridge remained queue
 admission only.
 
+Protocol v18 adds `QueueDiagnose`. It accepts only an explicit patient OID and
+admits the authentic nonqueued command through the same toolbar path. The
+server remains authoritative for six-meter organic-target validation and
+creates the ten-entry medical SUI; the bridge does not inspect or mutate
+patient state.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueDiagnose `
+  -ClientProcessId <pid> `
+  -TargetOid <fixture-patient-oid>
+```
+
+The accepted protocol-18 lifecycle admitted `diagnose` with local queue count
+zero. Server telemetry observed SUI PID 518, all nine ordered wound values, and
+Battle Fatigue as the tenth entry. Background Escape dismissed the page before
+the server fixture restored its complete snapshot.
+
 Run the source-contract and skill-data tests with:
 
 ```powershell

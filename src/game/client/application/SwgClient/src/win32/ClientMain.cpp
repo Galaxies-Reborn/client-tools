@@ -153,11 +153,12 @@ namespace ClientMainNamespace
 		BIC_queueHealWound,
 		BIC_queueHealDamage,
 		BIC_queueTendDamage,
-		BIC_queueTendWound
+		BIC_queueTendWound,
+		BIC_queueDiagnose
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 17;
+	LRESULT const cms_backgroundInputProtocolVersion = 18;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -556,6 +557,13 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("tendWound", targetValue);
 	}
 
+	bool performBackgroundQueueDiagnose(LPARAM const targetValue)
+	{
+		// Diagnose is intentionally nonqueued in the authentic client table,
+		// but still enters through the normal toolbar command admission path.
+		return performBackgroundQueueTending("diagnose", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -818,6 +826,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueTendWound:
 				if (!performBackgroundQueueTendWound(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueDiagnose:
+				if (!performBackgroundQueueDiagnose(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
