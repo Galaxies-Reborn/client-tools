@@ -95,10 +95,11 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_equipCdefPistol",
             "BIC_equipCdefCarbine",
             "BIC_combatTimerStatus",
+            "BIC_queueDurationControl",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 12", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 13", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -342,6 +343,7 @@ $results | ConvertTo-Json -Compress
             "EquipCdefPistol": 26,
             "EquipCdefCarbine": 27,
             "CombatTimerStatus": 28,
+            "QueueDurationControl": 29,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -462,6 +464,25 @@ $results | ConvertTo-Json -Compress
             self.client_project,
         )
 
+        duration_control = function_body(
+            self.client_main, "bool performBackgroundQueueDurationControl()"
+        )
+        self.assertIn('getValueString() != "44003778"', duration_control)
+        self.assertIn('NetworkId const targetId("39008597")', duration_control)
+        self.assertIn("isBackgroundCombatCanaryPair(*player, targetId)", duration_control)
+        self.assertIn('"headShot2"', duration_control)
+        self.assertIn("targetId", duration_control)
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(true)",
+            duration_control,
+        )
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(false)",
+            duration_control,
+        )
+        self.assertNotIn('"headShot1"', duration_control)
+        self.assertNotIn("doDamage", duration_control)
+
         window_proc = function_body(
             self.client_main,
             "LRESULT CALLBACK backgroundInputWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)",
@@ -494,6 +515,7 @@ $results | ConvertTo-Json -Compress
         helper_parameters = self.helper[: self.helper.index("Set-StrictMode")]
         for action in (
             "QueueCombatCanary",
+            "QueueDurationControl",
             "ClearCombatQueue",
             "CombatQueueStatus",
             "CombatTimerStatus",
@@ -567,6 +589,11 @@ $results | ConvertTo-Json -Compress
             "commandTimerData.getMaxTime(MessageQueueCommandTimer::F_execute)",
             self.client_main,
         )
+        self.assertIn(
+            'Crc::normalizeAndCalculate("headShot2")',
+            self.client_main,
+        )
+        self.assertIn('"headShot2"', self.helper)
 
     def test_command_queue_preserves_the_last_authoritative_removal_result(self):
         self.assertIn("clearLastCommandRemoval()", self.command_queue_header)
