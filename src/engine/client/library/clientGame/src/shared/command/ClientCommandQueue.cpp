@@ -75,6 +75,10 @@ namespace
 	const double       TOO_MANY_CMDS_NOTIFICATION_FREQUENCY = 5; //seconds
 
 	char               ms_removingCommandBuffer[256];
+	bool               ms_lastCommandRemovalValid = false;
+	uint32             ms_lastCommandRemovalSequenceId = 0;
+	Command::ErrorCode ms_lastCommandRemovalStatus = Command::CEC_Success;
+	int                ms_lastCommandRemovalStatusDetail = 0;
 
 #ifdef _DEBUG
 	const bool         cms_debug = false; // set to true to enable debug logging
@@ -200,6 +204,7 @@ void ClientCommandQueue::install()
 	CrashReportInformation::addDynamicText(ms_removingCommandBuffer);
 
 	ms_cutoffTime = 0.0f;
+	clearLastCommandRemoval();
 	ms_installed = true;
 }
 
@@ -210,6 +215,7 @@ void ClientCommandQueue::remove()
 	DEBUG_FATAL(!ms_installed, ("not installed\n"));
 
 	CrashReportInformation::removeDynamicText(ms_removingCommandBuffer);
+	clearLastCommandRemoval();
 
 	ms_installed = false;
 }
@@ -835,6 +841,29 @@ ClientCommandQueue::EntryMap const &ClientCommandQueue::get()
 
 // ----------------------------------------------------------------------
 
+void ClientCommandQueue::clearLastCommandRemoval()
+{
+	ms_lastCommandRemovalValid = false;
+	ms_lastCommandRemovalSequenceId = 0;
+	ms_lastCommandRemovalStatus = Command::CEC_Success;
+	ms_lastCommandRemovalStatusDetail = 0;
+}
+
+// ----------------------------------------------------------------------
+
+bool ClientCommandQueue::getLastCommandRemoval(uint32 &sequenceId, Command::ErrorCode &status, int &statusDetail)
+{
+	if (!ms_lastCommandRemovalValid)
+		return false;
+
+	sequenceId = ms_lastCommandRemovalSequenceId;
+	status = ms_lastCommandRemovalStatus;
+	statusDetail = ms_lastCommandRemovalStatusDetail;
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
 void ClientCommandQueue::handleCommandRemoved(uint32 sequenceId, float waitTime, Command::ErrorCode status, int statusDetail)
 {
 	DEBUG_REPORT_LOG(cms_debug, ("ClientCommandQueue::handleCommandRemoved(%d, %f, %d, %d)\n", static_cast<int>(sequenceId), waitTime, status, statusDetail));
@@ -845,6 +874,10 @@ void ClientCommandQueue::handleCommandRemoved(uint32 sequenceId, float waitTime,
 	if (i != ms_commandQueue.end())
 	{
 		const Entry & entry = (*i).second;
+		ms_lastCommandRemovalValid = true;
+		ms_lastCommandRemovalSequenceId = sequenceId;
+		ms_lastCommandRemovalStatus = status;
+		ms_lastCommandRemovalStatusDetail = statusDetail;
 
 		sprintf(ms_removingCommandBuffer, "RemovingCommand: name=[%s] status=[%d] statusDetail=[%d]\n", 
 			entry.m_command ? entry.m_command->m_commandName.c_str() : "???",

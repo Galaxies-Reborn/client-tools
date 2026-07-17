@@ -14,6 +14,12 @@ CLIENT_PROJECT = REPOSITORY_ROOT / (
     "src/game/client/application/SwgClient/build/win32/SwgClient.vcxproj"
 )
 HELPER_SOURCE = REPOSITORY_ROOT / "scripts/Invoke-PrecuBackgroundInput.ps1"
+COMMAND_QUEUE_HEADER = REPOSITORY_ROOT / (
+    "src/engine/client/library/clientGame/src/shared/command/ClientCommandQueue.h"
+)
+COMMAND_QUEUE_SOURCE = REPOSITORY_ROOT / (
+    "src/engine/client/library/clientGame/src/shared/command/ClientCommandQueue.cpp"
+)
 
 
 def function_body(source: str, signature: str) -> str:
@@ -36,6 +42,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         cls.client_main = CLIENT_MAIN_SOURCE.read_text(encoding="utf-8")
         cls.client_project = CLIENT_PROJECT.read_text(encoding="utf-8")
         cls.helper = HELPER_SOURCE.read_text(encoding="utf-8")
+        cls.command_queue_header = COMMAND_QUEUE_HEADER.read_text(encoding="utf-8")
+        cls.command_queue_source = COMMAND_QUEUE_SOURCE.read_text(encoding="utf-8")
 
     def test_bridge_is_explicitly_opt_in_and_disabled_by_default(self):
         self.assertIn(
@@ -80,10 +88,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_queueCombatCanary",
             "BIC_clearCombatQueue",
             "BIC_combatQueueStatus",
+            "BIC_equipCdefRifle",
+            "BIC_stand",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 7", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 10", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -320,6 +330,8 @@ $results | ConvertTo-Json -Compress
             "QueueCombatCanary": 19,
             "ClearCombatQueue": 20,
             "CombatQueueStatus": 21,
+            "EquipCdefRifle": 22,
+            "Stand": 23,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -459,6 +471,8 @@ $results | ConvertTo-Json -Compress
         self.assertIn("getCombatCommandsFromQueue(sequenceIds)", status_query)
         self.assertIn("CuiCombatManager::isInCombat", status_query)
         self.assertIn("CuiCombatManager::getCombatTarget().isValid()", status_query)
+        self.assertIn("ClientCommandQueue::getLastCommandRemoval", status_query)
+        self.assertIn("cms_backgroundCombatQueueStatusLastResult", status_query)
         for forbidden_mutation in (
             "enqueueCommand",
             "removeCommand",
@@ -472,6 +486,8 @@ $results | ConvertTo-Json -Compress
             "QueueCombatCanary",
             "ClearCombatQueue",
             "CombatQueueStatus",
+            "EquipCdefRifle",
+            "Stand",
         ):
             with self.subTest(action=action):
                 self.assertIn(f'"{action}"', helper_parameters)
@@ -481,8 +497,40 @@ $results | ConvertTo-Json -Compress
         self.assertIn("return $queryResult.ToInt64()", helper_query)
         self.assertIn("0x43510000L", self.helper)
         self.assertIn("count=$queueCount", self.helper)
+        self.assertIn("lastStatus=$lastStatus($lastStatusName)", self.helper)
+        self.assertIn("lastDetail=$lastDetail", self.helper)
         self.assertIn("[ValidateRange(1, 16)]", helper_parameters)
         self.assertIn("-Data $Repeat", self.helper)
+
+        equip_action = function_body(
+            self.client_main, "bool performBackgroundEquipCdefRifle()"
+        )
+        self.assertIn('getValueString() != "44003778"', equip_action)
+        self.assertIn("ContainerInterface::getContainer", equip_action)
+        self.assertIn('strstr(templateName, "rifle_cdef.iff")', equip_action)
+        self.assertIn("CuiInventoryManager::equipObject", equip_action)
+
+        self.assertIn('performBackgroundSelfCommand("/stand")', window_proc)
+        self.assertIn("queued through the production stand command", self.helper)
+
+    def test_command_queue_preserves_the_last_authoritative_removal_result(self):
+        self.assertIn("clearLastCommandRemoval()", self.command_queue_header)
+        self.assertIn("getLastCommandRemoval", self.command_queue_header)
+        removal = function_body(
+            self.command_queue_source,
+            "void ClientCommandQueue::handleCommandRemoved(uint32 sequenceId, float waitTime, Command::ErrorCode status, int statusDetail)",
+        )
+        self.assertIn("ms_lastCommandRemovalValid = true", removal)
+        self.assertIn("ms_lastCommandRemovalSequenceId = sequenceId", removal)
+        self.assertIn("ms_lastCommandRemovalStatus = status", removal)
+        self.assertIn("ms_lastCommandRemovalStatusDetail = statusDetail", removal)
+        queue_action = function_body(
+            self.client_main, "bool performBackgroundQueueCombatCanary(int const repeat)"
+        )
+        self.assertLess(
+            queue_action.index("ClientCommandQueue::clearLastCommandRemoval()"),
+            queue_action.index("ClientCommandQueue::enqueueCommand"),
+        )
 
     def test_plain_key_sequence_accepts_no_modifiers(self):
         sequence = function_body(self.helper, "function Send-BridgeKeySequence")

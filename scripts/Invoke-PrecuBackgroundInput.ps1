@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "ClearCombatQueue", "CombatQueueStatus")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "ClearCombatQueue", "CombatQueueStatus", "EquipCdefRifle", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -67,7 +67,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 7
+$expectedProtocolVersion = 10
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -91,6 +91,8 @@ $command = @{
     QueueCombatCanary = 19
     ClearCombatQueue = 20
     CombatQueueStatus = 21
+    EquipCdefRifle = 22
+    Stand           = 23
 }
 $dikByName = @{
     Escape    = 0x01
@@ -321,7 +323,19 @@ function ConvertTo-CombatQueueStatusDetail {
     $queueCount = $PackedStatus -band 0x3fffL
     $inCombat = ($PackedStatus -band 0x8000L) -ne 0
     $hasTarget = ($PackedStatus -band 0x4000L) -ne 0
-    return "count=$queueCount inCombat=$($inCombat.ToString().ToLowerInvariant()) hasTarget=$($hasTarget.ToString().ToLowerInvariant()) packed=0x$($PackedStatus.ToString('x8'))"
+    $hasLastResult = ($PackedStatus -band 0x0100000000000000L) -ne 0
+    $lastResult = "lastStatus=none lastDetail=none"
+    if ($hasLastResult) {
+        $lastStatus = ($PackedStatus -shr 32) -band 0xffL
+        $lastDetail = ($PackedStatus -shr 40) -band 0xffffL
+        if ($lastDetail -ge 0x8000L) {
+            $lastDetail -= 0x10000L
+        }
+        $statusNames = @("Success", "Locomotion", "Ability", "TargetType", "TargetRange", "StateMustNotHave", "StateMustHave", "GodLevel", "Cancelled")
+        $lastStatusName = if ($lastStatus -lt $statusNames.Count) { $statusNames[$lastStatus] } else { "Unknown" }
+        $lastResult = "lastStatus=$lastStatus($lastStatusName) lastDetail=$lastDetail"
+    }
+    return "count=$queueCount inCombat=$($inCombat.ToString().ToLowerInvariant()) hasTarget=$($hasTarget.ToString().ToLowerInvariant()) $lastResult packed=0x$($PackedStatus.ToString('x16'))"
 }
 
 function Send-BridgeKeySequence {
@@ -539,6 +553,16 @@ switch ($Action) {
     "CombatQueueStatus" {
         [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command.CombatQueueStatus
         $detail = ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus
+    }
+
+    "EquipCdefRifle" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.EquipCdefRifle
+        $detail = "queued for the bound combat fixture attacker"
+    }
+
+    "Stand" {
+        Send-BridgeCommand -Window $window -Message $message -Command $command.Stand
+        $detail = "queued through the production stand command"
     }
 }
 
