@@ -126,10 +126,11 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_queueDurationControl",
             "BIC_equipFixtureLightsaber",
             "BIC_equipFixtureFallbackSword",
+            "BIC_queueHealWound",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 14", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 15", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -376,6 +377,7 @@ $results | ConvertTo-Json -Compress
             "QueueDurationControl": 29,
             "EquipFixtureLightsaber": 30,
             "EquipFixtureFallbackSword": 31,
+            "QueueHealWound": 32,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -515,6 +517,33 @@ $results | ConvertTo-Json -Compress
         self.assertNotIn('"headShot1"', duration_control)
         self.assertNotIn("doDamage", duration_control)
 
+        heal_wound = function_body(
+            self.client_main,
+            "bool performBackgroundQueueHealWound(LPARAM const targetValue)",
+        )
+        self.assertIn("targetValue <= 0", heal_wound)
+        self.assertIn("NetworkId const targetId(targetBuffer)", heal_wound)
+        self.assertIn("CuiCombatManager::setLookAtTarget(targetId)", heal_wound)
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(true)",
+            heal_wound,
+        )
+        self.assertIn('"healWound"', heal_wound)
+        self.assertIn("targetId", heal_wound)
+        self.assertIn("Unicode::emptyString", heal_wound)
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(false)",
+            heal_wound,
+        )
+        for forbidden_mutation in (
+            "createObject",
+            "grantSkill",
+            "setAttrib",
+            "healWound(",
+        ):
+            with self.subTest(forbidden_mutation=forbidden_mutation):
+                self.assertNotIn(forbidden_mutation, heal_wound)
+
         window_proc = function_body(
             self.client_main,
             "LRESULT CALLBACK backgroundInputWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)",
@@ -558,6 +587,7 @@ $results | ConvertTo-Json -Compress
             "EquipCdefCarbine",
             "EquipFixtureLightsaber",
             "EquipFixtureFallbackSword",
+            "QueueHealWound",
             "Stand",
         ):
             with self.subTest(action=action):

@@ -72,6 +72,23 @@ target, PvP, and combat state. This proves that the Pre-CU weapon-speed
 override remains fail-closed for commands not yet opted into the migrated
 duration model.
 
+Protocol v15 adds `QueueHealWound` for the first production medical-command
+gate. The caller must supply the fixture patient OID explicitly; the bridge
+then uses the ordinary `ClientCommandQueue::enqueueCommand("healWound", ...)`
+path and atomically returns the actual local combat-queue count. It does not
+create medicine, grant skills, choose a wound, modify HAM, bypass client
+admission, or infer server success. The accepted lifecycle observed one
+successful seven-second retained queue entry followed by an already-queued
+cooldown rejection, with the server fixture independently proving exact Mind,
+wound, charge, and medical-XP results.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueHealWound `
+  -ClientProcessId <pid> `
+  -TargetOid <fixture-patient-oid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
