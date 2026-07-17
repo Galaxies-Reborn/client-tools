@@ -190,6 +190,14 @@ foreach ($file in $runtimeFiles) {
 
 $midiDirectory = Join-Path $clientRootPath "midi"
 New-Item -ItemType Directory -Path $midiDirectory -Force | Out-Null
+$generatedSampleBank = Join-Path $repoRoot "generated\entertainer-sample-bank\midi\instruments"
+$sampleBankDirectory = Join-Path $midiDirectory "instruments"
+$sampleBankCount = 0
+if (Test-Path -LiteralPath (Join-Path $generatedSampleBank "bank.json") -PathType Leaf) {
+    New-Item -ItemType Directory -Path $sampleBankDirectory -Force | Out-Null
+    Get-ChildItem -LiteralPath $generatedSampleBank -File | Copy-Item -Destination $sampleBankDirectory -Force
+    $sampleBankCount = @(Get-ChildItem -LiteralPath $sampleBankDirectory -Filter "instrument_*.wav" -File).Count
+}
 
 $gitCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $gitBranch = (& git -C $repoRoot branch --show-current).Trim()
@@ -220,6 +228,8 @@ $manifest = [ordered]@{
     inputBackend     = "SDL 3.4.10 multi-device controller input"
     audioBackend     = "JUCE 8.0.14 with WASAPI and WAV/MP3/Ogg decoders"
     midiDirectory    = $midiDirectory
+    sampleBankDirectory = if ($sampleBankCount -gt 0) { $sampleBankDirectory } else { $null }
+    sampleBankCount  = $sampleBankCount
     backupDirectory  = $backupDirectory
     removedIncompatibleLocalFiles = @($incompatibleLocalPaths | ForEach-Object { [IO.Path]::GetFileName($_) })
     removedObsoleteRuntimeFiles = @($obsoleteRuntimePaths | ForEach-Object { [IO.Path]::GetFileName($_) })

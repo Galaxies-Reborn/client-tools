@@ -227,11 +227,19 @@ struct SynthVoice
 	double phase = 0.0;
 	double detunedPhase = 0.0;
 	double modulationPhase = 0.0;
+	double sampleCursor = 0.0;
 	float envelope = 0.0f;
 	float filterState = 0.0f;
 	std::uint32_t noiseState = 0x6d2b79f5u;
 	SynthEnvelopeStage stage = SES_attack;
 	std::uint64_t age = 0;
+};
+
+struct SynthSample
+{
+	juce::AudioBuffer<float> pcm;
+	double sampleRate = 48000.0;
+	bool loaded = false;
 };
 
 struct SynthSession
@@ -244,11 +252,63 @@ struct SynthSession
 
 using SynthSessionMap = std::unordered_map<unsigned long long, SynthSession>;
 SynthSessionMap s_synthSessions;
+std::array<SynthSample, 14> s_synthSamples;
+int s_loadedSynthSampleCount = 0;
 
 SynthPatch const &getSynthPatch(int instrumentId)
 {
 	int const index = (std::max)(1, (std::min)(14, instrumentId)) - 1;
 	return s_synthPatches[index];
+}
+
+SynthSample const *getSynthSample(int instrumentId)
+{
+	int const index = (std::max)(1, (std::min)(14, instrumentId)) - 1;
+	SynthSample const &sample = s_synthSamples[static_cast<size_t>(index)];
+	return sample.loaded ? &sample : nullptr;
+}
+
+int loadSynthSampleBank(juce::File const &directory)
+{
+	for (SynthSample &sample : s_synthSamples)
+		sample = SynthSample();
+	s_loadedSynthSampleCount = 0;
+	if (!directory.isDirectory())
+		return 0;
+
+	for (int instrumentId = 1; instrumentId <= 14; ++instrumentId)
+	{
+		juce::String const filename = juce::String::formatted("instrument_%02d.wav", instrumentId);
+		juce::File const file = directory.getChildFile(filename);
+		std::unique_ptr<juce::AudioFormatReader> reader(s_formatManager.createReaderFor(file));
+		if (!reader || reader->lengthInSamples < 2 || reader->lengthInSamples > static_cast<juce::int64>((std::numeric_limits<int>::max)()))
+			continue;
+
+		SynthSample &sample = s_synthSamples[static_cast<size_t>(instrumentId - 1)];
+		int const channels = (std::max)(1, (std::min)(2, static_cast<int>(reader->numChannels)));
+		sample.pcm.setSize(channels, static_cast<int>(reader->lengthInSamples));
+		if (!reader->read(&sample.pcm, 0, sample.pcm.getNumSamples(), 0, true, true))
+		{
+			sample = SynthSample();
+			continue;
+		}
+		sample.sampleRate = reader->sampleRate;
+		sample.loaded = true;
+		++s_loadedSynthSampleCount;
+	}
+	return s_loadedSynthSampleCount;
+}
+
+void discoverSynthSampleBank()
+{
+	juce::File const executableDirectory = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+	juce::File const executableBank = executableDirectory.getChildFile("midi").getChildFile("instruments");
+	if (loadSynthSampleBank(executableBank) > 0)
+		return;
+
+	juce::File const workingBank = juce::File::getCurrentWorkingDirectory().getChildFile("midi").getChildFile("instruments");
+	if (workingBank != executableBank)
+		loadSynthSampleBank(workingBank);
 }
 
 void releaseSynthVoice(SynthVoice &voice)
@@ -294,6 +354,7 @@ void renderSynthSessions(DriverState const &driver, float *const *outputs, int o
 	{
 		SynthSession &session = entry.second;
 		SynthPatch const &patch = getSynthPatch(session.instrumentId);
+		SynthSample const *const instrumentSample = getSynthSample(session.instrumentId);
 		for (SynthVoice &voice : session.voices)
 		{
 			if (!voice.active)
@@ -302,6 +363,9 @@ void renderSynthSessions(DriverState const &driver, float *const *outputs, int o
 			double const frequency = 440.0 * std::pow(2.0, static_cast<double>(voice.note - 69) / 12.0);
 			double const phaseStep = twoPi * frequency / sampleRate;
 			double const detunedStep = phaseStep * (1.0 + patch.detune);
+			double const sampleStep = instrumentSample
+				? (instrumentSample->sampleRate / sampleRate) * std::pow(2.0, static_cast<double>(voice.note - 60) / 12.0)
+				: 0.0;
 			float const attackStep = 1.0f / static_cast<float>(sampleRate * (std::max)(patch.attackSeconds, 0.001f));
 			float const decayStep = (1.0f - patch.sustainLevel) / static_cast<float>(sampleRate * (std::max)(patch.decaySeconds, 0.001f));
 			float const releaseStep = 1.0f / static_cast<float>(sampleRate * (std::max)(patch.releaseSeconds, 0.001f));
@@ -359,7 +423,24 @@ void renderSynthSessions(DriverState const &driver, float *const *outputs, int o
 				float const noise = nextSynthNoise(voice);
 				float const sine = static_cast<float>(std::sin(phase));
 				float sample = 0.0f;
-				switch (patch.toneModel)
+				if (instrumentSample)
+				{
+					int const frameCount = instrumentSample->pcm.getNumSamples();
+					while (voice.sampleCursor >= frameCount)
+						voice.sampleCursor -= frameCount;
+					int const firstFrame = static_cast<int>(voice.sampleCursor);
+					int const secondFrame = firstFrame + 1 < frameCount ? firstFrame + 1 : 0;
+					float const fraction = static_cast<float>(voice.sampleCursor - firstFrame);
+					for (int channelIndex = 0; channelIndex < instrumentSample->pcm.getNumChannels(); ++channelIndex)
+					{
+						float const first = instrumentSample->pcm.getSample(channelIndex, firstFrame);
+						float const second = instrumentSample->pcm.getSample(channelIndex, secondFrame);
+						sample += first + fraction * (second - first);
+					}
+					sample /= static_cast<float>(instrumentSample->pcm.getNumChannels());
+					voice.sampleCursor += sampleStep;
+				}
+				else switch (patch.toneModel)
 				{
 				case STM_strings:
 					sample = 0.62f * synthSaw(phase) + 0.38f * synthSaw(detunedPhase) + patch.noiseAmount * noise;
@@ -405,12 +486,17 @@ void renderSynthSessions(DriverState const &driver, float *const *outputs, int o
 					break;
 				}
 
-				float filterCoefficient = patch.filterCoefficient;
-				if (patch.oneShot && patch.toneModel != STM_bells)
-					filterCoefficient *= 0.18f + 0.82f * voice.envelope;
-				voice.filterState += filterCoefficient * (sample - voice.filterState);
-				sample = voice.filterState;
-				sample *= voice.envelope * voice.velocity * patch.gain * driver.masterVolume;
+				if (instrumentSample)
+					sample *= voice.envelope * voice.velocity * 0.34f * driver.masterVolume;
+				else
+				{
+					float filterCoefficient = patch.filterCoefficient;
+					if (patch.oneShot && patch.toneModel != STM_bells)
+						filterCoefficient *= 0.18f + 0.82f * voice.envelope;
+					voice.filterState += filterCoefficient * (sample - voice.filterState);
+					sample = voice.filterState;
+					sample *= voice.envelope * voice.velocity * patch.gain * driver.masterVolume;
+				}
 				outputs[0][frame] += sample;
 				if (outputChannels > 1 && outputs[1])
 					outputs[1][frame] += sample;
@@ -1442,6 +1528,12 @@ char const *ClientAudioMidi::getSynthPatchName(int instrumentId)
 	return getSynthPatch(instrumentId).name;
 }
 
+int ClientAudioMidi::getLoadedSynthSampleCount()
+{
+	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	return s_loadedSynthSampleCount;
+}
+
 extern "C"
 {
 S32 AILCALL AIL_startup(void)
@@ -1451,6 +1543,7 @@ S32 AILCALL AIL_startup(void)
 	{
 		s_juceInitialiser = std::make_unique<juce::ScopedJuceInitialiser_GUI>();
 		s_formatManager.registerBasicFormats();
+		discoverSynthSampleBank();
 		s_preferences[DIG_MIXER_CHANNELS] = 64;
 		s_started = true;
 	}

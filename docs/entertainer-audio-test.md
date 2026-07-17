@@ -1,5 +1,29 @@
 # Entertainer Audio Test
 
+## Original-timbre sample bank
+
+The JUCE note synthesizer can derive a local sample bank from the original
+player-music recordings owned by the client installation. The generated WAVs
+are not committed to Git. The builder requires Python 3 and NumPy; when NumPy
+is absent, install the pinned requirement with
+`python -m pip install -r scripts\requirements-entertainer-sample-bank.txt`.
+
+```powershell
+.\scripts\Build-EntertainerSampleBank.ps1
+.\scripts\Run-EntertainerAudioTest.ps1
+```
+
+At startup the harness reports how many of the 14 instrument slots were loaded.
+The game and harness look for `midi\instruments\instrument_01.wav` through
+`instrument_14.wav` beside the executable. `Stage-X64Client.ps1` copies a
+generated bank into that location when one is available. Missing samples use
+the procedural JUCE patches automatically.
+
+The original performance table aliases visible instruments into six recorded
+stem families. Consequently, the generated bank preserves the shipped stem
+timbres and canonical instrument grouping; it cannot recover isolated notes
+that were never present in the prerecorded phrase tracks.
+
 `EntertainerAudioTest.exe` exercises the same JUCE/WASAPI backend, procedural
 instrument patches, MIDI input callback, and Standard MIDI File parser used by
 the x64 gameplay client. It does not load the game, connect to a server, open a

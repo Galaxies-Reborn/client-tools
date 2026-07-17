@@ -139,6 +139,7 @@ namespace
 			char description[256] = {};
 			AIL_digital_configuration(driver, &rate, &format, description);
 			std::cout << "Audio: " << description << " at " << rate << " Hz\n";
+			std::cout << "Original-timbre sample bank: " << ClientAudioMidi::getLoadedSynthSampleCount() << "/14 instruments\n";
 			printControls();
 			printStatus();
 			return true;

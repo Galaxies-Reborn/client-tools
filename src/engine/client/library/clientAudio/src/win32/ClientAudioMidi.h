@@ -54,6 +54,7 @@ public:
 	static void synthSustain(unsigned long long performerId, int channel, bool enabled);
 	static void synthAllNotesOff(unsigned long long performerId);
 	static char const *getSynthPatchName(int instrumentId);
+	static int getLoadedSynthSampleCount();
 };
 
 #endif
