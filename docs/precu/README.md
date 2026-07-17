@@ -43,7 +43,7 @@ Example live probes against a loaded fixture client:
   -Action CombatQueueStatus -ClientProcessId <pid>
 ```
 
-Protocol v12 extends that identity-bound path for the first complete Marksman
+Protocol v13 extends that identity-bound path for the first complete Marksman
 tier-I matrix. `EquipCdefRifle`, `EquipCdefPistol`, and `EquipCdefCarbine`
 locate only fixture weapons in either bound player's inventory and use the
 production inventory equip request. `QueueBodyShot1` and `QueueLegShot1` then
@@ -52,6 +52,16 @@ existing headShot1 canary. `CombatTimerStatus` reports only the latest
 server-origin execute timer for those three commands, including its current and
 maximum milliseconds. The client never derives a timer or fabricates a hit,
 damage, HAM cost, defense roll, or command result.
+
+`QueueDurationControl` is a separate fixed control for the shared timing gate.
+It queues only the authentic Publish 14.1 `headShot2` player command from the
+bound attacker to the bound defender. Its fixed 1,500 ms execute timer comes
+from the command table because the action is deliberately absent from
+`precu_combat_overrides`. The command performs its normal standard-combat
+action, while the identity-bound fixture owns and restores the resulting HAM,
+target, PvP, and combat state. This proves that the Pre-CU weapon-speed
+override remains fail-closed for commands not yet opted into the migrated
+duration model.
 
 Run the source-contract and skill-data tests with:
 

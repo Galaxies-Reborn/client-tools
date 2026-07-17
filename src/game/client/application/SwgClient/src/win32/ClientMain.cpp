@@ -146,11 +146,12 @@ namespace ClientMainNamespace
 		BIC_queueLegShot1,
 		BIC_equipCdefPistol,
 		BIC_equipCdefCarbine,
-		BIC_combatTimerStatus
+		BIC_combatTimerStatus,
+		BIC_queueDurationControl
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 12;
+	LRESULT const cms_backgroundInputProtocolVersion = 13;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -163,7 +164,8 @@ namespace ClientMainNamespace
 		BCTC_none = 0,
 		BCTC_headShot1,
 		BCTC_bodyShot1,
-		BCTC_legShot1
+		BCTC_legShot1,
+		BCTC_headShot2
 	};
 	struct BackgroundCombatTimerCapture
 	{
@@ -236,6 +238,8 @@ namespace ClientMainNamespace
 			command = BCTC_bodyShot1;
 		else if (commandCrc == Crc::normalizeAndCalculate("legShot1"))
 			command = BCTC_legShot1;
+		else if (commandCrc == Crc::normalizeAndCalculate("headShot2"))
+			command = BCTC_headShot2;
 		else
 			return;
 
@@ -409,6 +413,33 @@ namespace ClientMainNamespace
 				break;
 			}
 		}
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueDurationControl()
+	{
+		Object * const player = Game::getPlayer();
+		if (!player ||
+			Game::getPlayerNetworkId().getValueString() != "44003778")
+			return false;
+
+		NetworkId const targetId("39008597");
+		if (!isBackgroundCombatCanaryPair(*player, targetId))
+			return false;
+
+		// "headShot2" is an authentic Publish 14.1 player combat action with a
+		// fixed 1.5-second command-table execute time and no Pre-CU duration
+		// override. The identity-bound fixture owns and restores its transient
+		// HAM and combat-state effects.
+		CuiCombatManager::setCombatTarget(targetId);
+		clearBackgroundCombatTimerCapture();
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"headShot2",
+			targetId,
+			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
 		return queued;
 	}
@@ -637,6 +668,11 @@ namespace ClientMainNamespace
 
 			case BIC_combatTimerStatus:
 				return getBackgroundCombatTimerStatus();
+
+			case BIC_queueDurationControl:
+				if (!performBackgroundQueueDurationControl())
+					return 0;
+				return getBackgroundCombatQueueStatus();
 
 			default:
 				return 0;

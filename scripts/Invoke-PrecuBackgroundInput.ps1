@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -67,7 +67,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 12
+$expectedProtocolVersion = 13
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -98,6 +98,7 @@ $command = @{
     EquipCdefPistol = 26
     EquipCdefCarbine = 27
     CombatTimerStatus = 28
+    QueueDurationControl = 29
 }
 $dikByName = @{
     Escape    = 0x01
@@ -358,7 +359,7 @@ function ConvertTo-CombatTimerStatusDetail {
     }
 
     $commandValue = $PackedStatus -band 0xffL
-    $commandNames = @("none", "headShot1", "bodyShot1", "legShot1")
+    $commandNames = @("none", "headShot1", "bodyShot1", "legShot1", "headShot2")
     $commandName = if ($commandValue -lt $commandNames.Count) {
         $commandNames[$commandValue]
     }
@@ -595,6 +596,11 @@ switch ($Action) {
     "CombatTimerStatus" {
         [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command.CombatTimerStatus
         $detail = ConvertTo-CombatTimerStatusDetail -PackedStatus $packedStatus
+    }
+
+    "QueueDurationControl" {
+        [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command.QueueDurationControl
+        $detail = "command=headShot2 $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
     }
 
     "EquipCdefRifle" {
