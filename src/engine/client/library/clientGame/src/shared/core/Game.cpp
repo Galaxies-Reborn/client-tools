@@ -930,7 +930,6 @@ void Game::install(Application const application)
 				LookAtTransformModifier::setAllowLookAtTargetFunction(allowLookAtTarget);
 				CharacterLodManager::setManageLodCallback(manageCharacterLodCallback);
 
-#if 0
 				//-- Tell these classes how to get the current camera for debug purposes.
 				LookAtTransformModifier::setGetCameraFunction(Game::getConstCamera);
 				TargetPitchTransformModifier::setGetCameraFunction(Game::getConstCamera);
@@ -957,7 +956,6 @@ void Game::install(Application const application)
 					);
 				}
 				else
-#endif
 				{
 					CuiMediator * const splashMediator = CuiMediatorFactory::activate (CuiMediatorTypes::Splash);
 					CuiMediator * const backdropMediator = CuiMediatorFactory::activate (CuiMediatorTypes::Backdrop);

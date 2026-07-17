@@ -66,8 +66,31 @@ namespace
 	uint32 const s_displayGroupAstromech = Crc::normalizeAndCalculate ("astromech");
 	uint32 const s_displayGroupCostume = Crc::normalizeAndCalculate("costume");
 
+	bool getEntertainerRebornCommandInfo(std::string const &command, Unicode::String &name, Unicode::String *description)
+	{
+		if (!_stricmp(command.c_str(), "startMidiToMusic"))
+		{
+			name = Unicode::narrowToWide("Start Midi to Music");
+			if (description)
+				*description = Unicode::narrowToWide("Play the equipped entertainer instrument with MIDI or performance keys.");
+			return true;
+		}
+		if (!_stricmp(command.c_str(), "stopPerformanceMode"))
+		{
+			name = Unicode::narrowToWide("Stop Midi to Music");
+			if (description)
+				*description = Unicode::narrowToWide("Stop the active Entertainer Reborn performance.");
+			return true;
+		}
+		return false;
+	}
+
 	bool isCommandForPage(SwgCuiCommandBrowser::TabType tabType, uint32 const displayGroupSpace, std::string const & cmd)
 	{
+		Unicode::String localName;
+		if (getEntertainerRebornCommandInfo(cmd, localName, 0))
+			return tabType == SwgCuiCommandBrowser::TT_other;
+
 		size_t endpos = 0;
 		std::string cmd_first_word = cmd;
 		IGNORE_RETURN(Unicode::getFirstToken (cmd, 0, endpos, cmd_first_word, s_command_breaker));
@@ -639,6 +662,11 @@ void SwgCuiCommandBrowser::reset  ()
 	if (m_tabType == TT_combat || m_tabType == TT_space || m_tabType == TT_other || m_tabType == TT_astromech || m_tabType == TT_costume)
 	{
 		std::map<std::string, int> sv = player->getCommands ();
+		if (m_tabType == TT_other)
+		{
+			sv.insert(std::make_pair("startMidiToMusic", 1));
+			sv.insert(std::make_pair("stopPerformanceMode", 1));
+		}
 
 		{
 			for (std::map<std::string, int>::iterator it = sv.begin (); it != sv.end (); )
@@ -700,7 +728,8 @@ void SwgCuiCommandBrowser::reset  ()
 		for (std::map<std::string, int>::const_iterator it = sv.begin (); it != sv.end (); ++it)
 		{
 			Unicode::String displayName;
-			IGNORE_RETURN(CuiSkillManager::localizeCmdName (Unicode::toLower ((*it).first), displayName));
+			if (!getEntertainerRebornCommandInfo((*it).first, displayName, 0))
+				IGNORE_RETURN(CuiSkillManager::localizeCmdName (Unicode::toLower ((*it).first), displayName));
 			localizedCommandList.push_back(displayName);
 			commandNameMap[displayName] = (*it).first;
 
@@ -875,6 +904,7 @@ void SwgCuiCommandBrowser::addCommand (const std::string & cmd, UIPage * const i
 	dragInfo.type = CuiDragInfoTypes::CDIT_command;
 	IGNORE_RETURN(dragInfo.str.assign (1, '/'));
 	IGNORE_RETURN(dragInfo.str.append (cmd));
+	IGNORE_RETURN(getEntertainerRebornCommandInfo(cmd, dragInfo.name, 0));
 
 	IGNORE_RETURN(addEntry (cmd, dragInfo, insertBefore, *m_volume, 0));
 }
@@ -1228,8 +1258,8 @@ UIPage * SwgCuiCommandBrowser::createCommandPage (const std::string & cmd, const
 		displayPage->SetActivated (false);
 		displayPage->SetVisible   (true);
 		displayPage->SetName      (cmd);
-		Unicode::String description;			
-		if (CuiSkillManager::localizeCmdDescription(Unicode::toLower(cmd), description))
+		Unicode::String description;
+		if (getEntertainerRebornCommandInfo(cmd, displayName, &description) || CuiSkillManager::localizeCmdDescription(Unicode::toLower(cmd), description))
 		{
 			displayPage->SetLocalTooltip(description);
 			if(icon)

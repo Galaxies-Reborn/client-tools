@@ -64,7 +64,7 @@ PlayerMusicManager::Musician::~Musician()
 {
 	Audio::stopSound(m_soundId);
 #if defined(_WIN64)
-	if (m_creatureObject)
+	if (m_midiMode && m_creatureObject)
 		ClientAudioMidi::stopSynthSession(static_cast<unsigned long long>(m_creatureObject->getNetworkId().getValue()));
 #endif
 
@@ -153,7 +153,7 @@ void PlayerMusicManager::Musician::startPlaying()
 //-----------------------------------------------------------------------------
 void PlayerMusicManager::Musician::alter(float const deltaTime)
 {
-	if (m_creatureObject->getPerformanceType() == 0)
+	if (!m_midiMode && m_creatureObject->getPerformanceType() == 0)
 	{
 		m_playingOutro = true;
 		stopPlaying();
@@ -395,7 +395,7 @@ bool PlayerMusicManager::Musician::isPerforming() const
 	bool result = false;
 
 	if ((m_creatureObject != NULL) &&
-	    (m_creatureObject->getPerformanceType() != 0))
+	    (m_midiMode || m_creatureObject->getPerformanceType() != 0))
 	{
 		result = true;
 	}
@@ -491,13 +491,43 @@ void PlayerMusicManager::Musician::addFlourish(int const flourishIndex)
 }
 
 //-----------------------------------------------------------------------------
+void PlayerMusicManager::Musician::playMidiNoteVisual(int note)
+{
+	if (!m_midiMode || !m_creatureObject)
+		return;
+
+	++m_consecutiveFlourishCount;
+	m_timeSinceFlourish = 0.0f;
+	m_particleSystem1.setEnabled(false);
+	m_particleSystem2.setEnabled(false);
+	startParticleSystem(PlayerMusicManager::getFlourishParticleSystemPath(100, m_consecutiveFlourishCount));
+
+	SkeletalAppearance2 * const appearance = dynamic_cast<SkeletalAppearance2 *>(m_creatureObject->getAppearance());
+	if (appearance)
+	{
+		char actionName[32];
+		snprintf(actionName, sizeof(actionName), "skill_action_%d", (note % PlayerMusicManager::getMaximumFlourishCount()) + 1);
+		int animationId = 0;
+		bool animationIsAdd = false;
+		appearance->getAnimationResolver().playAction(CrcLowerString(actionName), animationId, animationIsAdd, NULL);
+	}
+}
+
+//-----------------------------------------------------------------------------
 void PlayerMusicManager::Musician::setMidiMode(bool enabled)
 {
 	m_midiMode = enabled;
 	if (!enabled)
+	{
+		m_particleSystem1.setAllowDelete(true);
+		m_particleSystem2.setAllowDelete(true);
+		m_particleSystem1.setEnabled(false);
+		m_particleSystem2.setEnabled(false);
 		return;
+	}
 
 	m_playingIntro = false;
+	m_playingOutro = false;
 	m_queudFlourishes->clear();
 	if (Audio::isSoundValid(m_soundId))
 	{

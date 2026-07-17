@@ -66,7 +66,6 @@ void SwgCuiPerformanceHud::performActivate()
 		return;
 	}
 	setIsUpdating(true);
-	CuiManager::requestPointer(true);
 	m_updateTimer = 0.0f;
 	m_failureTimer = 0.0f;
 	updateDisplay();
@@ -75,7 +74,6 @@ void SwgCuiPerformanceHud::performActivate()
 void SwgCuiPerformanceHud::performDeactivate()
 {
 	setIsUpdating(false);
-	CuiManager::requestPointer(false);
 }
 
 void SwgCuiPerformanceHud::update(float deltaTimeSecs)

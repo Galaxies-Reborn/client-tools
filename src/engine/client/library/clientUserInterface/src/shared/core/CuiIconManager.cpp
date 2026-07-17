@@ -589,6 +589,10 @@ std::string CuiIconManager::findIconPath (const CuiDragInfo & info)
 				}				
 
 				cmdCopy = token;
+				if (!_stricmp(cmdCopy.c_str(), "startMidiToMusic"))
+					cmdCopy = "startMusic";
+				else if (!_stricmp(cmdCopy.c_str(), "stopPerformanceMode"))
+					cmdCopy = "stopMusic";
 			}
 
 			const Command & commandTableCmd = CommandTable::getCommand (Crc::normalizeAndCalculate (cmdCopy.c_str ()));

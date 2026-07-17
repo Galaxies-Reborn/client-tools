@@ -6465,7 +6465,9 @@ void CreatureObject::onContainedSlottedContainerChanged(ClientObject &containedO
 	UNREF(containedObject);
 	UNREF(arrangement);
 
-	DEBUG_WARNING(ms_logAppearanceTabMessages, ("Creature Object: OnContainedSlottedContainerChanged called. Object [%s].", containedObject.getAppearance()->getAppearanceTemplate()->getName()));
+	Appearance const * const containedAppearance = containedObject.getAppearance();
+	AppearanceTemplate const * const containedAppearanceTemplate = containedAppearance ? containedAppearance->getAppearanceTemplate() : 0;
+	DEBUG_WARNING(ms_logAppearanceTabMessages, ("Creature Object: OnContainedSlottedContainerChanged called. Object [%s].", containedAppearanceTemplate ? containedAppearanceTemplate->getName() : "<none>"));
 
 	ClientObject* inventory = getInventoryObject();
 	ClientObject* appearance = getAppearanceInventoryObject();
@@ -6549,11 +6551,14 @@ void CreatureObject::onContainedSlottedContainerChanged(ClientObject &containedO
 					bool wearAllowed = true;
 
 					SlottedContainmentProperty * slottedContainmentNormalInv = ContainerInterface::getSlottedContainmentProperty(*normalInv); // Get the slot property of our item.
+					if (!slottedContainmentNormalInv)
+						continue;
+
 					SlottedContainmentProperty::SlotArrangement const slotsNI = slottedContainmentNormalInv->getSlotArrangement(slottedContainmentNormalInv->getCurrentArrangement()); // What arrangement does it go in?
 					for(unsigned int j = 0; j < slotsNI.size(); ++j)
 					{
 						DEBUG_WARNING(ms_logAppearanceTabMessages, ("Checking appearance item unworn, checking slot [%s]",  SlotIdManager::getSlotName(slotsNI[j]).getString()));
-						ClientObject* appearanceInv = ContainerInterface::getObjectInSlot(*appearance, SlotIdManager::getSlotName(slotsNI[j]).getString()); // Grab our item from our normal inventory.
+						ClientObject* appearanceInv = appearance ? ContainerInterface::getObjectInSlot(*appearance, SlotIdManager::getSlotName(slotsNI[j]).getString()) : 0;
 						if(appearanceInv && skeleAppearance->isWearing(appearanceInv))
 						{
 							wearAllowed = false;

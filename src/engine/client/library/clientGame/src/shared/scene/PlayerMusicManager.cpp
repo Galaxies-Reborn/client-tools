@@ -28,6 +28,7 @@
 #include "sharedFoundation/ExitChain.h"
 #include "sharedObject/NetworkIdManager.h"
 #include "sharedUtility/DataTable.h"
+#include "swgSharedUtility/Postures.h"
 #include "PerformanceMidiMessage.h"
 
 #include <list>
@@ -92,6 +93,7 @@ namespace PlayerMusicManagerNamespace
 	std::string getParticleSystemPath(DataTable const &dataTable, std::string const &name);
 	void        loadFlourishParticlePaths(FlourishParticleSystemPaths &flourishParticleSystemPaths, std::string const &path);
 	PlayerMusicManager::Musician *findMusician(CreatureObject const *creatureObject);
+	bool        isMidiPerformer(CreatureObject const *creatureObject);
 
 #ifdef _DEBUG
 	void showDebug();
@@ -120,6 +122,12 @@ PlayerMusicManager::Musician *PlayerMusicManagerNamespace::findMusician(Creature
 		if ((*i)->getCreatureObject() == creatureObject)
 			return *i;
 	return NULL;
+}
+
+//-----------------------------------------------------------------------------
+bool PlayerMusicManagerNamespace::isMidiPerformer(CreatureObject const *creatureObject)
+{
+	return creatureObject != NULL && s_midiPerformers.find(creatureObject->getNetworkId()) != s_midiPerformers.end();
 }
 
 //-----------------------------------------------------------------------------
@@ -589,6 +597,7 @@ void PlayerMusicManager::queueFlourish(CreatureObject const *creatureObject, con
 			if (existing != s_midiPerformers.end() && findMusician(creatureObject))
 				ClientAudioMidi::synthNoteOn(static_cast<unsigned long long>(creatureObject->getNetworkId().getValue()), midiMessage.channel, midiMessage.note, midiMessage.value);
 #endif
+			playMidiNoteVisual(creatureObject, midiMessage.note);
 			break;
 		case PerformanceMidiMessage::T_noteOff:
 #if defined(_WIN64)
@@ -636,9 +645,12 @@ void PlayerMusicManager::beginMidiPerformance(CreatureObject const *creatureObje
 		return;
 
 	s_midiPerformers[creatureObject->getNetworkId()] = instrumentId;
+	addMusician(const_cast<CreatureObject *>(creatureObject));
 	Musician * const musician = findMusician(creatureObject);
 	if (musician)
 		musician->setMidiMode(true);
+	if (Game::getSinglePlayer())
+		const_cast<CreatureObject *>(creatureObject)->requestServerPostureChange(Postures::SkillAnimating);
 
 #if defined(_WIN64)
 	if (musician || creatureObject == Game::getPlayerCreature())
@@ -655,6 +667,21 @@ void PlayerMusicManager::endMidiPerformance(CreatureObject const *creatureObject
 	ClientAudioMidi::stopSynthSession(static_cast<unsigned long long>(creatureObject->getNetworkId().getValue()));
 #endif
 	s_midiPerformers.erase(creatureObject->getNetworkId());
+	Musician * const musician = findMusician(creatureObject);
+	if (musician)
+		musician->setMidiMode(false);
+	if (Game::getSinglePlayer())
+		const_cast<CreatureObject *>(creatureObject)->requestServerPostureChange(Postures::Upright);
+}
+
+//-----------------------------------------------------------------------------
+void PlayerMusicManager::playMidiNoteVisual(CreatureObject const *creatureObject, int note)
+{
+	if (!creatureObject)
+		return;
+	Musician * const musician = findMusician(creatureObject);
+	if (musician)
+		musician->playMidiNoteVisual(note);
 }
 
 //-----------------------------------------------------------------------------
@@ -1063,9 +1090,10 @@ void PlayerMusicManager::checkStatus(CreatureObject const * const creatureObject
 					int const performanceType = musicianCreatureObject->getPerformanceType();
 					int const musicPerformanceCount = static_cast<int>(s_performanceDataTableRows.size());
 
-					if ((s_listenerGroupMembers.find(const_cast<CreatureObject *>(musicianCreatureObject)) == s_listenerGroupMembers.end()) ||
+					if (!isMidiPerformer(musicianCreatureObject) &&
+						((s_listenerGroupMembers.find(const_cast<CreatureObject *>(musicianCreatureObject)) == s_listenerGroupMembers.end()) ||
 						(performanceType > musicPerformanceCount) ||
-						(!musician.isPerforming()))
+						(!musician.isPerforming())))
 					{
 						// A creature that was in the group is not in the current group, so mark
 						// it for removal
@@ -1147,13 +1175,19 @@ void PlayerMusicManager::checkStatus(CreatureObject const * const creatureObject
 	}
 	else
 	{
-		bool const musiciansExisted = !s_musicians.empty();
+		bool musiciansRemoved = false;
 
-		// Not listening to anyone so remove all the musicians
+		// MIDI performers own a local synth session and do not require a server-side
+		// listen target. Remove only normal musicians when no one is being listened to.
 
-		while (!s_musicians.empty())
+		Musicians::iterator iterMusicians = s_musicians.begin();
+		while (iterMusicians != s_musicians.end())
 		{
-			PlayerMusicManager::Musician const *musician = (*s_musicians.begin());
+			Musicians::iterator const current = iterMusicians;
+			PlayerMusicManager::Musician const *musician = *current;
+			++iterMusicians;
+			if (isMidiPerformer(musician->getCreatureObject()))
+				continue;
 
 			// If they were a musician and are still playing, then make sure they have
 			// the not-listening particles
@@ -1166,13 +1200,14 @@ void PlayerMusicManager::checkStatus(CreatureObject const * const creatureObject
 				iterPerformanceParticleSystem->second->setEnabled(true);
 			}
 
-			IGNORE_RETURN(s_musicians.erase(s_musicians.begin()));
+			s_musicians.erase(current);
 
 			delete musician;
 			musician = NULL;
+			musiciansRemoved = true;
 		}
 
-		if (musiciansExisted)
+		if (musiciansRemoved && s_musicians.empty())
 		{
 			sampleFinished();
 		}

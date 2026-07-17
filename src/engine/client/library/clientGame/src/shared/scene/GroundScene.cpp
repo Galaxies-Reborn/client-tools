@@ -114,6 +114,7 @@
 #include "sharedFile/FileManifest.h"
 #include "sharedFile/TreeFile.h"
 #include "sharedFoundation/ConstCharCrcString.h"
+#include "sharedFoundation/ConfigFile.h"
 #include "sharedFoundation/CrashReportInformation.h"
 #include "sharedFoundation/CrcLowerString.h"
 #include "sharedFoundation/CrcStringTable.h"
@@ -163,12 +164,14 @@
 #include "sharedObject/AppearanceTemplate.h"
 #include "sharedObject/AppearanceTemplateList.h"
 #include "sharedObject/CellProperty.h"
+#include "sharedObject/Container.h"
 #include "sharedObject/ContainedByProperty.h"
 #include "sharedObject/PortalProperty.h"
 #include "sharedObject/DebugNotification.h"
 #include "sharedObject/NetworkIdManager.h"
 #include "sharedObject/ObjectTemplate.h"
 #include "sharedObject/ObjectTemplateList.h"
+#include "sharedObject/SlottedContainer.h"
 #include "sharedTerrain/TerrainObject.h"
 #include "sharedUtility/CachedFileManager.h"
 #include "sharedUtility/FileName.h"
@@ -954,6 +957,26 @@ GroundScene::GroundScene(
 
 	player->setObjectName (Unicode::narrowToWide (ConfigClientGame::getPlayerName ()));
 	player->setDebugName  (ConfigClientGame::getPlayerName ());
+
+	char const * const startingInstrumentTemplate = ConfigFile::getKeyString("ClientGame", "entertainerOfflineInstrumentTemplate", 0);
+	if (startingInstrumentTemplate && *startingInstrumentTemplate)
+	{
+		ClientObject * const instrument = dynamic_cast<ClientObject *>(ObjectTemplate::createObject(startingInstrumentTemplate));
+		if (!instrument)
+			WARNING(true, ("Unable to create offline entertainer instrument [%s]", startingInstrumentTemplate));
+		else
+		{
+			instrument->endBaselines();
+			SlottedContainer * const slotted = ContainerInterface::getSlottedContainer(*player);
+			int arrangement = 0;
+			Container::ContainerErrorCode error = Container::CEC_Success;
+			if (!slotted || !slotted->getFirstUnoccupiedArrangement(*instrument, arrangement, error) || !ContainerInterface::transferItemToSlottedContainer(*player, *instrument, arrangement))
+			{
+				WARNING(true, ("Unable to equip offline entertainer instrument [%s]", startingInstrumentTemplate));
+				delete instrument;
+			}
+		}
+	}
 
 	//-- make sure the player's animation state reflects items the game may start the player with.
 	//   Normally this is handled via the container interface, but in this case the container system

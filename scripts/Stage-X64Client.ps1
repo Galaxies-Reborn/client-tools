@@ -188,6 +188,71 @@ foreach ($file in $runtimeFiles) {
     Copy-Item -LiteralPath $file.Source -Destination (Join-Path $clientRootPath $file.Name) -Force
 }
 
+# Stage the repo-owned Entertainer UI and wire it into the client's loose UI
+# root. Loose files intentionally override archive content for this source build.
+$uiDirectory = Join-Path $clientRootPath "ui"
+$uiAssetDirectory = Join-Path $repoRoot "assets\ui"
+New-Item -ItemType Directory -Path $uiDirectory -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $uiAssetDirectory "ui_entertainer_reborn.inc") -Destination $uiDirectory -Force
+Copy-Item -LiteralPath (Join-Path $uiAssetDirectory "ui_options_entertainer.inc") -Destination $uiDirectory -Force
+
+$utf8NoBom = [Text.UTF8Encoding]::new($false)
+$uiRootPath = Join-Path $uiDirectory "ui_root.ui"
+if (-not (Test-Path -LiteralPath $uiRootPath -PathType Leaf)) {
+    throw "Client UI root is missing: $uiRootPath"
+}
+$uiRoot = [IO.File]::ReadAllText($uiRootPath)
+if ($uiRoot -notmatch '(?i)<include>ui_entertainer_reborn\.inc</include>') {
+    $rootMarker = "`t<include>ui_styles.inc</include>"
+    if (-not $uiRoot.Contains($rootMarker)) {
+        throw "Could not locate the UI root insertion marker in $uiRootPath"
+    }
+    $uiRoot = $uiRoot.Replace($rootMarker, "`t<include>ui_entertainer_reborn.inc</include>`r`n$rootMarker")
+    [IO.File]::WriteAllText($uiRootPath, $uiRoot, $utf8NoBom)
+}
+
+$optionsUiPath = Join-Path $uiDirectory "ui_options.inc"
+if (-not (Test-Path -LiteralPath $optionsUiPath -PathType Leaf)) {
+    throw "Client options UI is missing: $optionsUiPath"
+}
+$optionsUi = [IO.File]::ReadAllText($optionsUiPath)
+if ($optionsUi -notmatch "pagePerformance='comp\.target\.performance'") {
+    $codeMarker = "pageKeymap='comp.target.keymap'"
+    if (-not $optionsUi.Contains($codeMarker)) {
+        throw "Could not locate the options CodeData marker in $optionsUiPath"
+    }
+    $optionsUi = $optionsUi.Replace($codeMarker, "$codeMarker`r`n`t`t`t`tpagePerformance='comp.target.performance'")
+}
+if ($optionsUi -notmatch "Target='target\.performance'") {
+    $tabMarker = "Target='target.keymap'"
+    $tabTarget = $optionsUi.IndexOf($tabMarker, [StringComparison]::Ordinal)
+    $tabEnd = if ($tabTarget -ge 0) { $optionsUi.IndexOf("/>", $tabTarget, [StringComparison]::Ordinal) } else { -1 }
+    if ($tabEnd -lt 0) {
+        throw "Could not locate the keymap tab entry in $optionsUiPath"
+    }
+    $tabEnd += 2
+    $performanceTab = "`r`n`t`t`t`t`t<Data localName='Performance Input' Name='Performance Input' Size='128,64' Target='target.performance'/>"
+    $optionsUi = $optionsUi.Insert($tabEnd, $performanceTab)
+}
+if ($optionsUi -notmatch "Name='buttonPerformance'") {
+    $buttonMarker = ">@ui_opt:b_keymap</Button>"
+    $buttonEnd = $optionsUi.IndexOf($buttonMarker, [StringComparison]::Ordinal)
+    if ($buttonEnd -lt 0) {
+        throw "Could not locate the keymap button in $optionsUiPath"
+    }
+    $buttonEnd += $buttonMarker.Length
+    $performanceButton = "`r`n`t`t`t`t`t<Button LocalText='Performance Input' Location='4,395' MaximumSize='16384,22' MinimumSize='0,19' Name='buttonPerformance' OnPress='parent.parent.tabs.activetab=13' PackSize='a' RStyleDefault='rs_default' ScrollExtent='103,22' Size='103,22' Style='/Styles.New.buttons.hud.style'>Performance Input</Button>"
+    $optionsUi = $optionsUi.Insert($buttonEnd, $performanceButton)
+}
+if ($optionsUi -notmatch '(?i)<include>ui_options_entertainer\.inc</include>') {
+    $optionsIncludeMarker = "<include>ui_options_keymap.inc</include>"
+    if (-not $optionsUi.Contains($optionsIncludeMarker)) {
+        throw "Could not locate the options include marker in $optionsUiPath"
+    }
+    $optionsUi = $optionsUi.Replace($optionsIncludeMarker, "<include>ui_options_entertainer.inc</include>`r`n`t`t`t`t`t$optionsIncludeMarker")
+}
+[IO.File]::WriteAllText($optionsUiPath, $optionsUi, $utf8NoBom)
+
 $midiDirectory = Join-Path $clientRootPath "midi"
 New-Item -ItemType Directory -Path $midiDirectory -Force | Out-Null
 $generatedSampleBank = Join-Path $repoRoot "generated\entertainer-sample-bank\midi\instruments"
@@ -237,7 +302,6 @@ $manifest = [ordered]@{
 }
 
 $json = $manifest | ConvertTo-Json -Depth 5
-$utf8NoBom = [Text.UTF8Encoding]::new($false)
 [IO.File]::WriteAllText((Join-Path $clientRootPath "x64-runtime-manifest.json"), $json + [Environment]::NewLine, $utf8NoBom)
 
 Write-Host "Staged $($runtimeFiles.Count) x64 runtime files to $clientRootPath"

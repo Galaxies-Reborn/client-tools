@@ -169,6 +169,21 @@ namespace SwgCuiToolbarNamespace
 
 	const int MAX_PET_TOOLBAR_BUTTONS = 9;
 
+	bool getEntertainerRebornCommandDescription(std::string const &command, Unicode::String &description)
+	{
+		if (!_stricmp(command.c_str(), "startMidiToMusic"))
+		{
+			description = Unicode::narrowToWide("Start Midi to Music - play the equipped instrument with MIDI or performance keys.");
+			return true;
+		}
+		if (!_stricmp(command.c_str(), "stopPerformanceMode"))
+		{
+			description = Unicode::narrowToWide("Stop Midi to Music.");
+			return true;
+		}
+		return false;
+	}
+
 	class DefaultCommand
 	{
 	public:
@@ -929,7 +944,7 @@ UIWidget * SwgCuiToolbar::createToolbarWidget (const CuiDragInfo & item)
 			{
 				std::string cmd(item.str);
 				cmd.erase(cmd.begin());
-				if (CuiSkillManager::localizeCmdDescription(Unicode::toLower(cmd), description))
+				if (getEntertainerRebornCommandDescription(cmd, description) || CuiSkillManager::localizeCmdDescription(Unicode::toLower(cmd), description))
 				{
 					button->SetTooltip(description);
 				}
@@ -3307,6 +3322,16 @@ void SwgCuiToolbar::updateFromSizes ()
 
 void SwgCuiToolbar::setupDefaults()
 {
+	if (Game::getSinglePlayer())
+	{
+		CuiDragInfo item;
+		item.type = CuiDragInfoTypes::CDIT_command;
+		item.str = "/startMidiToMusic";
+		setToolbarItem(COMBAT_PANE_INDEX, 22, item);
+		item.str = "/stopPerformanceMode";
+		setToolbarItem(COMBAT_PANE_INDEX, 23, item);
+	}
+
 	//-- set the new item up
 	/*CuiDragInfo item;
 
@@ -4343,7 +4368,7 @@ void SwgCuiToolbar::populateDefaultActionWindow()
 						std::string cmd(item->str);
 						cmd.erase(cmd.begin());
 
-						if (CuiSkillManager::localizeCmdDescription(Unicode::toLower(cmd), description))
+						if (getEntertainerRebornCommandDescription(cmd, description) || CuiSkillManager::localizeCmdDescription(Unicode::toLower(cmd), description))
 						{
 							m_bigButton->SetTooltip(description);
 						}

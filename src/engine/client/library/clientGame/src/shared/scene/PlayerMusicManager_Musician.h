@@ -28,6 +28,7 @@ public:
 	void nextFrame(bool const lowerVolume);
 	void startPlaying();
 	void addFlourish(int const flourishIndex);
+	void playMidiNoteVisual(int note);
 	void setMidiMode(bool enabled);
 	void startParticleSystem(std::string const &path);
 

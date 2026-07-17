@@ -6,6 +6,7 @@
 #include "clientGame/Game.h"
 #include "clientGame/PlayerMusicManager.h"
 #include "sharedDebug/InstallTimer.h"
+#include "sharedFoundation/ConfigFile.h"
 #include "sharedFoundation/ExitChain.h"
 #include "sharedFoundation/NetworkId.h"
 #include "sharedFoundation/Os.h"
@@ -40,6 +41,9 @@ namespace PerformanceModeManagerNamespace
 	double s_scriptDurationSeconds = 0.0;
 	float s_scriptEventBudget = 0.0f;
 	bool s_scriptPaused = false;
+	bool s_reportedMidiInputEvent = false;
+	bool s_reportedSynthDispatch = false;
+	bool s_reportedKeyboardInputEvent = false;
 #if defined(_WIN64)
 	std::vector<ClientAudioMidiEvent> s_scriptEvents;
 	size_t s_scriptEventIndex = 0;
@@ -77,6 +81,16 @@ namespace PerformanceModeManagerNamespace
 	bool isSynthMode(PerformanceModeManager::Mode mode)
 	{
 		return mode == PerformanceModeManager::M_midiToMusic || mode == PerformanceModeManager::M_musicFromScript;
+	}
+
+	bool isOfflineTest()
+	{
+		return Game::getSinglePlayer();
+	}
+
+	int offlineInstrumentId()
+	{
+		return std::max(1, std::min(14, ConfigFile::getKeyInt("ClientGame", "entertainerOfflineInstrumentId", 10)));
 	}
 
 	std::string midiDirectoryPath()
@@ -232,6 +246,8 @@ namespace PerformanceModeManagerNamespace
 
 	void sendMidiMessage(PerformanceMidiMessage::Type type, int channel, int note, int value)
 	{
+		if (isOfflineTest())
+			return;
 		char parameter[32];
 		snprintf(parameter, sizeof(parameter), "%d", PerformanceMidiMessage::encode(type, channel, note, value));
 		ClientCommandQueue::sendImmediateCommandToServer("performanceMidiEvent", NetworkId::cms_invalid, Unicode::narrowToWide(parameter));
@@ -242,7 +258,20 @@ namespace PerformanceModeManagerNamespace
 #if defined(_WIN64)
 		CreatureObject const * const player = Game::getPlayerCreature();
 		if (player)
-			ClientAudioMidi::synthNoteOn(static_cast<unsigned long long>(player->getNetworkId().getValue()), channel, note, velocity);
+		{
+			unsigned long long const performerId = static_cast<unsigned long long>(player->getNetworkId().getValue());
+			if (!ClientAudioMidi::hasSynthSession(performerId) && s_instrumentId >= 1 && s_instrumentId <= 14)
+				PlayerMusicManager::beginMidiPerformance(player, s_instrumentId);
+			bool const synthReady = ClientAudioMidi::hasSynthSession(performerId);
+			if (!s_reportedSynthDispatch)
+			{
+				s_reportedSynthDispatch = true;
+				REPORT_LOG(true, ("Entertainer Reborn MIDI: first local note dispatch, synth session %s (performer %llu, instrument %d, note %d).\n", synthReady ? "ready" : "missing", performerId, s_instrumentId, note));
+			}
+			if (synthReady)
+				ClientAudioMidi::synthNoteOn(performerId, channel, note, velocity);
+			PlayerMusicManager::playMidiNoteVisual(player, note);
+		}
 #else
 		UNREF(channel);
 		UNREF(note);
@@ -322,12 +351,19 @@ namespace PerformanceModeManagerNamespace
 		s_pendingTimeout = 0.0f;
 		s_flourishCooldown = 0.0f;
 		resetHeldKeys();
+		s_reportedMidiInputEvent = false;
+		s_reportedSynthDispatch = false;
+		s_reportedKeyboardInputEvent = false;
 
 #if defined(_WIN64)
 		std::string midiStatus;
 		bool midiOpened = false;
 		if (s_mode != PerformanceModeManager::M_musicFromScript)
 		{
+			std::vector<ClientAudioMidiDevice> const devices = ClientAudioMidi::getInputDevices();
+			REPORT_LOG(true, ("Entertainer Reborn MIDI: activating mode %d with %u input device(s).\n", static_cast<int>(s_mode), static_cast<unsigned int>(devices.size())));
+			for (std::vector<ClientAudioMidiDevice>::const_iterator i = devices.begin(); i != devices.end(); ++i)
+				REPORT_LOG(true, ("Entertainer Reborn MIDI: device [%s], identifier [%s].\n", i->name.c_str(), i->identifier.c_str()));
 			if (!s_midiDeviceIdentifier.empty())
 				midiOpened = ClientAudioMidi::openInput(s_midiDeviceIdentifier, midiStatus);
 			if (!midiOpened)
@@ -336,6 +372,7 @@ namespace PerformanceModeManagerNamespace
 				if (midiOpened)
 					s_midiDeviceIdentifier = ClientAudioMidi::getOpenInputIdentifier();
 			}
+			REPORT_LOG(true, ("Entertainer Reborn MIDI: %s%s%s.\n", midiOpened ? "opened " : "not opened: ", midiOpened ? s_midiDeviceName.c_str() : midiStatus.c_str(), midiOpened ? "" : ""));
 		}
 		else
 		{
@@ -345,7 +382,7 @@ namespace PerformanceModeManagerNamespace
 		if (isSynthMode(s_mode))
 		{
 			CreatureObject const * const player = Game::getPlayerCreature();
-			s_instrumentId = PlayerMusicManager::getInstrumentId(player);
+			s_instrumentId = isOfflineTest() ? offlineInstrumentId() : PlayerMusicManager::getInstrumentId(player);
 			if (!player || s_instrumentId < 1 || s_instrumentId > 14)
 			{
 				clearModeState();
@@ -411,12 +448,16 @@ void PerformanceModeManager::install()
 
 #if defined(_WIN64)
 	std::vector<MidiDevice> const devices = getMidiDevices();
+	REPORT_LOG(true, ("Entertainer Reborn MIDI: install detected %u input device(s).\n", static_cast<unsigned int>(devices.size())));
 	for (std::vector<MidiDevice>::const_iterator i = devices.begin(); i != devices.end(); ++i)
+	{
+		REPORT_LOG(true, ("Entertainer Reborn MIDI: detected [%s], identifier [%s].\n", i->name.c_str(), i->identifier.c_str()));
 		if (i->identifier == s_midiDeviceIdentifier)
 		{
 			s_midiDeviceName = i->name;
 			break;
 		}
+	}
 #endif
 	ExitChain::add(PerformanceModeManager::remove, "PerformanceModeManager::remove", 0, false);
 }
@@ -437,7 +478,7 @@ void PerformanceModeManager::alter(float elapsedTime)
 	CreatureObject const * const player = Game::getPlayerCreature();
 	if (s_pendingMode != M_none)
 	{
-		if (player && player->getPerformanceType() > 0)
+		if (player && (isOfflineTest() || player->getPerformanceType() > 0))
 		{
 			if (!activatePendingMode())
 				return;
@@ -457,7 +498,7 @@ void PerformanceModeManager::alter(float elapsedTime)
 	if (s_mode == M_none)
 		return;
 
-	if (!player || player->getPerformanceType() == 0)
+	if (!player || (!isOfflineTest() && player->getPerformanceType() == 0))
 	{
 		clearModeState();
 		s_statusMessage = "Performance ended.";
@@ -493,6 +534,11 @@ void PerformanceModeManager::alter(float elapsedTime)
 	int eventBudget = 128;
 	while (eventBudget-- > 0 && ClientAudioMidi::pollEvent(event))
 	{
+		if (!s_reportedMidiInputEvent)
+		{
+			s_reportedMidiInputEvent = true;
+			REPORT_LOG(true, ("Entertainer Reborn MIDI: received first event (type %d, channel %d, note/controller %d, value %d).\n", static_cast<int>(event.type), event.channel, event.note, event.value));
+		}
 		if (s_mode == M_midiToFlourish && event.type == ClientAudioMidiEvent::T_noteOn && event.value > 0)
 		{
 			int const flourish = findMidiFlourish(event.note);
@@ -567,6 +613,11 @@ bool PerformanceModeManager::processEvent(IoEvent const &event)
 		if (!s_musicKeyHeld[musicKey])
 		{
 			int const note = std::max(0, std::min(127, 48 + musicKey + s_midiOctaveShift * 12));
+			if (!s_reportedKeyboardInputEvent)
+			{
+				s_reportedKeyboardInputEvent = true;
+				REPORT_LOG(true, ("Entertainer Reborn MIDI: received first performance keyboard note (DIK %d, note %d).\n", event.arg2, note));
+			}
 			s_musicKeyHeld[musicKey] = true;
 			s_musicKeyHeldNote[musicKey] = note;
 			playLocalNote(0, note, 100);
@@ -613,7 +664,7 @@ bool PerformanceModeManager::startMidiToFlourish(std::string const &songName, st
 		statusMessage = "Enter the game before starting a performance";
 		return false;
 	}
-	if (hasPerformanceMode() || player->getPerformanceType() != 0)
+	if (hasPerformanceMode() || (!isOfflineTest() && player->getPerformanceType() != 0))
 	{
 		statusMessage = "Stop the current performance before starting Midi to Flourish";
 		return false;
@@ -633,13 +684,16 @@ bool PerformanceModeManager::startMidiToFlourish(std::string const &songName, st
 		return false;
 	}
 
-	IGNORE_RETURN(ClientCommandQueue::enqueueCommand("startMusic", NetworkId::cms_invalid, Unicode::narrowToWide(selectedSong)));
+	if (!isOfflineTest())
+		IGNORE_RETURN(ClientCommandQueue::enqueueCommand("startMusic", NetworkId::cms_invalid, Unicode::narrowToWide(selectedSong)));
 	s_pendingMode = M_midiToFlourish;
 	s_songName = selectedSong;
 	s_pendingTimeout = s_serverConfirmationTimeout;
 	s_flourishCooldown = 0.0f;
 	resetHeldKeys();
-	s_statusMessage = "Waiting for the server to start " + selectedSong + "...";
+	s_statusMessage = isOfflineTest() ? "Starting offline Midi to Flourish..." : "Waiting for the server to start " + selectedSong + "...";
+	if (isOfflineTest())
+		IGNORE_RETURN(activatePendingMode());
 	statusMessage = s_statusMessage;
 	return true;
 }
@@ -659,7 +713,7 @@ bool PerformanceModeManager::startMidiToMusic(std::string &statusMessage)
 		statusMessage = "Enter the game before starting a performance";
 		return false;
 	}
-	if (hasPerformanceMode() || player->getPerformanceType() != 0)
+	if (hasPerformanceMode() || (!isOfflineTest() && player->getPerformanceType() != 0))
 	{
 		statusMessage = "Stop the current performance before starting Midi to Music";
 		return false;
@@ -673,11 +727,17 @@ bool PerformanceModeManager::startMidiToMusic(std::string &statusMessage)
 	}
 
 	s_songName = songs.front();
-	IGNORE_RETURN(ClientCommandQueue::enqueueCommand("startMusic", NetworkId::cms_invalid, Unicode::narrowToWide(s_songName)));
+	if (!isOfflineTest())
+		IGNORE_RETURN(ClientCommandQueue::enqueueCommand("startMusic", NetworkId::cms_invalid, Unicode::narrowToWide(s_songName)));
 	s_pendingMode = M_midiToMusic;
 	s_pendingTimeout = s_serverConfirmationTimeout;
 	resetHeldKeys();
-	s_statusMessage = "Waiting for the server to authorize Midi to Music...";
+	s_statusMessage = isOfflineTest() ? "Starting offline Midi to Music..." : "Waiting for the server to authorize Midi to Music...";
+	if (isOfflineTest() && !activatePendingMode())
+	{
+		statusMessage = s_statusMessage;
+		return false;
+	}
 	statusMessage = s_statusMessage;
 	return true;
 }
@@ -701,7 +761,7 @@ bool PerformanceModeManager::startMusicFromScript(std::string const &fileName, s
 		statusMessage = "Enter the game before starting a performance";
 		return false;
 	}
-	if (hasPerformanceMode() || player->getPerformanceType() != 0)
+	if (hasPerformanceMode() || (!isOfflineTest() && player->getPerformanceType() != 0))
 	{
 		statusMessage = "Stop the current performance before starting Music from Script";
 		return false;
@@ -730,13 +790,19 @@ bool PerformanceModeManager::startMusicFromScript(std::string const &fileName, s
 	s_scriptEventBudget = s_scriptEventsPerSecond;
 	s_scriptPaused = false;
 	s_songName = songs.front();
-	IGNORE_RETURN(ClientCommandQueue::enqueueCommand("startMusic", NetworkId::cms_invalid, Unicode::narrowToWide(s_songName)));
+	if (!isOfflineTest())
+		IGNORE_RETURN(ClientCommandQueue::enqueueCommand("startMusic", NetworkId::cms_invalid, Unicode::narrowToWide(s_songName)));
 	s_pendingMode = M_musicFromScript;
 	s_pendingTimeout = s_serverConfirmationTimeout;
 	resetHeldKeys();
 	char details[256];
 	snprintf(details, sizeof(details), "Waiting for the server to authorize %s (format %d, %d tracks, %d events, %.1f seconds)...", fileName.c_str(), info.fileType, info.trackCount, info.eventCount, info.durationSeconds);
 	s_statusMessage = details;
+	if (isOfflineTest() && !activatePendingMode())
+	{
+		statusMessage = s_statusMessage;
+		return false;
+	}
 	statusMessage = s_statusMessage;
 	return true;
 #endif
@@ -754,7 +820,7 @@ void PerformanceModeManager::stopPerformanceMode(bool sendServerStop)
 		unsigned long long const performerId = static_cast<unsigned long long>(player->getNetworkId().getValue());
 		ClientAudioMidi::synthAllNotesOff(performerId);
 #endif
-		if (sendServerStop)
+		if (sendServerStop && !isOfflineTest())
 		{
 			sendMidiMessage(PerformanceMidiMessage::T_allNotesOff, 0, 0, 0);
 			sendMidiMessage(PerformanceMidiMessage::T_sessionStop, 0, 0, 0);
@@ -762,7 +828,7 @@ void PerformanceModeManager::stopPerformanceMode(bool sendServerStop)
 		PlayerMusicManager::endMidiPerformance(player);
 	}
 
-	if (sendServerStop)
+	if (sendServerStop && !isOfflineTest())
 		IGNORE_RETURN(ClientCommandQueue::enqueueCommand("stopMusic", NetworkId::cms_invalid, Unicode::emptyString));
 
 	clearModeState();
@@ -837,6 +903,11 @@ std::vector<std::string> PerformanceModeManager::getAvailableMusicSongs()
 	CreatureObject const * const player = Game::getPlayerCreature();
 	if (!player)
 		return result;
+	if (isOfflineTest())
+	{
+		result.push_back("offline_test");
+		return result;
+	}
 
 	std::string const prefix = "startmusic+";
 	std::map<std::string, int> const &commands = player->getCommands();

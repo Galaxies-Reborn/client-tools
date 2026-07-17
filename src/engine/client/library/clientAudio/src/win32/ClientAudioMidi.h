@@ -49,6 +49,7 @@ public:
 
 	static void startSynthSession(unsigned long long performerId, int instrumentId);
 	static void stopSynthSession(unsigned long long performerId);
+	static bool hasSynthSession(unsigned long long performerId);
 	static void synthNoteOn(unsigned long long performerId, int channel, int note, int velocity);
 	static void synthNoteOff(unsigned long long performerId, int channel, int note);
 	static void synthSustain(unsigned long long performerId, int channel, bool enabled);

@@ -1441,6 +1441,12 @@ void ClientAudioMidi::stopSynthSession(unsigned long long performerId)
 	s_synthSessions.erase(performerId);
 }
 
+bool ClientAudioMidi::hasSynthSession(unsigned long long performerId)
+{
+	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	return s_synthSessions.find(performerId) != s_synthSessions.end();
+}
+
 void ClientAudioMidi::synthNoteOn(unsigned long long performerId, int channel, int note, int velocity)
 {
 	std::lock_guard<std::recursive_mutex> lock(s_mutex);

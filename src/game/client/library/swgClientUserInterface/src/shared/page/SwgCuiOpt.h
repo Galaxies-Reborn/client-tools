@@ -15,7 +15,6 @@
 class UIPage;
 class UIButton;
 class SwgCuiOptBase;
-class SwgCuiOptKeymap;
 class UITabbedPane;
 
 // ======================================================================
@@ -58,11 +57,6 @@ private:
 
 	bool                 m_keepSettings;
 
-	// Standalone keymap dialog. In NGE-retail the keymap UI lives at
-	// /PDA.keymap rather than as a sub-tab of OptMain. We construct a
-	// SwgCuiOptKeymap pointing at it and pop it up when the Keymap tab is
-	// clicked.
-	SwgCuiOptKeymap *    m_standaloneKeymap;
 };
 
 // ======================================================================

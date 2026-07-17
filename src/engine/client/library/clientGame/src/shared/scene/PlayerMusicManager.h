@@ -31,6 +31,7 @@ public:
 	static void        queueFlourish(CreatureObject const *creatureObject, const int flourishIndex);
 	static void        beginMidiPerformance(CreatureObject const *creatureObject, int instrumentId);
 	static void        endMidiPerformance(CreatureObject const *creatureObject);
+	static void        playMidiNoteVisual(CreatureObject const *creatureObject, int note);
 	static void        startPerformance(CreatureObject &musician);
 	static void        stopPerformance(CreatureObject &musician);
 	static void        checkStatus(CreatureObject const * const creatureObject);
