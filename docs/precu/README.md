@@ -29,8 +29,8 @@ uses the mediator's production clear action, while `CombatQueueStatus` is
 read-only. The July 16 live run observed add counts of 4 and 3 on the two
 clients, natural authoritative removal to zero, a sequence-specific clear of
 `12 -> 1 -> 0` in 300 ms, and `6 -> 0` across a client relog. The server still
-rejects `headShot1`; this gate validates the client queue lifecycle and does
-not claim that Pre-CU command execution or HAM damage is implemented.
+rejected `headShot1` at that historical v7 milestone; the current v13
+acceptance below supersedes that execution limitation.
 
 Example live probes against a loaded fixture client:
 
@@ -52,6 +52,15 @@ existing headShot1 canary. `CombatTimerStatus` reports only the latest
 server-origin execute timer for those three commands, including its current and
 maximum milliseconds. The client never derives a timer or fabricates a hit,
 damage, HAM cost, defense roll, or command result.
+
+The July 17 primary-accuracy run also exercised the v13 canary at a
+62.99-meter surface distance with the compiled client command table declaring
+`headShot1.maxRangeToTarget=64`. The real queue admitted one command, received
+`Success`, captured the server-origin 4,725 ms execute timer, and applied real
+Mind damage. Server fixture telemetry reported a 53.338253-percent Core3 hit
+chance against the 53.32653-percent 63-meter model. The bridge supplied only
+the fixed fixture target and production enqueue request; it did not bypass
+client admission or create the result.
 
 `QueueDurationControl` is a separate fixed control for the shared timing gate.
 It queues only the authentic Publish 14.1 `headShot2` player command from the
