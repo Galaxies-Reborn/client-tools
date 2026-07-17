@@ -89,6 +89,18 @@ wound, charge, and medical-XP results.
   -TargetOid <fixture-patient-oid>
 ```
 
+Protocol v16 adds `QueueHealDamage`. It accepts only an explicit patient OID
+and queues the authentic five-second `healDamage` command through
+`ClientCommandQueue`; server-side code remains solely responsible for medicine
+selection, treatment recovery, HAM changes, cost, charges, and medical XP.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueHealDamage `
+  -ClientProcessId <pid> `
+  -TargetOid <fixture-patient-oid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell

@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -70,7 +70,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 15
+$expectedProtocolVersion = 16
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -105,6 +105,7 @@ $command = @{
     EquipFixtureLightsaber = 30
     EquipFixtureFallbackSword = 31
     QueueHealWound = 32
+    QueueHealDamage = 33
 }
 $dikByName = @{
     Escape    = 0x01
@@ -617,6 +618,18 @@ switch ($Action) {
             -Window $window `
             -Message $message `
             -Command $command.QueueHealWound `
+            -Data $TargetOid
+        $detail = "target=$TargetOid $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
+    }
+
+    "QueueHealDamage" {
+        if (-not $PSBoundParameters.ContainsKey("TargetOid")) {
+            throw "QueueHealDamage requires -TargetOid."
+        }
+        [long]$packedStatus = Invoke-BridgeQuery `
+            -Window $window `
+            -Message $message `
+            -Command $command.QueueHealDamage `
             -Data $TargetOid
         $detail = "target=$TargetOid $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
     }
