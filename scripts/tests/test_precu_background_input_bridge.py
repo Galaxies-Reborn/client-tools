@@ -20,6 +20,17 @@ COMMAND_QUEUE_HEADER = REPOSITORY_ROOT / (
 COMMAND_QUEUE_SOURCE = REPOSITORY_ROOT / (
     "src/engine/client/library/clientGame/src/shared/command/ClientCommandQueue.cpp"
 )
+DIRECT_INPUT_CONFIG_HEADER = REPOSITORY_ROOT / (
+    "src/engine/client/library/clientDirectInput/src/shared/"
+    "ConfigClientDirectInput.h"
+)
+DIRECT_INPUT_CONFIG_SOURCE = REPOSITORY_ROOT / (
+    "src/engine/client/library/clientDirectInput/src/shared/"
+    "ConfigClientDirectInput.cpp"
+)
+DIRECT_INPUT_SOURCE = REPOSITORY_ROOT / (
+    "src/engine/client/library/clientDirectInput/src/win32/DirectInput.cpp"
+)
 
 
 def function_body(source: str, signature: str) -> str:
@@ -44,6 +55,13 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         cls.helper = HELPER_SOURCE.read_text(encoding="utf-8")
         cls.command_queue_header = COMMAND_QUEUE_HEADER.read_text(encoding="utf-8")
         cls.command_queue_source = COMMAND_QUEUE_SOURCE.read_text(encoding="utf-8")
+        cls.direct_input_config_header = DIRECT_INPUT_CONFIG_HEADER.read_text(
+            encoding="utf-8"
+        )
+        cls.direct_input_config_source = DIRECT_INPUT_CONFIG_SOURCE.read_text(
+            encoding="utf-8"
+        )
+        cls.direct_input_source = DIRECT_INPUT_SOURCE.read_text(encoding="utf-8")
 
     def test_bridge_is_explicitly_opt_in_and_disabled_by_default(self):
         self.assertIn(
@@ -60,6 +78,16 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             install_body.index("enableBackgroundInputBridge"),
             install_body.index("RegisterWindowMessageA"),
         )
+
+    def test_unattended_host_can_explicitly_disable_physical_input_devices(self):
+        self.assertIn("static bool         getUseKeyboard();", self.direct_input_config_header)
+        self.assertIn("KEY_BOOL(useKeyboard,                     true);", self.direct_input_config_source)
+        keyboard_install = function_body(
+            self.direct_input_source,
+            "void DirectInputNamespace::installKeyboardDevice(DWORD menuKey)",
+        )
+        self.assertIn("ConfigClientDirectInput::getUseKeyboard()", keyboard_install)
+        self.assertIn("ConfigClientDirectInput::getUseMouse()", self.direct_input_source)
 
     def test_protocol_name_and_command_numbers_are_stable(self):
         self.assertIn(
@@ -96,10 +124,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_equipCdefCarbine",
             "BIC_combatTimerStatus",
             "BIC_queueDurationControl",
+            "BIC_equipFixtureLightsaber",
+            "BIC_equipFixtureFallbackSword",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 13", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 14", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -344,6 +374,8 @@ $results | ConvertTo-Json -Compress
             "EquipCdefCarbine": 27,
             "CombatTimerStatus": 28,
             "QueueDurationControl": 29,
+            "EquipFixtureLightsaber": 30,
+            "EquipFixtureFallbackSword": 31,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -524,6 +556,8 @@ $results | ConvertTo-Json -Compress
             "QueueLegShot1",
             "EquipCdefPistol",
             "EquipCdefCarbine",
+            "EquipFixtureLightsaber",
+            "EquipFixtureFallbackSword",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -568,8 +602,17 @@ $results | ConvertTo-Json -Compress
         self.assertIn('playerId != "39008597"', generic_equip)
         self.assertIn("ContainerInterface::getContainer", generic_equip)
         self.assertIn("strstr(templateName, templateSuffix)", generic_equip)
-        self.assertIn("CuiInventoryManager::equipObject", generic_equip)
-        for suffix in ("rifle_cdef.iff", "pistol_cdef.iff", "carbine_cdef.iff"):
+        self.assertIn(
+            "return CuiInventoryManager::equipObject(object->getNetworkId())",
+            generic_equip,
+        )
+        for suffix in (
+            "rifle_cdef.iff",
+            "pistol_cdef.iff",
+            "carbine_cdef.iff",
+            "pistol_dl44.iff",
+            "pistol_dl44_metal.iff",
+        ):
             self.assertIn(f'"{suffix}"', self.client_main)
 
         self.assertIn('performBackgroundSelfCommand("/stand")', window_proc)

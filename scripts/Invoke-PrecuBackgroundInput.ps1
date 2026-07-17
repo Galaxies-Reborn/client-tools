@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -67,7 +67,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 13
+$expectedProtocolVersion = 14
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -99,6 +99,8 @@ $command = @{
     EquipCdefCarbine = 27
     CombatTimerStatus = 28
     QueueDurationControl = 29
+    EquipFixtureLightsaber = 30
+    EquipFixtureFallbackSword = 31
 }
 $dikByName = @{
     Escape    = 0x01
@@ -604,13 +606,13 @@ switch ($Action) {
     }
 
     "EquipCdefRifle" {
-        Send-BridgeCommand -Window $window -Message $message -Command $command.EquipCdefRifle
-        $detail = "queued for the bound combat fixture player"
+        [long]$equipResult = Invoke-BridgeQuery -Window $window -Message $message -Command $command.EquipCdefRifle
+        $detail = "equipAccepted=$([bool]$equipResult) result=$equipResult for the bound combat fixture player"
     }
 
-    { $_ -in @("EquipCdefPistol", "EquipCdefCarbine") } {
-        Send-BridgeCommand -Window $window -Message $message -Command $command[$Action]
-        $detail = "queued for the bound combat fixture player"
+    { $_ -in @("EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword") } {
+        [long]$equipResult = Invoke-BridgeQuery -Window $window -Message $message -Command $command[$Action]
+        $detail = "equipAccepted=$([bool]$equipResult) result=$equipResult for the bound combat fixture player"
     }
 
     "Stand" {

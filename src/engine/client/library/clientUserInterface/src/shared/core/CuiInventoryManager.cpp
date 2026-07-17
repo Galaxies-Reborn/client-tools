@@ -781,16 +781,18 @@ void CuiInventoryManager::pickupObject (const NetworkId & id)
 
 	//----------------------------------------------------------------------
 
-void CuiInventoryManager::equipObject (const NetworkId & id)
+bool CuiInventoryManager::equipObject (const NetworkId & id)
 {
 	CreatureObject * const player = Game::getPlayerCreature ();
 	if (!player)
-		return;
+		return false;
 	
 	TangibleObject * const tangible     = dynamic_cast<TangibleObject *>     (NetworkIdManager::getObjectById (id));
 	
 	if (tangible)
-		CuiInventoryManager::equipItem (*tangible, *player);
+		return CuiInventoryManager::equipItem (*tangible, *player);
+
+	return false;
 }
 
 //----------------------------------------------------------------------

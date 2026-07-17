@@ -1604,10 +1604,13 @@ void DirectInputNamespace::installKeyboardDevice(DWORD menuKey)
 {
 	InstallTimer const installTimer("DirectInputNamespace::installKeyboardDevice");
 
-	NOT_NULL(ms_directInput);
-	DEBUG_FATAL(ms_keyboardDevice, ("a keyboard device already exists\n"));
-	ms_keyboardDevice = new KeyboardDevice(GUID_SysKeyboard, cms_maxBufferedEventCount, menuKey);
-	addDevice(ms_keyboardDevice);
+	if (ConfigClientDirectInput::getUseKeyboard())
+	{
+		NOT_NULL(ms_directInput);
+		DEBUG_FATAL(ms_keyboardDevice, ("a keyboard device already exists\n"));
+		ms_keyboardDevice = new KeyboardDevice(GUID_SysKeyboard, cms_maxBufferedEventCount, menuKey);
+		addDevice(ms_keyboardDevice);
+	}
 }
 
 // ----------------------------------------------------------------------
