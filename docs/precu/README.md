@@ -169,12 +169,15 @@ condition-treatment recovery, Mind cost, charge use, effects, and medical XP.
   -TargetOid <fixture-patient-oid>
 ```
 
-Protocol v25 adds `QueueHealEnhance` without renumbering any earlier bridge
-action. The caller supplies only the patient OID and the client enters the
-authentic queued `healEnhance` command through `ClientCommandQueue`; the server
-owns hospital/camp/droid and combat admission, enhancement-pack selection,
-battle-fatigue scaling, Focus-adjusted Mind, charge use, buff replacement,
-medical XP, effects, and wound-treatment recovery.
+Protocol v26 retains the `QueueHealEnhance` action number and transports the
+patient OID both as the normal queue target and as a narrow command parameter.
+That compatibility path preserves an exterior fixture patient even when the
+retained optional-target client row has not loaded it into the look-at object
+map. The server resolves only an eligible living patient from that parameter
+and continues to own hospital/camp/droid and combat admission,
+enhancement-pack selection, battle-fatigue scaling, Focus-adjusted Mind,
+charge use, buff replacement, medical XP, effects, and wound-treatment
+recovery.
 
 ```powershell
 .\scripts\Invoke-PrecuBackgroundInput.ps1 `

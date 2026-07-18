@@ -165,7 +165,7 @@ namespace ClientMainNamespace
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 25;
+	LRESULT const cms_backgroundInputProtocolVersion = 26;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -523,7 +523,8 @@ namespace ClientMainNamespace
 
 	bool performBackgroundQueueTending(
 		char const * const commandName,
-		LPARAM const targetValue)
+		LPARAM const targetValue,
+		bool const includeTargetParameter = false)
 	{
 		Object * const player = Game::getPlayer();
 		if (!player || !commandName || targetValue <= 0)
@@ -546,10 +547,14 @@ namespace ClientMainNamespace
 		CuiCombatManager::setLookAtTarget(targetId);
 		ClientCommandQueue::clearLastCommandRemoval();
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		Unicode::String const commandParameters =
+			includeTargetParameter
+				? Unicode::narrowToWide(targetBuffer)
+				: Unicode::emptyString;
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			commandName,
 			targetId,
-			Unicode::emptyString) != 0;
+			commandParameters) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
 		return queued;
 	}
@@ -634,10 +639,15 @@ namespace ClientMainNamespace
 	bool performBackgroundQueueHealEnhance(LPARAM const targetValue)
 	{
 		// Publish 14.1 Heal Enhance is queued. The bridge supplies only the
-		// fixture patient OID; the server owns facility/combat admission,
-		// enhancement-pack selection, battle fatigue, Mind, charge, XP, and
-		// wound-treatment recovery.
-		return performBackgroundQueueTending("healEnhance", targetValue);
+		// fixture patient OID. The retained optional-target command row can
+		// discard an unloaded look-at object, so protocol 26 also transports
+		// the same OID as a command parameter for server-side resolution.
+		// The server still owns facility/combat admission, enhancement-pack
+		// selection, battle fatigue, Mind, charge, XP, and recovery.
+		return performBackgroundQueueTending(
+			"healEnhance",
+			targetValue,
+			true);
 	}
 
 	bool performBackgroundClearCombatQueue()
