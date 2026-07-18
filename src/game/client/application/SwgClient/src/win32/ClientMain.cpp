@@ -156,11 +156,12 @@ namespace ClientMainNamespace
 		BIC_queueTendWound,
 		BIC_queueDiagnose,
 		BIC_queueMedicalForage,
-		BIC_queueFirstAid
+		BIC_queueFirstAid,
+		BIC_queueDragIncapacitatedPlayer
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 20;
+	LRESULT const cms_backgroundInputProtocolVersion = 21;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -592,6 +593,16 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("firstAid", targetValue);
 	}
 
+	bool performBackgroundQueueDragIncapacitatedPlayer(LPARAM const targetValue)
+	{
+		// Publish 14.1 drag is intentionally nonqueued. The bridge supplies
+		// only the patient OID; the server owns tier-II skill, incap/death,
+		// group-or-consent, LOS, outdoor, range, and movement authority.
+		return performBackgroundQueueTending(
+			"dragIncapacitatedPlayer",
+			targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -869,6 +880,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueFirstAid:
 				if (!performBackgroundQueueFirstAid(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueDragIncapacitatedPlayer:
+				if (!performBackgroundQueueDragIncapacitatedPlayer(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
