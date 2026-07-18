@@ -196,10 +196,11 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_queueExtinguishFire",
             "BIC_queueCureDisease",
             "BIC_queueRevivePlayer",
+            "BIC_queueDeathBlow",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 29", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 30", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -461,6 +462,7 @@ $results | ConvertTo-Json -Compress
             "QueueExtinguishFire": 44,
             "QueueCureDisease": 45,
             "QueueRevivePlayer": 46,
+            "QueueDeathBlow": 47,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -780,6 +782,14 @@ $results | ConvertTo-Json -Compress
             'performBackgroundQueueTending("revivePlayer", targetValue)',
             revive_player,
         )
+        death_blow = function_body(
+            self.client_main,
+            "bool performBackgroundQueueDeathBlow(LPARAM const targetValue)",
+        )
+        self.assertIn(
+            'performBackgroundQueueTending("deathBlow", targetValue)',
+            death_blow,
+        )
         tending = function_body(
             self.client_main,
             "bool performBackgroundQueueTending(",
@@ -854,6 +864,7 @@ $results | ConvertTo-Json -Compress
             "QueueExtinguishFire",
             "QueueCureDisease",
             "QueueRevivePlayer",
+            "QueueDeathBlow",
             "Stand",
         ):
             with self.subTest(action=action):

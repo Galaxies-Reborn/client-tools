@@ -164,11 +164,12 @@ namespace ClientMainNamespace
 		BIC_queueHealEnhance,
 		BIC_queueExtinguishFire,
 		BIC_queueCureDisease,
-		BIC_queueRevivePlayer
+		BIC_queueRevivePlayer,
+		BIC_queueDeathBlow
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 29;
+	LRESULT const cms_backgroundInputProtocolVersion = 30;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -679,6 +680,14 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("revivePlayer", targetValue);
 	}
 
+	bool performBackgroundQueueDeathBlow(LPARAM const targetValue)
+	{
+		// The authentic Publish 14.1 row advertises 16 meters and queues for
+		// three seconds. The bridge supplies only the victim OID; the server
+		// owns the stricter five-meter, LOS, PvP, incap, feign, and death gates.
+		return performBackgroundQueueTending("deathBlow", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -996,6 +1005,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueRevivePlayer:
 				if (!performBackgroundQueueRevivePlayer(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueDeathBlow:
+				if (!performBackgroundQueueDeathBlow(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
