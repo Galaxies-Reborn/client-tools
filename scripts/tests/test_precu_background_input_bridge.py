@@ -134,7 +134,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 18", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 19", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -386,6 +386,7 @@ $results | ConvertTo-Json -Compress
             "QueueTendDamage": 34,
             "QueueTendWound": 35,
             "QueueDiagnose": 36,
+            "QueueMedicalForage": 37,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -613,6 +614,20 @@ $results | ConvertTo-Json -Compress
             'performBackgroundQueueTending("diagnose", targetValue)',
             diagnose,
         )
+        medical_forage = function_body(
+            self.client_main,
+            "bool performBackgroundQueueMedicalForage()",
+        )
+        self.assertIn('"medicalForage"', medical_forage)
+        self.assertIn("NetworkId::cms_invalid", medical_forage)
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(true)",
+            medical_forage,
+        )
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(false)",
+            medical_forage,
+        )
         for forbidden_mutation in (
             "createObject",
             "grantSkill",
@@ -671,6 +686,7 @@ $results | ConvertTo-Json -Compress
             "QueueTendDamage",
             "QueueTendWound",
             "QueueDiagnose",
+            "QueueMedicalForage",
             "Stand",
         ):
             with self.subTest(action=action):

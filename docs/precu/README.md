@@ -142,6 +142,18 @@ zero. Server telemetry observed SUI PID 518, all nine ordered wound values, and
 Battle Fatigue as the tenth entry. Background Escape dismissed the page before
 the server fixture restored its complete snapshot.
 
+Protocol v19 adds `QueueMedicalForage`. It admits the authentic targetless,
+nonqueued command without foreground focus. The bridge does not simulate the
+search or select a reward: the server owns the adjusted Action cost, 8.5-second
+stationary task, medical-foraging chance, area depletion, inventory check, and
+food/resource/medicine-component result.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueMedicalForage `
+  -ClientProcessId <pid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
