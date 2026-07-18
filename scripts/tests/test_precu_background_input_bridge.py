@@ -31,6 +31,17 @@ DIRECT_INPUT_CONFIG_SOURCE = REPOSITORY_ROOT / (
 DIRECT_INPUT_SOURCE = REPOSITORY_ROOT / (
     "src/engine/client/library/clientDirectInput/src/win32/DirectInput.cpp"
 )
+SPLASH_SOURCE = REPOSITORY_ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/page/"
+    "SwgCuiSplash.cpp"
+)
+LOGIN_SOURCE = REPOSITORY_ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/page/"
+    "SwgCuiLoginScreen.cpp"
+)
+GAME_SOURCE = REPOSITORY_ROOT / (
+    "src/engine/client/library/clientGame/src/shared/core/Game.cpp"
+)
 
 
 def function_body(source: str, signature: str) -> str:
@@ -62,6 +73,9 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             encoding="utf-8"
         )
         cls.direct_input_source = DIRECT_INPUT_SOURCE.read_text(encoding="utf-8")
+        cls.splash_source = SPLASH_SOURCE.read_text(encoding="utf-8")
+        cls.login_source = LOGIN_SOURCE.read_text(encoding="utf-8")
+        cls.game_source = GAME_SOURCE.read_text(encoding="utf-8")
 
     def test_bridge_is_explicitly_opt_in_and_disabled_by_default(self):
         self.assertIn(
@@ -88,6 +102,47 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         )
         self.assertIn("ConfigClientDirectInput::getUseKeyboard()", keyboard_install)
         self.assertIn("ConfigClientDirectInput::getUseMouse()", self.direct_input_source)
+
+    def test_bridge_enabled_client_bypasses_splash_without_foreground_input(self):
+        activation = function_body(
+            self.splash_source, "void SwgCuiSplash::performActivate ()"
+        )
+        self.assertIn(
+            'ConfigFile::getKeyBool("SwgClient", '
+            '"enableBackgroundInputBridge", false)',
+            activation,
+        )
+        self.assertLess(activation.index("enableBackgroundInputBridge"), activation.index("proceed()"))
+
+    def test_bridge_enabled_client_attempts_login_without_foreground_input(self):
+        activation = function_body(
+            self.login_source, "void SwgCuiLoginScreen::performActivate ()"
+        )
+        self.assertIn(
+            'ConfigFile::getKeyBool("SwgClient", '
+            '"enableBackgroundInputBridge", false)',
+            activation,
+        )
+        self.assertIn(
+            "ConfigClientGame::getAutoConnectToLoginServer() || bridgeAutoConnect",
+            activation,
+        )
+
+    def test_bridge_enabled_client_scheduler_runs_without_window_focus(self):
+        self.assertIn(
+            'ConfigFile::getKeyBool("SwgClient", '
+            '"enableBackgroundInputBridge", false)',
+            self.game_source,
+        )
+        focus_gate = self.game_source.index(
+            "if (GetActiveWindow() == Os::getWindow()"
+        )
+        scheduler = self.game_source.index("GameScheduler::alter(elapsedTime)", focus_gate)
+        bridge_config = self.game_source.rindex(
+            "enableBackgroundInputBridge", 0, focus_gate
+        )
+        self.assertLess(bridge_config, scheduler)
+        self.assertIn("backgroundInputBridge)", self.game_source[focus_gate:scheduler])
 
     def test_protocol_name_and_command_numbers_are_stable(self):
         self.assertIn(

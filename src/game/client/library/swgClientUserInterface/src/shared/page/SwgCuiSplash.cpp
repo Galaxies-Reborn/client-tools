@@ -23,6 +23,7 @@
 #include "clientUserInterface/CuiMediatorFactory.h"
 #include "clientUserInterface/CuiMessageBox.h"
 #include "sharedFoundation/ApplicationVersion.h"
+#include "sharedFoundation/ConfigFile.h"
 #include "sharedGame/PlatformFeatureBits.h"
 #include "swgClientUserInterface/SwgCuiMediatorTypes.h"
 
@@ -90,8 +91,15 @@ SwgCuiSplash::~SwgCuiSplash ()
 
 void SwgCuiSplash::performActivate ()
 {
-	
-	if (ConfigClientGame::getSkipSplash())
+	bool const backgroundInputBridge =
+		ConfigFile::getKeyBool("SwgClient", "enableBackgroundInputBridge", false);
+	REPORT_LOG(backgroundInputBridge, ("Pre-CU background splash bypass activated\n"));
+
+	// The dedicated Pre-CU automation client must be able to reach the login
+	// mediator without foreground input. Keep the normal splash sequence for
+	// ordinary clients, but make bridge-enabled launches deterministic.
+	if (ConfigClientGame::getSkipSplash() ||
+		backgroundInputBridge)
 	{
 		proceed();
 		return;
