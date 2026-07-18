@@ -173,7 +173,12 @@ void SwgCuiLoginScreen::performActivate ()
 		ConfigClientGame::getLoginClientID() ? ConfigClientGame::getLoginClientID() : "<null>",
 		ConfigClientGame::getLoginClientPassword() ? static_cast<int>(strlen(ConfigClientGame::getLoginClientPassword())) : -1));
 
-	if ((!m_autoConnected && ConfigClientGame::getAutoConnectToLoginServer ()) || (sessionId != 0 && !ConfigClientGame::getEnableAdminLogin()))
+	bool const bridgeAutoConnect =
+		ConfigFile::getKeyBool("SwgClient", "enableBackgroundInputBridge", false);
+	REPORT_LOG(bridgeAutoConnect, ("Pre-CU background login auto-connect activated\n"));
+	if ((!m_autoConnected &&
+		(ConfigClientGame::getAutoConnectToLoginServer() || bridgeAutoConnect)) ||
+		(sessionId != 0 && !ConfigClientGame::getEnableAdminLogin()))
 	{
 		m_autoConnected = true;
 		ok ();
@@ -238,6 +243,11 @@ void SwgCuiLoginScreen::ok ()
 	
 	m_usernameTextbox->GetLocalText (name);
 	m_passwordTextbox->GetLocalText (passwd);
+	bool const bridgeLogin =
+		ConfigFile::getKeyBool("SwgClient", "enableBackgroundInputBridge", false);
+	REPORT_LOG(bridgeLogin, ("Pre-CU background login credentials present (username=%u password=%u)\n",
+		static_cast<unsigned int>(name.size()),
+		static_cast<unsigned int>(passwd.size())));
 	
 	const char* const sessionId = CuiLoginManager::getSessionIdKey ();
 
