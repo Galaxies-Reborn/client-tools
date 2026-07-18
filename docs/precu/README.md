@@ -235,6 +235,13 @@ three-second, 16-meter Publish 14.1 command row; the server remains
 authoritative for the five-meter range, line-of-sight, PvP, incap, feign,
 already-dead, and self-target gates.
 
+The retained Publish 14.1 aliases are intentionally client-invisible while
+remaining queued combat actions. The later client ordinarily gives such a row
+sequence zero, which conflicts with its queue-clear sentinel. The compatibility
+queue allocates a normal tracked sequence only for `deathBlow` and
+`coupDeGrace`; the authentic rows and authoritative server path remain
+unchanged.
+
 ```powershell
 .\scripts\Invoke-PrecuBackgroundInput.ps1 `
   -Action QueueDeathBlow `

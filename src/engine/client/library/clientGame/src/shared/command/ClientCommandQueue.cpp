@@ -720,11 +720,25 @@ uint32 ClientCommandQueue::enqueueCommand(Command const &command, NetworkId cons
 			return 0;
 	}
 
+	static uint32 const hash_coupDeGrace =
+		Crc::normalizeAndCalculate("coupDeGrace");
+	static uint32 const hash_deathBlow =
+		Crc::normalizeAndCalculate("deathBlow");
+	bool const trackPrecuDeathBlow =
+		command.m_addToCombatQueue &&
+		(command.m_commandHash == hash_coupDeGrace ||
+		 command.m_commandHash == hash_deathBlow);
+
 	uint32 sequenceId = ms_nextSequenceId;
 	if (!command.isNull())
 	{
 		// Assign next sequenceId for client-visible commands.
-		if (command.m_visibleToClients)
+		// Publish 14.1 marks its two death-blow aliases invisible even though
+		// they are queued combat actions. The later client otherwise reuses
+		// sequence zero, which is its queue-clear sentinel. Track only these
+		// pinned retail aliases so they enter the stock queue with a valid
+		// sequence without changing the authentic command table.
+		if (command.m_visibleToClients || trackPrecuDeathBlow)
 		{
 			sequenceId = nextSequenceId();
 			if (command.m_defaultPriority == Command::CP_Normal)
