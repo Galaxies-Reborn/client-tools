@@ -136,7 +136,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 20", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 21", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -390,6 +390,7 @@ $results | ConvertTo-Json -Compress
             "QueueDiagnose": 36,
             "QueueMedicalForage": 37,
             "QueueFirstAid": 38,
+            "QueueDragIncapacitatedPlayer": 39,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -639,6 +640,18 @@ $results | ConvertTo-Json -Compress
             'performBackgroundQueueTending("firstAid", targetValue)',
             first_aid,
         )
+        drag_player = function_body(
+            self.client_main,
+            "bool performBackgroundQueueDragIncapacitatedPlayer(LPARAM const targetValue)",
+        )
+        self.assertIn(
+            '"dragIncapacitatedPlayer"',
+            drag_player,
+        )
+        self.assertIn(
+            "targetValue",
+            drag_player,
+        )
         for forbidden_mutation in (
             "createObject",
             "grantSkill",
@@ -699,6 +712,7 @@ $results | ConvertTo-Json -Compress
             "QueueDiagnose",
             "QueueMedicalForage",
             "QueueFirstAid",
+            "QueueDragIncapacitatedPlayer",
             "Stand",
         ):
             with self.subTest(action=action):
