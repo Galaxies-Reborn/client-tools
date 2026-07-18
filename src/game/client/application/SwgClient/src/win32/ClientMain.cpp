@@ -157,11 +157,12 @@ namespace ClientMainNamespace
 		BIC_queueDiagnose,
 		BIC_queueMedicalForage,
 		BIC_queueFirstAid,
-		BIC_queueDragIncapacitatedPlayer
+		BIC_queueDragIncapacitatedPlayer,
+		BIC_queueQuickHeal
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 21;
+	LRESULT const cms_backgroundInputProtocolVersion = 22;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -603,6 +604,14 @@ namespace ClientMainNamespace
 			targetValue);
 	}
 
+	bool performBackgroundQueueQuickHeal(LPARAM const targetValue)
+	{
+		// Publish 14.1 Quick Heal is intentionally nonqueued. The bridge
+		// supplies only the patient OID; the server owns skill, eligibility,
+		// range, Health/Action healing, Mind cost, and Focus/Willpower wounds.
+		return performBackgroundQueueTending("quickHeal", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -885,6 +894,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueDragIncapacitatedPlayer:
 				if (!performBackgroundQueueDragIncapacitatedPlayer(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueQuickHeal:
+				if (!performBackgroundQueueQuickHeal(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
