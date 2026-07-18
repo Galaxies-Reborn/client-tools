@@ -159,11 +159,12 @@ namespace ClientMainNamespace
 		BIC_queueFirstAid,
 		BIC_queueDragIncapacitatedPlayer,
 		BIC_queueQuickHeal,
-		BIC_queueHealState
+		BIC_queueHealState,
+		BIC_queueCurePoison
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 23;
+	LRESULT const cms_backgroundInputProtocolVersion = 24;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -621,6 +622,14 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("healState", targetValue);
 	}
 
+	bool performBackgroundQueueCurePoison(LPARAM const targetValue)
+	{
+		// Publish 14.1 Cure Poison is intentionally nonqueued. The bridge
+		// supplies only the patient OID; the server owns poison state, antidote
+		// selection and power, treatment recovery, range, Mind, charge, and XP.
+		return performBackgroundQueueTending("curePoison", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -913,6 +922,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueHealState:
 				if (!performBackgroundQueueHealState(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueCurePoison:
+				if (!performBackgroundQueueCurePoison(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 

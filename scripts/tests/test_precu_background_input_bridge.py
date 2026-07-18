@@ -191,10 +191,11 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_queueDragIncapacitatedPlayer",
             "BIC_queueQuickHeal",
             "BIC_queueHealState",
+            "BIC_queueCurePoison",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 23", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 24", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -451,6 +452,7 @@ $results | ConvertTo-Json -Compress
             "QueueDragIncapacitatedPlayer": 39,
             "QueueQuickHeal": 40,
             "QueueHealState": 41,
+            "QueueCurePoison": 42,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -728,6 +730,14 @@ $results | ConvertTo-Json -Compress
             'performBackgroundQueueTending("healState", targetValue)',
             heal_state,
         )
+        cure_poison = function_body(
+            self.client_main,
+            "bool performBackgroundQueueCurePoison(LPARAM const targetValue)",
+        )
+        self.assertIn(
+            'performBackgroundQueueTending("curePoison", targetValue)',
+            cure_poison,
+        )
         for forbidden_mutation in (
             "createObject",
             "grantSkill",
@@ -791,6 +801,7 @@ $results | ConvertTo-Json -Compress
             "QueueDragIncapacitatedPlayer",
             "QueueQuickHeal",
             "QueueHealState",
+            "QueueCurePoison",
             "Stand",
         ):
             with self.subTest(action=action):
