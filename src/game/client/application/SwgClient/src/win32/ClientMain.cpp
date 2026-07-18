@@ -155,11 +155,12 @@ namespace ClientMainNamespace
 		BIC_queueTendDamage,
 		BIC_queueTendWound,
 		BIC_queueDiagnose,
-		BIC_queueMedicalForage
+		BIC_queueMedicalForage,
+		BIC_queueFirstAid
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 19;
+	LRESULT const cms_backgroundInputProtocolVersion = 20;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -583,6 +584,14 @@ namespace ClientMainNamespace
 		return queued;
 	}
 
+	bool performBackgroundQueueFirstAid(LPARAM const targetValue)
+	{
+		// First aid is intentionally nonqueued in the authentic client table.
+		// The bridge supplies only the patient OID; the server owns bleeding,
+		// eligibility, range, treatment strength, and zero-cost behavior.
+		return performBackgroundQueueTending("firstAid", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -855,6 +864,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueMedicalForage:
 				if (!performBackgroundQueueMedicalForage())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueFirstAid:
+				if (!performBackgroundQueueFirstAid(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
