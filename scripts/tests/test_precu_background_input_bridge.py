@@ -193,10 +193,11 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_queueHealState",
             "BIC_queueCurePoison",
             "BIC_queueHealEnhance",
+            "BIC_queueExtinguishFire",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 26", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 27", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -455,6 +456,7 @@ $results | ConvertTo-Json -Compress
             "QueueHealState": 41,
             "QueueCurePoison": 42,
             "QueueHealEnhance": 43,
+            "QueueExtinguishFire": 44,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -750,6 +752,14 @@ $results | ConvertTo-Json -Compress
         )
         self.assertIn("targetValue,", heal_enhance)
         self.assertIn("true", heal_enhance)
+        extinguish_fire = function_body(
+            self.client_main,
+            "bool performBackgroundQueueExtinguishFire(LPARAM const targetValue)",
+        )
+        self.assertIn(
+            'performBackgroundQueueTending("extinguishFire", targetValue)',
+            extinguish_fire,
+        )
         tending = function_body(
             self.client_main,
             "bool performBackgroundQueueTending(",
@@ -821,6 +831,7 @@ $results | ConvertTo-Json -Compress
             "QueueHealState",
             "QueueCurePoison",
             "QueueHealEnhance",
+            "QueueExtinguishFire",
             "Stand",
         ):
             with self.subTest(action=action):

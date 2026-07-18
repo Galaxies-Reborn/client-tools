@@ -161,11 +161,12 @@ namespace ClientMainNamespace
 		BIC_queueQuickHeal,
 		BIC_queueHealState,
 		BIC_queueCurePoison,
-		BIC_queueHealEnhance
+		BIC_queueHealEnhance,
+		BIC_queueExtinguishFire
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 26;
+	LRESULT const cms_backgroundInputProtocolVersion = 27;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -650,6 +651,14 @@ namespace ClientMainNamespace
 			true);
 	}
 
+	bool performBackgroundQueueExtinguishFire(LPARAM const targetValue)
+	{
+		// Publish 14.1 Extinguish Fire is intentionally nonqueued. The bridge
+		// supplies only the patient OID; the server owns fire state, blanket
+		// selection and power, treatment recovery, range, Mind, charge, and XP.
+		return performBackgroundQueueTending("extinguishFire", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -952,6 +961,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueHealEnhance:
 				if (!performBackgroundQueueHealEnhance(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueExtinguishFire:
+				if (!performBackgroundQueueExtinguishFire(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 

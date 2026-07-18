@@ -186,6 +186,20 @@ recovery.
   -TargetOid <fixture-patient-oid>
 ```
 
+Protocol v27 adds `QueueExtinguishFire`. The caller supplies only the fixture
+patient OID and the client admits the authentic nonqueued `extinguishFire`
+command through `ClientCommandQueue`. The server remains authoritative for
+fire state, organic-patient and PvP-help validation, blanket selection and
+power, shared treatment recovery, Focus-adjusted Mind cost, charge use,
+effects, and medical XP.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueExtinguishFire `
+  -ClientProcessId <pid> `
+  -TargetOid <fixture-patient-oid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
