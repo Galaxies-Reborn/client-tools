@@ -158,11 +158,12 @@ namespace ClientMainNamespace
 		BIC_queueMedicalForage,
 		BIC_queueFirstAid,
 		BIC_queueDragIncapacitatedPlayer,
-		BIC_queueQuickHeal
+		BIC_queueQuickHeal,
+		BIC_queueHealState
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 22;
+	LRESULT const cms_backgroundInputProtocolVersion = 23;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -612,6 +613,14 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("quickHeal", targetValue);
 	}
 
+	bool performBackgroundQueueHealState(LPARAM const targetValue)
+	{
+		// Publish 14.1 Heal State is queued. The bridge supplies only the
+		// patient OID; the server owns state and medicine selection, treatment
+		// recovery, range, Mind cost, charge use, state removal, and XP.
+		return performBackgroundQueueTending("healState", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -899,6 +908,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueQuickHeal:
 				if (!performBackgroundQueueQuickHeal(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueHealState:
+				if (!performBackgroundQueueHealState(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
