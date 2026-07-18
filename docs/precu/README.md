@@ -214,6 +214,21 @@ effects, and medical XP.
   -TargetOid <fixture-patient-oid>
 ```
 
+Protocol v29 adds `QueueRevivePlayer`. The caller supplies only the loaded,
+dead fixture patient OID and the client admits the authentic nonqueued
+`revivePlayer` command through `ClientCommandQueue`. The server remains
+authoritative for the seven-meter player/death gate, resuscitation window,
+group-or-consent and PvP-help rules, revive-pack selection, six-channel
+damage/wound healing, Focus-adjusted Mind cost, charge use, medical XP,
+upright recovery, and 60-second grogginess.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueRevivePlayer `
+  -ClientProcessId <medic-pid> `
+  -TargetOid <dead-fixture-patient-oid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell

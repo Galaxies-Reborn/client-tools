@@ -163,11 +163,12 @@ namespace ClientMainNamespace
 		BIC_queueCurePoison,
 		BIC_queueHealEnhance,
 		BIC_queueExtinguishFire,
-		BIC_queueCureDisease
+		BIC_queueCureDisease,
+		BIC_queueRevivePlayer
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 28;
+	LRESULT const cms_backgroundInputProtocolVersion = 29;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -669,6 +670,15 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("cureDisease", targetValue);
 	}
 
+	bool performBackgroundQueueRevivePlayer(LPARAM const targetValue)
+	{
+		// Publish 14.1 Revive Player is intentionally nonqueued. The bridge
+		// supplies only the dead patient OID; the server owns player/death,
+		// resuscitation-window, group-or-consent, PvP, range, pack, six-channel
+		// healing, Focus-adjusted Mind, charge, XP, grogginess, and recovery.
+		return performBackgroundQueueTending("revivePlayer", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -981,6 +991,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueCureDisease:
 				if (!performBackgroundQueueCureDisease(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueRevivePlayer:
+				if (!performBackgroundQueueRevivePlayer(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
