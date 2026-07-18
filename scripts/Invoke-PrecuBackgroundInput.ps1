@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -70,7 +70,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 24
+$expectedProtocolVersion = 25
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -115,6 +115,7 @@ $command = @{
     QueueQuickHeal = 40
     QueueHealState = 41
     QueueCurePoison = 42
+    QueueHealEnhance = 43
 }
 $dikByName = @{
     Escape    = 0x01
@@ -745,6 +746,18 @@ switch ($Action) {
             -Command $command.QueueCurePoison `
             -Data $TargetOid
         $detail = "target=$TargetOid command=curePoison $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
+    }
+
+    "QueueHealEnhance" {
+        if (-not $PSBoundParameters.ContainsKey("TargetOid")) {
+            throw "QueueHealEnhance requires -TargetOid."
+        }
+        [long]$packedStatus = Invoke-BridgeQuery `
+            -Window $window `
+            -Message $message `
+            -Command $command.QueueHealEnhance `
+            -Data $TargetOid
+        $detail = "target=$TargetOid command=healEnhance $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
     }
 
     "EquipCdefRifle" {

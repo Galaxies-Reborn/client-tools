@@ -160,11 +160,12 @@ namespace ClientMainNamespace
 		BIC_queueDragIncapacitatedPlayer,
 		BIC_queueQuickHeal,
 		BIC_queueHealState,
-		BIC_queueCurePoison
+		BIC_queueCurePoison,
+		BIC_queueHealEnhance
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 24;
+	LRESULT const cms_backgroundInputProtocolVersion = 25;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -630,6 +631,15 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("curePoison", targetValue);
 	}
 
+	bool performBackgroundQueueHealEnhance(LPARAM const targetValue)
+	{
+		// Publish 14.1 Heal Enhance is queued. The bridge supplies only the
+		// fixture patient OID; the server owns facility/combat admission,
+		// enhancement-pack selection, battle fatigue, Mind, charge, XP, and
+		// wound-treatment recovery.
+		return performBackgroundQueueTending("healEnhance", targetValue);
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -927,6 +937,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueCurePoison:
 				if (!performBackgroundQueueCurePoison(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueHealEnhance:
+				if (!performBackgroundQueueHealEnhance(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
