@@ -229,6 +229,19 @@ upright recovery, and 60-second grogginess.
   -TargetOid <dead-fixture-patient-oid>
 ```
 
+Protocol v30 adds `QueueDeathBlow`. The caller supplies only the loaded,
+incapacitated hostile player OID. The client retains the authentic queued
+three-second, 16-meter Publish 14.1 command row; the server remains
+authoritative for the five-meter range, line-of-sight, PvP, incap, feign,
+already-dead, and self-target gates.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueDeathBlow `
+  -ClientProcessId <attacker-pid> `
+  -TargetOid <incapacitated-hostile-oid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
