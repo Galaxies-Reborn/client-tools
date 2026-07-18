@@ -154,11 +154,12 @@ namespace ClientMainNamespace
 		BIC_queueHealDamage,
 		BIC_queueTendDamage,
 		BIC_queueTendWound,
-		BIC_queueDiagnose
+		BIC_queueDiagnose,
+		BIC_queueMedicalForage
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 18;
+	LRESULT const cms_backgroundInputProtocolVersion = 19;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -564,6 +565,24 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("diagnose", targetValue);
 	}
 
+	bool performBackgroundQueueMedicalForage()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Medical forage has targetType=none and is intentionally nonqueued.
+		// Admit it through the normal toolbar path; the server owns its Action
+		// cost, stationary delay, area depletion, chance, and reward.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"medicalForage",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -831,6 +850,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueDiagnose:
 				if (!performBackgroundQueueDiagnose(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueMedicalForage:
+				if (!performBackgroundQueueMedicalForage())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
