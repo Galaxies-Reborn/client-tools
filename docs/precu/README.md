@@ -154,6 +154,21 @@ food/resource/medicine-component result.
   -ClientProcessId <pid>
 ```
 
+Protocols v20 through v23 add the same narrow, off-focus admission boundary for
+First Aid, incapacitated-player drag, Quick Heal, and Heal State. Protocol v24
+adds `QueueCurePoison`. The caller supplies only the fixture patient OID and the
+client enters the authentic nonqueued `curePoison` command through
+`ClientCommandQueue`; the server remains authoritative for poison state,
+organic-patient and PvP-help validation, antidote selection and power,
+condition-treatment recovery, Mind cost, charge use, effects, and medical XP.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueCurePoison `
+  -ClientProcessId <pid> `
+  -TargetOid <fixture-patient-oid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
