@@ -200,6 +200,20 @@ effects, and medical XP.
   -TargetOid <fixture-patient-oid>
 ```
 
+Protocol v28 adds `QueueCureDisease`. The caller supplies only the fixture
+patient OID and the client admits the authentic nonqueued `cureDisease`
+command through `ClientCommandQueue`. The server remains authoritative for
+disease state, organic-patient and PvP-help validation, antidote selection and
+power, shared treatment recovery, Focus-adjusted Mind cost, charge use,
+effects, and medical XP.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueueCureDisease `
+  -ClientProcessId <pid> `
+  -TargetOid <fixture-patient-oid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
