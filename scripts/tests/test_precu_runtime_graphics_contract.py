@@ -6,6 +6,7 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PROFILE_ROOT = REPOSITORY_ROOT / "config" / "precu"
 CLIENT_CONFIG = PROFILE_ROOT / "client.cfg"
+LOGIN_CONFIG = PROFILE_ROOT / "precu_login.cfg"
 LIVE_CONFIG = PROFILE_ROOT / "precu_live.cfg"
 BLOOM_SOURCE = REPOSITORY_ROOT / (
     "src/engine/client/library/clientGame/src/shared/core/Bloom.cpp"
@@ -78,6 +79,14 @@ EXPECTED_TRE_ORDER = (
 
 
 class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
+    def test_profile_owns_focus_free_local_acceptance_login(self):
+        config = LOGIN_CONFIG.read_text(encoding="utf-8")
+        self.assertRegex(config, r"(?m)^\s*loginClientID\s*=\s*1001\s*$")
+        self.assertRegex(
+            config,
+            r"(?m)^\s*loginClientPassword\s*=\s*local\s*$",
+        )
+
     def test_profile_owns_the_complete_publish14_include_chain(self):
         config = CLIENT_CONFIG.read_text(encoding="utf-8")
         includes = re.findall(r'^\.include\s+"([^"]+)"', config, re.MULTILINE)

@@ -228,11 +228,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_surrenderEntertainerHairstyleOne",
             "BIC_surrenderEntertainerHairstyleTwo",
             "BIC_surrenderEntertainerHairstyleThree",
+            "BIC_surrenderEntertainerHairstyleFour",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 46", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 46", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 47", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 47", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -526,6 +527,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderEntertainerHairstyleOne": 76,
             "SurrenderEntertainerHairstyleTwo": 77,
             "SurrenderEntertainerHairstyleThree": 78,
+            "SurrenderEntertainerHairstyleFour": 79,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -956,6 +958,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderEntertainerHairstyleOne",
             "SurrenderEntertainerHairstyleTwo",
             "SurrenderEntertainerHairstyleThree",
+            "SurrenderEntertainerHairstyleFour",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -1204,6 +1207,24 @@ $results | ConvertTo-Json -Compress
         self.assertIn(
             "NetworkId::cms_invalid",
             surrender_hairstyle_three_action,
+        )
+
+        surrender_hairstyle_four_action = function_body(
+            self.client_main,
+            "bool performBackgroundSurrenderEntertainerHairstyleFour()",
+        )
+        self.assertIn(
+            'getValueString() != "39008597"',
+            surrender_hairstyle_four_action,
+        )
+        self.assertIn('"surrenderSkill"', surrender_hairstyle_four_action)
+        self.assertIn(
+            '"social_entertainer_hairstyle_04"',
+            surrender_hairstyle_four_action,
+        )
+        self.assertIn(
+            "NetworkId::cms_invalid",
+            surrender_hairstyle_four_action,
         )
 
         equip_action = function_body(
