@@ -168,11 +168,14 @@ namespace ClientMainNamespace
 		BIC_queueRevivePlayer,
 		BIC_queueDeathBlow,
 		BIC_selectCloneLocation,
-		BIC_confirmCloneLocation
+		BIC_confirmCloneLocation,
+		BIC_startDanceRhythmic,
+		BIC_flourishOne,
+		BIC_stopDance
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 31;
+	LRESULT const cms_backgroundInputProtocolVersion = 32;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -691,6 +694,29 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("deathBlow", targetValue);
 	}
 
+	bool performBackgroundPerformanceCommand(
+		char const * const commandName,
+		char const * const commandParameters)
+	{
+		Object * const player = Game::getPlayer();
+		if (!player || !commandName || !commandParameters ||
+			Game::getPlayerNetworkId().getValueString() != "39008597")
+			return false;
+
+		// Protocol 32 supplies only a fixed authentic command and parameter for
+		// the identity-bound acceptance player. Skill, posture, current
+		// performance, Action cost, heartbeat, and exhaustion remain owned by
+		// the normal Publish 14.1 command and authoritative server scripts.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			commandName,
+			NetworkId::cms_invalid,
+			Unicode::narrowToWide(commandParameters)) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
 	LRESULT performBackgroundSelectCloneLocation(
 		LPARAM const selectionIndex, bool const confirm)
 	{
@@ -1040,6 +1066,18 @@ namespace ClientMainNamespace
 
 			case BIC_confirmCloneLocation:
 				return performBackgroundSelectCloneLocation(lParam, true);
+
+			case BIC_startDanceRhythmic:
+				return performBackgroundPerformanceCommand(
+					"startDance", "rhythmic") ? 1 : 0;
+
+			case BIC_flourishOne:
+				return performBackgroundPerformanceCommand(
+					"flourish", "1") ? 1 : 0;
+
+			case BIC_stopDance:
+				return performBackgroundPerformanceCommand(
+					"stopDance", "") ? 1 : 0;
 
 			default:
 				return 0;

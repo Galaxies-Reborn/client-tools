@@ -249,6 +249,27 @@ unchanged.
   -TargetOid <incapacitated-hostile-oid>
 ```
 
+Protocol v32 adds an identity-bound real-client performance seam for the
+dedicated acceptance character. `StartDanceRhythmic`, `FlourishOne`, and
+`StopDance` enqueue the authentic Publish 14.1 commands with fixed parameters
+through the ordinary toolbar/client command queue. The client does not grant
+skills, change HAM, attach performance scripts, or synthesize results; those
+remain authoritative on the server.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action StartDanceRhythmic `
+  -ClientProcessId <dedicated-precu-client-pid>
+
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action FlourishOne `
+  -ClientProcessId <dedicated-precu-client-pid>
+
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action StopDance `
+  -ClientProcessId <dedicated-precu-client-pid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
