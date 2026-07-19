@@ -37,6 +37,7 @@
 #include "clientUserInterface/CuiActions.h"
 #include "clientUserInterface/CuiChatHistory.h"
 #include "clientUserInterface/CuiCombatManager.h"
+#include "clientUserInterface/CuiDataDrivenPageManager.h"
 #include "clientUserInterface/CuiInventoryManager.h"
 #include "clientUserInterface/CuiManager.h"
 #include "clientUserInterface/CuiMediatorFactory.h"
@@ -165,11 +166,13 @@ namespace ClientMainNamespace
 		BIC_queueExtinguishFire,
 		BIC_queueCureDisease,
 		BIC_queueRevivePlayer,
-		BIC_queueDeathBlow
+		BIC_queueDeathBlow,
+		BIC_selectCloneLocation,
+		BIC_confirmCloneLocation
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 30;
+	LRESULT const cms_backgroundInputProtocolVersion = 31;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -688,6 +691,25 @@ namespace ClientMainNamespace
 		return performBackgroundQueueTending("deathBlow", targetValue);
 	}
 
+	LRESULT performBackgroundSelectCloneLocation(
+		LPARAM const selectionIndex, bool const confirm)
+	{
+		if (!Game::getPlayer() ||
+			Game::getPlayerNetworkId().getValueString() != "39008597" ||
+			selectionIndex < 0 ||
+			selectionIndex > 127)
+			return 0;
+
+		// The generic SUI manager requires one unambiguous active list box with
+		// the exact server-authored clone title and sends its normal selection
+		// and OK notifications. This bridge supplies only the row for the fixed
+		// live-test victim; the server owns death state, clone locations, the
+		// selected destination, penalties, and teleport.
+		return static_cast<LRESULT>(
+			CuiDataDrivenPageManager::selectOrConfirmSingleListRow(
+				static_cast<int>(selectionIndex), confirm));
+	}
+
 	bool performBackgroundClearCombatQueue()
 	{
 		if (!Game::getPlayer())
@@ -1012,6 +1034,12 @@ namespace ClientMainNamespace
 				if (!performBackgroundQueueDeathBlow(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
+
+			case BIC_selectCloneLocation:
+				return performBackgroundSelectCloneLocation(lParam, false);
+
+			case BIC_confirmCloneLocation:
+				return performBackgroundSelectCloneLocation(lParam, true);
 
 			default:
 				return 0;
