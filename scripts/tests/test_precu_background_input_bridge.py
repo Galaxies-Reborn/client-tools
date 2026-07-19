@@ -211,11 +211,13 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_surrenderEntertainerMusicOne",
             "BIC_startMusicStarwars2",
             "BIC_surrenderEntertainerMusicTwo",
+            "BIC_startMusicFolk",
+            "BIC_surrenderEntertainerMusicThree",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 36", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 36", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 37", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 37", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -492,6 +494,8 @@ $results | ConvertTo-Json -Compress
             "SurrenderEntertainerMusicOne": 59,
             "StartMusicStarwars2": 60,
             "SurrenderEntertainerMusicTwo": 61,
+            "StartMusicFolk": 62,
+            "SurrenderEntertainerMusicThree": 63,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -905,6 +909,8 @@ $results | ConvertTo-Json -Compress
             "SurrenderEntertainerMusicOne",
             "StartMusicStarwars2",
             "SurrenderEntertainerMusicTwo",
+            "StartMusicFolk",
+            "SurrenderEntertainerMusicThree",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -964,6 +970,10 @@ $results | ConvertTo-Json -Compress
             'performBackgroundPerformanceCommand(\n\t\t\t\t\t"startMusic", "starwars2")',
             self.client_main,
         )
+        self.assertIn(
+            'performBackgroundPerformanceCommand(\n\t\t\t\t\t"startMusic", "folk")',
+            self.client_main,
+        )
 
         surrender_action = function_body(
             self.client_main,
@@ -1000,6 +1010,18 @@ $results | ConvertTo-Json -Compress
         self.assertIn("ClientCommandQueue::enqueueCommand", surrender_two_action)
         self.assertIn("NetworkId::cms_invalid", surrender_two_action)
         self.assertNotIn("player->getNetworkId(),", surrender_two_action)
+
+        surrender_three_action = function_body(
+            self.client_main,
+            "bool performBackgroundSurrenderEntertainerMusicThree()",
+        )
+        self.assertIn('getValueString() != "39008597"', surrender_three_action)
+        self.assertIn('"surrenderSkill"', surrender_three_action)
+        self.assertIn(
+            'Unicode::narrowToWide("social_entertainer_music_03")',
+            surrender_three_action,
+        )
+        self.assertIn("NetworkId::cms_invalid", surrender_three_action)
 
         equip_action = function_body(
             self.client_main, "bool performBackgroundEquipCdefRifle()"
