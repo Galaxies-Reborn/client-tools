@@ -232,11 +232,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_startDancePopular",
             "BIC_surrenderDancerNovice",
             "BIC_surrenderDancerAbilityOne",
+            "BIC_surrenderDancerAbilityTwo",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 49", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 49", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 50", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 50", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -534,6 +535,7 @@ $results | ConvertTo-Json -Compress
             "StartDancePopular": 80,
             "SurrenderDancerNovice": 81,
             "SurrenderDancerAbilityOne": 82,
+            "SurrenderDancerAbilityTwo": 83,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -968,6 +970,7 @@ $results | ConvertTo-Json -Compress
             "StartDancePopular",
             "SurrenderDancerNovice",
             "SurrenderDancerAbilityOne",
+            "SurrenderDancerAbilityTwo",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -1270,6 +1273,24 @@ $results | ConvertTo-Json -Compress
         self.assertIn(
             "NetworkId::cms_invalid",
             surrender_dancer_ability_one_action,
+        )
+
+        surrender_dancer_ability_two_action = function_body(
+            self.client_main,
+            "bool performBackgroundSurrenderDancerAbilityTwo()",
+        )
+        self.assertIn(
+            'getValueString() != "39008597"',
+            surrender_dancer_ability_two_action,
+        )
+        self.assertIn('"surrenderSkill"', surrender_dancer_ability_two_action)
+        self.assertIn(
+            '"social_dancer_ability_02"',
+            surrender_dancer_ability_two_action,
+        )
+        self.assertIn(
+            "NetworkId::cms_invalid",
+            surrender_dancer_ability_two_action,
         )
         self.assertIn('"startDance", "popular"', self.client_main)
 
