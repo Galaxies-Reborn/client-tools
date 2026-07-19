@@ -171,11 +171,13 @@ namespace ClientMainNamespace
 		BIC_confirmCloneLocation,
 		BIC_startDanceRhythmic,
 		BIC_flourishOne,
-		BIC_stopDance
+		BIC_stopDance,
+		BIC_startMusicStarwars1,
+		BIC_stopMusic
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 32;
+	LRESULT const cms_backgroundInputProtocolVersion = 33;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -1078,6 +1080,14 @@ namespace ClientMainNamespace
 			case BIC_stopDance:
 				return performBackgroundPerformanceCommand(
 					"stopDance", "") ? 1 : 0;
+
+			case BIC_startMusicStarwars1:
+				return performBackgroundPerformanceCommand(
+					"startMusic", "starwars1") ? 1 : 0;
+
+			case BIC_stopMusic:
+				return performBackgroundPerformanceCommand(
+					"stopMusic", "") ? 1 : 0;
 
 			default:
 				return 0;
