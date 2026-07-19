@@ -251,11 +251,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_surrenderMusicianNovice",
             "BIC_surrenderMusicianAbilityOne",
             "BIC_surrenderMusicianAbilityTwo",
+            "BIC_surrenderMusicianAbilityThree",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 68", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 68", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 69", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 69", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -572,6 +573,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianNovice": 99,
             "SurrenderMusicianAbilityOne": 100,
             "SurrenderMusicianAbilityTwo": 101,
+            "SurrenderMusicianAbilityThree": 102,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1025,6 +1027,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianNovice",
             "SurrenderMusicianAbilityOne",
             "SurrenderMusicianAbilityTwo",
+            "SurrenderMusicianAbilityThree",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -1678,6 +1681,26 @@ $results | ConvertTo-Json -Compress
         self.assertIn(
             "NetworkId::cms_invalid",
             surrender_musician_ability_two_action,
+        )
+        surrender_musician_ability_three_action = function_body(
+            self.client_main,
+            "bool performBackgroundSurrenderMusicianAbilityThree()",
+        )
+        self.assertIn(
+            'getValueString() != "39008597"',
+            surrender_musician_ability_three_action,
+        )
+        self.assertIn(
+            '"surrenderSkill"',
+            surrender_musician_ability_three_action,
+        )
+        self.assertIn(
+            '"social_musician_ability_03"',
+            surrender_musician_ability_three_action,
+        )
+        self.assertIn(
+            "NetworkId::cms_invalid",
+            surrender_musician_ability_three_action,
         )
         self.assertIn('"startDance", "popular"', self.client_main)
 
