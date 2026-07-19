@@ -207,11 +207,15 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_startBandStarwars1",
             "BIC_bandFlourishOne",
             "BIC_stopBand",
+            "BIC_startMusicRock",
+            "BIC_surrenderEntertainerMusicOne",
+            "BIC_startMusicStarwars2",
+            "BIC_surrenderEntertainerMusicTwo",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 35", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 35", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 36", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 36", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -486,6 +490,8 @@ $results | ConvertTo-Json -Compress
             "StopBand": 57,
             "StartMusicRock": 58,
             "SurrenderEntertainerMusicOne": 59,
+            "StartMusicStarwars2": 60,
+            "SurrenderEntertainerMusicTwo": 61,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -897,6 +903,8 @@ $results | ConvertTo-Json -Compress
             "StopBand",
             "StartMusicRock",
             "SurrenderEntertainerMusicOne",
+            "StartMusicStarwars2",
+            "SurrenderEntertainerMusicTwo",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -952,6 +960,10 @@ $results | ConvertTo-Json -Compress
             'performBackgroundPerformanceCommand(\n\t\t\t\t\t"startMusic", "rock")',
             self.client_main,
         )
+        self.assertIn(
+            'performBackgroundPerformanceCommand(\n\t\t\t\t\t"startMusic", "starwars2")',
+            self.client_main,
+        )
 
         surrender_action = function_body(
             self.client_main,
@@ -974,6 +986,20 @@ $results | ConvertTo-Json -Compress
         ):
             with self.subTest(forbidden_mutation=forbidden_mutation):
                 self.assertNotIn(forbidden_mutation, surrender_action)
+
+        surrender_two_action = function_body(
+            self.client_main,
+            "bool performBackgroundSurrenderEntertainerMusicTwo()",
+        )
+        self.assertIn('getValueString() != "39008597"', surrender_two_action)
+        self.assertIn('"surrenderSkill"', surrender_two_action)
+        self.assertIn(
+            'Unicode::narrowToWide("social_entertainer_music_02")',
+            surrender_two_action,
+        )
+        self.assertIn("ClientCommandQueue::enqueueCommand", surrender_two_action)
+        self.assertIn("NetworkId::cms_invalid", surrender_two_action)
+        self.assertNotIn("player->getNetworkId(),", surrender_two_action)
 
         equip_action = function_body(
             self.client_main, "bool performBackgroundEquipCdefRifle()"

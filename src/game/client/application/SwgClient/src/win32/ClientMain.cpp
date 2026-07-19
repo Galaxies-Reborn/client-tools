@@ -178,11 +178,13 @@ namespace ClientMainNamespace
 		BIC_bandFlourishOne,
 		BIC_stopBand,
 		BIC_startMusicRock,
-		BIC_surrenderEntertainerMusicOne
+		BIC_surrenderEntertainerMusicOne,
+		BIC_startMusicStarwars2,
+		BIC_surrenderEntertainerMusicTwo
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 35;
+	LRESULT const cms_backgroundInputProtocolVersion = 36;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -747,6 +749,25 @@ namespace ClientMainNamespace
 		return queued;
 	}
 
+	bool performBackgroundSurrenderEntertainerMusicTwo()
+	{
+		Object * const player = Game::getPlayer();
+		if (!player ||
+			Game::getPlayerNetworkId().getValueString() != "39008597")
+			return false;
+
+		// Protocol 36 submits the next fixed Publish 14.1 progression request
+		// through the ordinary actor-routed surrender command.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"surrenderSkill",
+			NetworkId::cms_invalid,
+			Unicode::narrowToWide("social_entertainer_music_02")) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
 	LRESULT performBackgroundSelectCloneLocation(
 		LPARAM const selectionIndex, bool const confirm)
 	{
@@ -1135,6 +1156,15 @@ namespace ClientMainNamespace
 
 			case BIC_surrenderEntertainerMusicOne:
 				return performBackgroundSurrenderEntertainerMusicOne()
+					? 1
+					: 0;
+
+			case BIC_startMusicStarwars2:
+				return performBackgroundPerformanceCommand(
+					"startMusic", "starwars2") ? 1 : 0;
+
+			case BIC_surrenderEntertainerMusicTwo:
+				return performBackgroundSurrenderEntertainerMusicTwo()
 					? 1
 					: 0;
 
