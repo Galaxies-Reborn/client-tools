@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "SelectCloneLocation", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -61,6 +61,9 @@ param(
     [ValidateRange(1, [long]::MaxValue)]
     [long]$TargetOid,
 
+    [ValidateRange(0, 127)]
+    [int]$SelectionIndex,
+
     [AllowEmptyString()]
     [string]$Text
 )
@@ -70,7 +73,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 30
+$expectedProtocolVersion = 31
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -120,6 +123,8 @@ $command = @{
     QueueCureDisease = 45
     QueueRevivePlayer = 46
     QueueDeathBlow = 47
+    SelectCloneLocation = 48
+    ConfirmCloneLocation = 49
 }
 $dikByName = @{
     Escape    = 0x01
@@ -810,6 +815,42 @@ switch ($Action) {
             -Command $command.QueueDeathBlow `
             -Data $TargetOid
         $detail = "target=$TargetOid command=deathBlow $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
+    }
+
+    "SelectCloneLocation" {
+        if (-not $PSBoundParameters.ContainsKey("SelectionIndex")) {
+            throw "SelectCloneLocation requires -SelectionIndex."
+        }
+        [long]$selected = Invoke-BridgeQuery `
+            -Window $window `
+            -Message $message `
+            -Command $command.SelectCloneLocation `
+            -Data $SelectionIndex
+        if ($selected -ne 1) {
+            throw ("The identity-bound dead client did not expose exactly one selectable clone list for row " +
+                "$SelectionIndex (selectionResult=0x{0:x})." -f $selected)
+        }
+        [long]$confirmed = 0
+        for ($attempt = 0; $attempt -lt 20; $attempt++) {
+            Start-Sleep -Milliseconds 250
+            $confirmed = Invoke-BridgeQuery `
+                -Window $window `
+                -Message $message `
+                -Command $command.ConfirmCloneLocation `
+                -Data $SelectionIndex
+            if ($confirmed -eq 1) {
+                break
+            }
+            if (($confirmed -band 0xf0000) -ne 0x50000) {
+                break
+            }
+        }
+        if ($confirmed -ne 1) {
+            throw ("The identity-bound clone list did not receive the server-authored row $SelectionIndex " +
+                "prompt update or retain that row for confirmation " +
+                "(confirmationResult=0x{0:x})." -f $confirmed)
+        }
+        $detail = "selectionIndex=$SelectionIndex realSuiSelectionRoundTripAndOk=true"
     }
 
     "EquipCdefRifle" {
