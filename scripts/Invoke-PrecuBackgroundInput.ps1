@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "SelectCloneLocation", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "SelectCloneLocation", "StartDanceRhythmic", "FlourishOne", "StopDance", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -73,7 +73,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 31
+$expectedProtocolVersion = 32
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -125,6 +125,9 @@ $command = @{
     QueueDeathBlow = 47
     SelectCloneLocation = 48
     ConfirmCloneLocation = 49
+    StartDanceRhythmic = 50
+    FlourishOne = 51
+    StopDance = 52
 }
 $dikByName = @{
     Escape    = 0x01
@@ -851,6 +854,22 @@ switch ($Action) {
                 "(confirmationResult=0x{0:x})." -f $confirmed)
         }
         $detail = "selectionIndex=$SelectionIndex realSuiSelectionRoundTripAndOk=true"
+    }
+
+    { $_ -in @("StartDanceRhythmic", "FlourishOne", "StopDance") } {
+        [long]$accepted = Invoke-BridgeQuery `
+            -Window $window `
+            -Message $message `
+            -Command $command[$Action]
+        if ($accepted -ne 1) {
+            throw "The identity-bound client did not accept $Action through the production command queue."
+        }
+        $productionCommand = @{
+            StartDanceRhythmic = "startDance rhythmic"
+            FlourishOne = "flourish 1"
+            StopDance = "stopDance"
+        }[$Action]
+        $detail = "accepted=true productionCommand=$productionCommand"
     }
 
     "EquipCdefRifle" {
