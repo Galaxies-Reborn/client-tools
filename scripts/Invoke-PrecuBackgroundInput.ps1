@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "SelectCloneLocation", "StartDanceRhythmic", "FlourishOne", "StopDance", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "SelectCloneLocation", "StartDanceRhythmic", "FlourishOne", "StopDance", "StartMusicStarwars1", "StopMusic", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -73,7 +73,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 32
+$expectedProtocolVersion = 33
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -128,6 +128,8 @@ $command = @{
     StartDanceRhythmic = 50
     FlourishOne = 51
     StopDance = 52
+    StartMusicStarwars1 = 53
+    StopMusic = 54
 }
 $dikByName = @{
     Escape    = 0x01
@@ -856,7 +858,7 @@ switch ($Action) {
         $detail = "selectionIndex=$SelectionIndex realSuiSelectionRoundTripAndOk=true"
     }
 
-    { $_ -in @("StartDanceRhythmic", "FlourishOne", "StopDance") } {
+    { $_ -in @("StartDanceRhythmic", "FlourishOne", "StopDance", "StartMusicStarwars1", "StopMusic") } {
         [long]$accepted = Invoke-BridgeQuery `
             -Window $window `
             -Message $message `
@@ -868,6 +870,8 @@ switch ($Action) {
             StartDanceRhythmic = "startDance rhythmic"
             FlourishOne = "flourish 1"
             StopDance = "stopDance"
+            StartMusicStarwars1 = "startMusic starwars1"
+            StopMusic = "stopMusic"
         }[$Action]
         $detail = "accepted=true productionCommand=$productionCommand"
     }

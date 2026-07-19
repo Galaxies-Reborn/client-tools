@@ -270,6 +270,22 @@ remain authoritative on the server.
   -ClientProcessId <dedicated-precu-client-pid>
 ```
 
+Protocol v33 extends the same narrow command seam to the first solo music
+session. `StartMusicStarwars1` queues `startMusic starwars1`, `FlourishOne`
+queues the ordinary first flourish, and `StopMusic` queues the ordinary stop.
+The server still owns the equipped instrument, both ability checks, Action
+costs, heartbeat, and the Publish 14.1 delayed outro.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action StartMusicStarwars1 `
+  -ClientProcessId <dedicated-precu-client-pid>
+
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action StopMusic `
+  -ClientProcessId <dedicated-precu-client-pid>
+```
+
 Run the source-contract and skill-data tests with:
 
 ```powershell

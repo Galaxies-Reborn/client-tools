@@ -202,10 +202,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_startDanceRhythmic",
             "BIC_flourishOne",
             "BIC_stopDance",
+            "BIC_startMusicStarwars1",
+            "BIC_stopMusic",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 32", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 33", self.client_main)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -473,6 +475,8 @@ $results | ConvertTo-Json -Compress
             "StartDanceRhythmic": 50,
             "FlourishOne": 51,
             "StopDance": 52,
+            "StartMusicStarwars1": 53,
+            "StopMusic": 54,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
