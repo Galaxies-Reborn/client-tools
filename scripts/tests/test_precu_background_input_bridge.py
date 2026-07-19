@@ -204,10 +204,14 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_stopDance",
             "BIC_startMusicStarwars1",
             "BIC_stopMusic",
+            "BIC_startBandStarwars1",
+            "BIC_bandFlourishOne",
+            "BIC_stopBand",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 33", self.client_main)
+        self.assertIn("cms_backgroundInputProtocolVersion = 34", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 34", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -477,6 +481,9 @@ $results | ConvertTo-Json -Compress
             "StopDance": 52,
             "StartMusicStarwars1": 53,
             "StopMusic": 54,
+            "StartBandStarwars1": 55,
+            "BandFlourishOne": 56,
+            "StopBand": 57,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -883,6 +890,9 @@ $results | ConvertTo-Json -Compress
             "StartDanceRhythmic",
             "FlourishOne",
             "StopDance",
+            "StartBandStarwars1",
+            "BandFlourishOne",
+            "StopBand",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -908,6 +918,10 @@ $results | ConvertTo-Json -Compress
         )
         self.assertIn('!= "39008597"', performance_action)
         self.assertIn("ClientCommandQueue::enqueueCommand", performance_action)
+        self.assertIn(
+            "Immediate Publish 14 commands legitimately return sequence zero",
+            performance_action,
+        )
         self.assertIn("NetworkId::cms_invalid", performance_action)
         self.assertIn("Unicode::narrowToWide(commandParameters)", performance_action)
         for forbidden_mutation in (

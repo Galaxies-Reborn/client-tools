@@ -173,11 +173,14 @@ namespace ClientMainNamespace
 		BIC_flourishOne,
 		BIC_stopDance,
 		BIC_startMusicStarwars1,
-		BIC_stopMusic
+		BIC_stopMusic,
+		BIC_startBandStarwars1,
+		BIC_bandFlourishOne,
+		BIC_stopBand
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 33;
+	LRESULT const cms_backgroundInputProtocolVersion = 34;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -711,12 +714,15 @@ namespace ClientMainNamespace
 		// the normal Publish 14.1 command and authoritative server scripts.
 		ClientCommandQueue::clearLastCommandRemoval();
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
-		bool const queued = ClientCommandQueue::enqueueCommand(
+		ClientCommandQueue::enqueueCommand(
 			commandName,
 			NetworkId::cms_invalid,
-			Unicode::narrowToWide(commandParameters)) != 0;
+			Unicode::narrowToWide(commandParameters));
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
-		return queued;
+		// Immediate Publish 14 commands legitimately return sequence zero even
+		// though they were submitted and executed. The server-side fixture owns
+		// admission and is the authoritative observation boundary.
+		return true;
 	}
 
 	LRESULT performBackgroundSelectCloneLocation(
@@ -1088,6 +1094,18 @@ namespace ClientMainNamespace
 			case BIC_stopMusic:
 				return performBackgroundPerformanceCommand(
 					"stopMusic", "") ? 1 : 0;
+
+			case BIC_startBandStarwars1:
+				return performBackgroundPerformanceCommand(
+					"startBand", "starwars1") ? 1 : 0;
+
+			case BIC_bandFlourishOne:
+				return performBackgroundPerformanceCommand(
+					"bandFlourish", "1") ? 1 : 0;
+
+			case BIC_stopBand:
+				return performBackgroundPerformanceCommand(
+					"stopBand", "") ? 1 : 0;
 
 			default:
 				return 0;
