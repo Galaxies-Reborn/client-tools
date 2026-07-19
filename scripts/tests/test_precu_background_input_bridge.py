@@ -210,8 +210,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 34", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 34", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 35", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 35", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -484,6 +484,8 @@ $results | ConvertTo-Json -Compress
             "StartBandStarwars1": 55,
             "BandFlourishOne": 56,
             "StopBand": 57,
+            "StartMusicRock": 58,
+            "SurrenderEntertainerMusicOne": 59,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -893,6 +895,8 @@ $results | ConvertTo-Json -Compress
             "StartBandStarwars1",
             "BandFlourishOne",
             "StopBand",
+            "StartMusicRock",
+            "SurrenderEntertainerMusicOne",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -944,6 +948,32 @@ $results | ConvertTo-Json -Compress
             'performBackgroundPerformanceCommand(\n\t\t\t\t\t"stopDance", "")',
             self.client_main,
         )
+        self.assertIn(
+            'performBackgroundPerformanceCommand(\n\t\t\t\t\t"startMusic", "rock")',
+            self.client_main,
+        )
+
+        surrender_action = function_body(
+            self.client_main,
+            "bool performBackgroundSurrenderEntertainerMusicOne()",
+        )
+        self.assertIn('getValueString() != "39008597"', surrender_action)
+        self.assertIn('"surrenderSkill"', surrender_action)
+        self.assertIn(
+            'Unicode::narrowToWide("social_entertainer_music_01")',
+            surrender_action,
+        )
+        self.assertIn("ClientCommandQueue::enqueueCommand", surrender_action)
+        self.assertIn("NetworkId::cms_invalid", surrender_action)
+        self.assertNotIn("player->getNetworkId(),", surrender_action)
+        for forbidden_mutation in (
+            "grantSkill",
+            "revokeSkill",
+            "setAttrib",
+            "setPerformanceType",
+        ):
+            with self.subTest(forbidden_mutation=forbidden_mutation):
+                self.assertNotIn(forbidden_mutation, surrender_action)
 
         equip_action = function_body(
             self.client_main, "bool performBackgroundEquipCdefRifle()"

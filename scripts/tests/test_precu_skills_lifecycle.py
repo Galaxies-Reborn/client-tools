@@ -161,7 +161,9 @@ class PrecuSkillsLifecycleTests(unittest.TestCase):
         self.assertIn("m_pendingSurrenderSkill = skillName", confirmation)
         self.assertIn("m_pendingSurrenderPlayerId = player->getNetworkId()", confirmation)
         self.assertEqual(confirmation.count("ClientCommandQueue::enqueueCommand("), 1)
-        self.assertIn("surrenderCommand, player->getNetworkId()", confirmation)
+        self.assertIn("surrenderCommand, NetworkId::cms_invalid", confirmation)
+        self.assertNotIn("surrenderCommand, player->getNetworkId()", confirmation)
+        self.assertIn("targetType=none", confirmation)
         self.assertIn("Unicode::narrowToWide(skillName)", confirmation)
         self.assertLess(
             confirmation.index("surrenderCommand.isNull()"),

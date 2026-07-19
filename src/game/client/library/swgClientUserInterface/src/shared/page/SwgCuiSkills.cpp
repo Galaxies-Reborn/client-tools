@@ -715,8 +715,11 @@ void SwgCuiSkills::onDeleteSkillConfirmation(std::string const & skillName)
 	m_pendingSurrenderSkill = skillName;
 	m_pendingSurrenderPlayerId = player->getNetworkId();
 	updateSurrenderButton();
+	// surrenderSkill is actor-routed and declares targetType=none. Supplying
+	// the player as a target makes the authoritative command gate reject an
+	// otherwise valid request with CEC_TargetType.
 	m_surrenderSequenceId = ClientCommandQueue::enqueueCommand(
-		surrenderCommand, player->getNetworkId(), Unicode::narrowToWide(skillName));
+		surrenderCommand, NetworkId::cms_invalid, Unicode::narrowToWide(skillName));
 	if (m_surrenderSequenceId == 0)
 	{
 		REPORT_LOG(true, ("SwgCuiSkills: surrenderSkill enqueue failed for '%s'\n", skillName.c_str()));
