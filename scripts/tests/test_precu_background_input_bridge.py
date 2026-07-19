@@ -254,11 +254,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_surrenderMusicianAbilityThree",
             "BIC_surrenderMusicianAbilityFour",
             "BIC_surrenderMusicianWoundOne",
+            "BIC_surrenderMusicianWoundTwo",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 71", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 71", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 72", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 72", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -578,6 +579,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianAbilityThree": 102,
             "SurrenderMusicianAbilityFour": 103,
             "SurrenderMusicianWoundOne": 104,
+            "SurrenderMusicianWoundTwo": 105,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1034,6 +1036,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianAbilityThree",
             "SurrenderMusicianAbilityFour",
             "SurrenderMusicianWoundOne",
+            "SurrenderMusicianWoundTwo",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -1747,6 +1750,26 @@ $results | ConvertTo-Json -Compress
         self.assertIn(
             "NetworkId::cms_invalid",
             surrender_musician_wound_one_action,
+        )
+        surrender_musician_wound_two_action = function_body(
+            self.client_main,
+            "bool performBackgroundSurrenderMusicianWoundTwo()",
+        )
+        self.assertIn(
+            'getValueString() != "39008597"',
+            surrender_musician_wound_two_action,
+        )
+        self.assertIn(
+            '"surrenderSkill"',
+            surrender_musician_wound_two_action,
+        )
+        self.assertIn(
+            '"social_musician_wound_02"',
+            surrender_musician_wound_two_action,
+        )
+        self.assertIn(
+            "NetworkId::cms_invalid",
+            surrender_musician_wound_two_action,
         )
         self.assertIn('"startDance", "popular"', self.client_main)
 
