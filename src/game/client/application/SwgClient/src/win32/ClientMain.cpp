@@ -210,11 +210,12 @@ namespace ClientMainNamespace
 		BIC_surrenderDancerWoundThree,
 		BIC_surrenderDancerWoundFour,
 		BIC_surrenderDancerShockOne,
-		BIC_surrenderDancerShockTwo
+		BIC_surrenderDancerShockTwo,
+		BIC_surrenderDancerShockThree
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 58;
+	LRESULT const cms_backgroundInputProtocolVersion = 59;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -1176,6 +1177,23 @@ namespace ClientMainNamespace
 		return queued;
 	}
 
+	bool performBackgroundSurrenderDancerShockThree()
+	{
+		Object * const player = Game::getPlayer();
+		if (!player ||
+			Game::getPlayerNetworkId().getValueString() != "39008597")
+			return false;
+
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"surrenderSkill",
+			NetworkId::cms_invalid,
+			Unicode::narrowToWide("social_dancer_shock_03")) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
 	LRESULT performBackgroundSelectCloneLocation(
 		LPARAM const selectionIndex, bool const confirm)
 	{
@@ -1715,6 +1733,11 @@ namespace ClientMainNamespace
 
 			case BIC_surrenderDancerShockTwo:
 				return performBackgroundSurrenderDancerShockTwo()
+					? 1
+					: 0;
+
+			case BIC_surrenderDancerShockThree:
+				return performBackgroundSurrenderDancerShockThree()
 					? 1
 					: 0;
 
