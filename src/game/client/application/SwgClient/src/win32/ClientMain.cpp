@@ -182,11 +182,13 @@ namespace ClientMainNamespace
 		BIC_startMusicStarwars2,
 		BIC_surrenderEntertainerMusicTwo,
 		BIC_startMusicFolk,
-		BIC_surrenderEntertainerMusicThree
+		BIC_surrenderEntertainerMusicThree,
+		BIC_startMusicStarwars3,
+		BIC_surrenderEntertainerMusicFour
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 37;
+	LRESULT const cms_backgroundInputProtocolVersion = 38;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -787,6 +789,23 @@ namespace ClientMainNamespace
 		return queued;
 	}
 
+	bool performBackgroundSurrenderEntertainerMusicFour()
+	{
+		Object * const player = Game::getPlayer();
+		if (!player ||
+			Game::getPlayerNetworkId().getValueString() != "39008597")
+			return false;
+
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"surrenderSkill",
+			NetworkId::cms_invalid,
+			Unicode::narrowToWide("social_entertainer_music_04")) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
 	LRESULT performBackgroundSelectCloneLocation(
 		LPARAM const selectionIndex, bool const confirm)
 	{
@@ -1193,6 +1212,15 @@ namespace ClientMainNamespace
 
 			case BIC_surrenderEntertainerMusicThree:
 				return performBackgroundSurrenderEntertainerMusicThree()
+					? 1
+					: 0;
+
+			case BIC_startMusicStarwars3:
+				return performBackgroundPerformanceCommand(
+					"startMusic", "starwars3") ? 1 : 0;
+
+			case BIC_surrenderEntertainerMusicFour:
+				return performBackgroundSurrenderEntertainerMusicFour()
 					? 1
 					: 0;
 

@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "SelectCloneLocation", "StartDanceRhythmic", "FlourishOne", "StopDance", "StartMusicStarwars1", "StopMusic", "StartBandStarwars1", "BandFlourishOne", "StopBand", "StartMusicRock", "SurrenderEntertainerMusicOne", "StartMusicStarwars2", "SurrenderEntertainerMusicTwo", "StartMusicFolk", "SurrenderEntertainerMusicThree", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "SelectCloneLocation", "StartDanceRhythmic", "FlourishOne", "StopDance", "StartMusicStarwars1", "StopMusic", "StartBandStarwars1", "BandFlourishOne", "StopBand", "StartMusicRock", "SurrenderEntertainerMusicOne", "StartMusicStarwars2", "SurrenderEntertainerMusicTwo", "StartMusicFolk", "SurrenderEntertainerMusicThree", "StartMusicStarwars3", "SurrenderEntertainerMusicFour", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -73,7 +73,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 37
+$expectedProtocolVersion = 38
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -139,6 +139,8 @@ $command = @{
     SurrenderEntertainerMusicTwo = 61
     StartMusicFolk = 62
     SurrenderEntertainerMusicThree = 63
+    StartMusicStarwars3 = 64
+    SurrenderEntertainerMusicFour = 65
 }
 $dikByName = @{
     Escape    = 0x01
@@ -867,7 +869,7 @@ switch ($Action) {
         $detail = "selectionIndex=$SelectionIndex realSuiSelectionRoundTripAndOk=true"
     }
 
-    { $_ -in @("StartDanceRhythmic", "FlourishOne", "StopDance", "StartMusicStarwars1", "StopMusic", "StartBandStarwars1", "BandFlourishOne", "StopBand", "StartMusicRock", "StartMusicStarwars2", "StartMusicFolk") } {
+    { $_ -in @("StartDanceRhythmic", "FlourishOne", "StopDance", "StartMusicStarwars1", "StopMusic", "StartBandStarwars1", "BandFlourishOne", "StopBand", "StartMusicRock", "StartMusicStarwars2", "StartMusicFolk", "StartMusicStarwars3") } {
         [long]$accepted = Invoke-BridgeQuery `
             -Window $window `
             -Message $message `
@@ -887,6 +889,7 @@ switch ($Action) {
             StartMusicRock = "startMusic rock"
             StartMusicStarwars2 = "startMusic starwars2"
             StartMusicFolk = "startMusic folk"
+            StartMusicStarwars3 = "startMusic starwars3"
         }[$Action]
         $detail = "submitted=true productionCommand=$productionCommand"
     }
@@ -922,6 +925,17 @@ switch ($Action) {
             throw "The identity-bound client did not queue the production Music III surrender."
         }
         $detail = "submitted=true productionCommand=surrenderSkill skill=social_entertainer_music_03"
+    }
+
+    "SurrenderEntertainerMusicFour" {
+        [long]$accepted = Invoke-BridgeQuery `
+            -Window $window `
+            -Message $message `
+            -Command $command.SurrenderEntertainerMusicFour
+        if ($accepted -ne 1) {
+            throw "The identity-bound client did not queue the production Music IV surrender."
+        }
+        $detail = "submitted=true productionCommand=surrenderSkill skill=social_entertainer_music_04"
     }
 
     "EquipCdefRifle" {
