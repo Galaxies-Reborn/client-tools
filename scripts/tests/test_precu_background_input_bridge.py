@@ -217,11 +217,13 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_surrenderEntertainerMusicFour",
             "BIC_startMusicCeremonial",
             "BIC_surrenderEntertainerMaster",
+            "BIC_startDanceBasicTwo",
+            "BIC_surrenderEntertainerDanceOne",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 39", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 39", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 40", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 40", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -504,6 +506,8 @@ $results | ConvertTo-Json -Compress
             "SurrenderEntertainerMusicFour": 65,
             "StartMusicCeremonial": 66,
             "SurrenderEntertainerMaster": 67,
+            "StartDanceBasicTwo": 68,
+            "SurrenderEntertainerDanceOne": 69,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -923,6 +927,8 @@ $results | ConvertTo-Json -Compress
             "SurrenderEntertainerMusicFour",
             "StartMusicCeremonial",
             "SurrenderEntertainerMaster",
+            "StartDanceBasicTwo",
+            "SurrenderEntertainerDanceOne",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -1058,6 +1064,21 @@ $results | ConvertTo-Json -Compress
             surrender_master_action,
         )
         self.assertIn("NetworkId::cms_invalid", surrender_master_action)
+
+        surrender_dance_one_action = function_body(
+            self.client_main,
+            "bool performBackgroundSurrenderEntertainerDanceOne()",
+        )
+        self.assertIn(
+            'getValueString() != "39008597"',
+            surrender_dance_one_action,
+        )
+        self.assertIn('"surrenderSkill"', surrender_dance_one_action)
+        self.assertIn(
+            'Unicode::narrowToWide("social_entertainer_dance_01")',
+            surrender_dance_one_action,
+        )
+        self.assertIn("NetworkId::cms_invalid", surrender_dance_one_action)
 
         equip_action = function_body(
             self.client_main, "bool performBackgroundEquipCdefRifle()"
