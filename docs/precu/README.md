@@ -286,6 +286,16 @@ costs, heartbeat, and the Publish 14.1 delayed outro.
   -ClientProcessId <dedicated-precu-client-pid>
 ```
 
+Protocol v34 adds the corresponding group-owned band commands.
+`StartBandStarwars1`, `BandFlourishOne`, and `StopBand` queue the production
+`startBand starwars1`, `bandFlourish 1`, and `stopBand` commands. Use the
+existing identity-bound group actions to invite and join the two acceptance
+characters; the server remains authoritative for group membership, range,
+instrument and skill admission, synchronized start time, per-member Action
+cost, and the delayed band outro. The bridge reports fixed-command submission;
+the authoritative fixture observation proves admission because immediate
+Publish 14 commands may validly return client sequence zero.
+
 Run the source-contract and skill-data tests with:
 
 ```powershell
