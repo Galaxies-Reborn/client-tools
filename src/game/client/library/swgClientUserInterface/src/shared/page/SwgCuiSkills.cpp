@@ -324,6 +324,8 @@ m_pageProfessionList(0),
 m_pageMyStats       (0),
 m_pageProfession    (0),
 m_buttonClose       (0),
+m_textProfessionListMy(0),
+m_textProfessionListAll(0),
 m_textProfName      (0),
 m_textProfessionBody(0),
 m_pageGraphs        (0),
@@ -381,8 +383,18 @@ m_callback          (new MessageDispatch::Callback)
 		if (dsObj)
 			m_dsProfTree = static_cast<UIDataSourceContainer *>(dsObj);
 
-		REPORT_LOG(true, ("SwgCuiSkills:   pageProfList children: tree=%p data=%p\n",
-			(void *)m_treeProf, (void *)m_dsProfTree));
+		UIBaseObject * const labelMyObj =
+			m_pageProfessionList->GetObjectFromPath("labelMy", TUIText);
+		UIBaseObject * const labelAllObj =
+			m_pageProfessionList->GetObjectFromPath("labelAll", TUIText);
+		if (labelMyObj)
+			m_textProfessionListMy = static_cast<UIText *>(labelMyObj);
+		if (labelAllObj)
+			m_textProfessionListAll = static_cast<UIText *>(labelAllObj);
+
+		REPORT_LOG(true, ("SwgCuiSkills:   pageProfList children: tree=%p data=%p labelMy=%p labelAll=%p\n",
+			(void *)m_treeProf, (void *)m_dsProfTree,
+			(void *)m_textProfessionListMy, (void *)m_textProfessionListAll));
 	}
 
 	// XP, Skill-Mod, and weapon-certification table column DataSources, nested
@@ -938,6 +950,26 @@ void SwgCuiSkills::OnTabbedPaneChanged(UIWidget * context)
 
 //-----------------------------------------------------------------------
 
+int SwgCuiSkills::showAllProfessionsForBackgroundValidation()
+{
+	if (!m_tabs || !m_treeProf)
+		return -1;
+
+	// This is used only by the opt-in, window-targeted Pre-CU validation bridge.
+	// It exercises the same tab state and population methods as a retail click,
+	// without requiring foreground focus or synthesizing system-wide input.
+	m_tabs->SetActiveTab(1);
+	populateProfessionList();
+	populateSelectedProfession();
+
+	int const rowCount = static_cast<int>(m_treeProf->GetRowCount());
+	REPORT_LOG(true, ("SwgCuiSkills: background All Professions validation rows=%d activeTab=%ld\n",
+		rowCount, static_cast<long>(m_tabs->GetActiveTab())));
+	return rowCount;
+}
+
+//-----------------------------------------------------------------------
+
 void SwgCuiSkills::populateExperience()
 {
 	if (m_dsExpName)  m_dsExpName->Clear();
@@ -1039,6 +1071,18 @@ void SwgCuiSkills::populateCertifications()
 
 void SwgCuiSkills::populateProfessionList()
 {
+	// The authentic page supplies distinct headings for both tabs, and its
+	// personal XP/mod/certification stack belongs only to My Character. Hiding
+	// that stack lets the profession tree consume the full left column in the
+	// All Professions view, matching the Publish 14 presentation contract.
+	bool const showAll = (m_tabs && m_tabs->GetActiveTab() == 1);
+	if (m_pageMyStats)
+		m_pageMyStats->SetVisible(!showAll);
+	if (m_textProfessionListMy)
+		m_textProfessionListMy->SetVisible(!showAll);
+	if (m_textProfessionListAll)
+		m_textProfessionListAll->SetVisible(showAll);
+
 	if (!m_dsProfTree)
 	{
 		REPORT_LOG(true, ("SwgCuiSkills: populateProfessionList skipped: m_dsProfTree is null\n"));
@@ -1049,8 +1093,6 @@ void SwgCuiSkills::populateProfessionList()
 
 	// Determine the set of profession-novice skills to display based on
 	// the active tab.
-	bool const showAll = (m_tabs && m_tabs->GetActiveTab() == 1);
-
 	std::set<std::string> noviceSet;
 
 	if (showAll)

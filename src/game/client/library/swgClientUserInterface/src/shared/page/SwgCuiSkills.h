@@ -55,6 +55,7 @@ public:
 	void                       onCommandsChanged     (CreatureObject const & creature);
 	void                       onDeleteSkillConfirmation (std::string const & skillName);
 	void                       onSceneChanged        (bool const &);
+	int                        showAllProfessionsForBackgroundValidation ();
 
 protected:
 	virtual void               performActivate       ();
@@ -89,6 +90,8 @@ private:
 	UIPage *                   m_pageMyStats;
 	UIPage *                   m_pageProfession;
 	UIButton *                 m_buttonClose;
+	UIText *                   m_textProfessionListMy;
+	UIText *                   m_textProfessionListAll;
 
 	// Right-panel text + graph layout containers.
 	UIText *                   m_textProfName;

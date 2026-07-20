@@ -136,6 +136,52 @@ class PrecuSkillsPresentationCleanupSourceTests(unittest.TestCase):
             populate.index("SkillManager::getInstance().getSkill"),
         )
 
+    def test_background_all_professions_validation_uses_retail_tab_path(self) -> None:
+        validation = function_body(
+            self.source,
+            "int SwgCuiSkills::showAllProfessionsForBackgroundValidation()",
+        )
+        for contract in (
+            "m_tabs->SetActiveTab(1)",
+            "populateProfessionList()",
+            "populateSelectedProfession()",
+            "m_treeProf->GetRowCount()",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, validation)
+        self.assertLess(
+            validation.index("m_tabs->SetActiveTab(1)"),
+            validation.index("populateProfessionList()"),
+        )
+
+    def test_all_professions_uses_authentic_heading_and_full_left_column(self) -> None:
+        constructor = function_body(
+            self.source, "SwgCuiSkills::SwgCuiSkills(UIPage & page)"
+        )
+        for contract in (
+            'GetObjectFromPath("labelMy", TUIText)',
+            'GetObjectFromPath("labelAll", TUIText)',
+            "m_textProfessionListMy",
+            "m_textProfessionListAll",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, constructor)
+
+        populate = function_body(
+            self.source, "void SwgCuiSkills::populateProfessionList()"
+        )
+        for contract in (
+            "m_pageMyStats->SetVisible(!showAll)",
+            "m_textProfessionListMy->SetVisible(!showAll)",
+            "m_textProfessionListAll->SetVisible(showAll)",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, populate)
+        self.assertLess(
+            populate.index("m_pageMyStats->SetVisible(!showAll)"),
+            populate.index("m_dsProfTree->Clear()"),
+        )
+
     def test_master_links_derive_from_runtime_novice_prerequisites(self) -> None:
         graph = function_body(
             self.source, "bool SwgCuiSkills::tryPopulateGraph4x4("
