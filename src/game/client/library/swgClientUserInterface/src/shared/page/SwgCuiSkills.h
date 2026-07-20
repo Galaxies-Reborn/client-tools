@@ -81,6 +81,7 @@ private:
 	bool                       tryPopulateGraph4x4    (SkillObject const * novice, std::set<std::string> const & playerSkills);
 	void                       applyTreeBox           (char const * path, std::string const & skillName, std::set<std::string> const & playerSkills);
 	void                       hideAllGraphs          ();
+	void                       resetGraph4x4Presentation ();
 
 	// Top-level page bindings (resolved via CodeData on the /Skill.skills page).
 	UITabbedPane *             m_tabs;
