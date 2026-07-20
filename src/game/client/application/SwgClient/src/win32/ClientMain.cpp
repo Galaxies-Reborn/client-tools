@@ -237,12 +237,14 @@ namespace ClientMainNamespace
 		BIC_surrenderMusicianKnowledgeThree,
 		BIC_surrenderMusicianKnowledgeFour,
 		BIC_surrenderMusicianMaster,
-		BIC_showAllProfessions
+		BIC_showAllProfessions,
+		BIC_selectAllProfession
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 84;
+	LRESULT const cms_backgroundInputProtocolVersion = 85;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
+	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -430,6 +432,25 @@ namespace ClientMainNamespace
 			return 0;
 
 		return cms_backgroundSkillsStatusMarker | rowCount;
+	}
+
+	LRESULT performBackgroundSelectAllProfession(int selectionIndex)
+	{
+		if (!Game::getPlayer())
+			return 0;
+
+		CuiMediator * const mediator = CuiMediatorFactory::activateInWorkspace(
+			CuiMediatorTypes::WS_Skills);
+		SwgCuiSkills * const skills = dynamic_cast<SwgCuiSkills *>(mediator);
+		if (!skills)
+			return 0;
+
+		int const selectedRow =
+			skills->selectAllProfessionForBackgroundValidation(selectionIndex);
+		if (selectedRow < 0 || selectedRow > 0xffff)
+			return 0;
+
+		return cms_backgroundSkillsSelectionMarker | selectedRow;
 	}
 
 	bool performBackgroundTargetCounterpart()
@@ -2302,6 +2323,9 @@ namespace ClientMainNamespace
 
 			case BIC_showAllProfessions:
 				return performBackgroundShowAllProfessions();
+
+			case BIC_selectAllProfession:
+				return performBackgroundSelectAllProfession(static_cast<int>(lParam));
 
 			default:
 				return 0;

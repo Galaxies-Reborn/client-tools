@@ -267,11 +267,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_surrenderMusicianKnowledgeFour",
             "BIC_surrenderMusicianMaster",
             "BIC_showAllProfessions",
+            "BIC_selectAllProfession",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 84", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 84", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 85", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 85", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -604,6 +605,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianKnowledgeFour": 115,
             "SurrenderMusicianMaster": 116,
             "ShowAllProfessions": 117,
+            "SelectAllProfession": 118,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1073,6 +1075,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianKnowledgeFour",
             "SurrenderMusicianMaster",
             "ShowAllProfessions",
+            "SelectAllProfession",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -1086,6 +1089,8 @@ $results | ConvertTo-Json -Compress
         self.assertIn("lastStatus=$lastStatus($lastStatusName)", self.helper)
         self.assertIn("lastDetail=$lastDetail", self.helper)
         self.assertIn("0x544d0000L", self.helper)
+        self.assertIn("0x53500000L", self.helper)
+        self.assertIn("selectedProfessionRow=$selectedRow", self.helper)
         self.assertIn("available=true command=$commandName", self.helper)
         self.assertIn("currentMs=$currentMilliseconds", self.helper)
         self.assertIn("maxMs=$maxMilliseconds", self.helper)
