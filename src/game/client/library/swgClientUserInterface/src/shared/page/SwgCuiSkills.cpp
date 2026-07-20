@@ -1614,14 +1614,13 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 		applyTreeBox("graph.novice.b", novice->getSkillName(), playerSkills);
 	}
 
-	// Back-links at the bottom (graph.prev.*): the basic profession(s) this
-	// elite branches FROM -- e.g. Pistoleer shows "To: Marksman" below Novice.
-	// Found by reverse-searching every profession's branchLinks for this
-	// profession's root; clickable via m_linkSkills (handled in OnMessage),
-	// mirroring the forward "To: X" elite links up top.
+	// Back-links at the bottom (graph.prev.*): every profession which supplies
+	// an actual prerequisite for this novice box. Derive these from the runtime
+	// SkillObject instead of reverse-searching branchLinks: elite professions
+	// such as Bounty Hunter and Commando require both a mastered profession and
+	// a branch from another profession, which branchLinks cannot represent
+	// without incorrectly attaching the master requirement to one branch.
 	{
-		std::string const rootName = stripNoviceSuffix(novice->getSkillName());
-
 		// Clear all four bottom slots first (profession switch may leave stale).
 		for (int s = 0; s < 4; ++s)
 		{
@@ -1637,34 +1636,45 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 		}
 
 		int prevSlot = 0;
-		for (int i = 0; i < k_professionDefCount && prevSlot < 4; ++i)
+		std::set<ProfessionDef const *> displayed;
+		SkillObject::SkillVector const & prerequisites = novice->getPrerequisiteSkills();
+		for (SkillObject::SkillVector::const_iterator prerequisite = prerequisites.begin();
+			prerequisite != prerequisites.end() && prevSlot < 4; ++prerequisite)
 		{
-			ProfessionDef const & d = k_professionDefs[i];
-			bool linksToUs = false;
-			for (int col = 0; col < 4 && !linksToUs; ++col)
-				for (int slot = 0; slot < 3; ++slot)
-				{
-					char const * const lr = d.branchLinks[col][slot];
-					if (lr && lr[0] && rootName == lr)
-					{
-						linksToUs = true;
-						break;
-					}
-				}
-			if (!linksToUs)
+			if (!*prerequisite)
 				continue;
+
+			std::string const prerequisiteName = (*prerequisite)->getSkillName();
+			ProfessionDef const * owner = 0;
+			for (int i = 0; i < k_professionDefCount && !owner; ++i)
+			{
+				ProfessionDef const & candidate = k_professionDefs[i];
+				if (prerequisiteName == candidate.noviceSkill ||
+					prerequisiteName == candidate.masterSkill)
+					owner = &candidate;
+				for (int col = 0; col < 4 && !owner; ++col)
+					for (int row = 0; row < 4; ++row)
+						if (prerequisiteName == candidate.branchSkills[col][row])
+						{
+							owner = &candidate;
+							break;
+						}
+			}
+			if (!owner || displayed.find(owner) != displayed.end())
+				continue;
+			displayed.insert(owner);
 
 			char path[64];
 			snprintf(path, sizeof(path), "graph.prev.%d", prevSlot);
 			UIBaseObject * const obj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
-			if (obj && d.displayName && d.noviceSkill)
+			if (obj && owner->displayName && owner->noviceSkill)
 			{
 				UIText * const t = static_cast<UIText *>(obj);
 				Unicode::String label = Unicode::narrowToWide("To: ");
-				label += Unicode::narrowToWide(d.displayName);
+				label += Unicode::narrowToWide(owner->displayName);
 				t->SetLocalText(label);
 				t->SetVisible(true);
-				m_linkSkills[t] = d.noviceSkill;
+				m_linkSkills[t] = owner->noviceSkill;
 				if (!isRegisteredMediatorObject(*t))
 					registerMediatorObject(*t, true);
 			}
