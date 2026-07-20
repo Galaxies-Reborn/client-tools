@@ -260,11 +260,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_surrenderMusicianShockOne",
             "BIC_surrenderMusicianShockTwo",
             "BIC_surrenderMusicianShockThree",
+            "BIC_surrenderMusicianShockFour",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 77", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 77", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 78", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 78", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -590,6 +591,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianShockOne": 108,
             "SurrenderMusicianShockTwo": 109,
             "SurrenderMusicianShockThree": 110,
+            "SurrenderMusicianShockFour": 111,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1052,6 +1054,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianShockOne",
             "SurrenderMusicianShockTwo",
             "SurrenderMusicianShockThree",
+            "SurrenderMusicianShockFour",
             "Stand",
         ):
             with self.subTest(action=action):
@@ -1877,6 +1880,18 @@ $results | ConvertTo-Json -Compress
         self.assertIn(
             "NetworkId::cms_invalid",
             surrender_musician_shock_three_action,
+        )
+        surrender_musician_shock_four_action = function_body(
+            self.client_main,
+            "bool performBackgroundSurrenderMusicianShockFour()",
+        )
+        self.assertIn(
+            '"social_musician_shock_04"',
+            surrender_musician_shock_four_action,
+        )
+        self.assertIn(
+            "NetworkId::cms_invalid",
+            surrender_musician_shock_four_action,
         )
         self.assertIn('"startDance", "popular"', self.client_main)
 
