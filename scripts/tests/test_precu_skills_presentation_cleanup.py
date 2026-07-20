@@ -203,6 +203,21 @@ class PrecuSkillsPresentationCleanupSourceTests(unittest.TestCase):
             show_all.index("noviceSet.insert(nov)"),
         )
 
+    def test_background_profession_selection_uses_production_graph_path(self) -> None:
+        selection = function_body(
+            self.source,
+            "int SwgCuiSkills::selectAllProfessionForBackgroundValidation(int row)",
+        )
+        for contract in (
+            "showAllProfessionsForBackgroundValidation()",
+            "GetDataSourceContainerAtRow",
+            "m_selectedProfession = data->GetName()",
+            "synchronizeProfessionTreeSelection()",
+            "populateSelectedProfession()",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, selection)
+
     def test_master_links_derive_from_runtime_novice_prerequisites(self) -> None:
         graph = function_body(
             self.source, "bool SwgCuiSkills::tryPopulateGraph4x4("

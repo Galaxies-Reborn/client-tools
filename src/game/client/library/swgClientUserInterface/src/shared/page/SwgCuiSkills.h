@@ -56,6 +56,7 @@ public:
 	void                       onDeleteSkillConfirmation (std::string const & skillName);
 	void                       onSceneChanged        (bool const &);
 	int                        showAllProfessionsForBackgroundValidation ();
+	int                        selectAllProfessionForBackgroundValidation (int row);
 
 protected:
 	virtual void               performActivate       ();

@@ -970,6 +970,30 @@ int SwgCuiSkills::showAllProfessionsForBackgroundValidation()
 
 //-----------------------------------------------------------------------
 
+int SwgCuiSkills::selectAllProfessionForBackgroundValidation(int row)
+{
+	int const rowCount = showAllProfessionsForBackgroundValidation();
+	if (!m_treeProf || row < 0 || row >= rowCount)
+		return -1;
+
+	UIDataSourceContainer const * const data =
+		m_treeProf->GetDataSourceContainerAtRow(static_cast<long>(row));
+	if (!data)
+		return -1;
+
+	// Follow the production selection path after resolving the requested row.
+	// This avoids synthetic system input while exercising the same selected
+	// profession model and graph presentation as a retail tree click.
+	m_selectedProfession = data->GetName();
+	synchronizeProfessionTreeSelection();
+	populateSelectedProfession();
+	REPORT_LOG(true, ("SwgCuiSkills: background selected profession row=%d skill='%s'\n",
+		row, m_selectedProfession.c_str()));
+	return row;
+}
+
+//-----------------------------------------------------------------------
+
 void SwgCuiSkills::populateExperience()
 {
 	if (m_dsExpName)  m_dsExpName->Clear();
