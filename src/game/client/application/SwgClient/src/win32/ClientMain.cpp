@@ -98,6 +98,7 @@
 #include "swgClientUserInterface/SwgCuiManager.h"
 #include "swgClientUserInterface/SwgCuiActions.h"
 #include "swgClientUserInterface/SwgCuiMediatorTypes.h"
+#include "swgClientUserInterface/SwgCuiSkills.h"
 #include "swgSharedNetworkMessages/SetupSwgSharedNetworkMessages.h"
 
 
@@ -235,11 +236,13 @@ namespace ClientMainNamespace
 		BIC_surrenderMusicianKnowledgeTwo,
 		BIC_surrenderMusicianKnowledgeThree,
 		BIC_surrenderMusicianKnowledgeFour,
-		BIC_surrenderMusicianMaster
+		BIC_surrenderMusicianMaster,
+		BIC_showAllProfessions
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 83;
+	LRESULT const cms_backgroundInputProtocolVersion = 84;
+	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
 	LRESULT const cms_backgroundCombatQueueStatusInCombat = 0x00008000;
 	LRESULT const cms_backgroundCombatQueueStatusHasTarget = 0x00004000;
@@ -409,6 +412,24 @@ namespace ClientMainNamespace
 
 		return CuiMediatorFactory::activateInWorkspace(
 			CuiMediatorTypes::WS_StatMigration) != 0;
+	}
+
+	LRESULT performBackgroundShowAllProfessions()
+	{
+		if (!Game::getPlayer())
+			return 0;
+
+		CuiMediator * const mediator = CuiMediatorFactory::activateInWorkspace(
+			CuiMediatorTypes::WS_Skills);
+		SwgCuiSkills * const skills = dynamic_cast<SwgCuiSkills *>(mediator);
+		if (!skills)
+			return 0;
+
+		int const rowCount = skills->showAllProfessionsForBackgroundValidation();
+		if (rowCount < 0 || rowCount > 0xffff)
+			return 0;
+
+		return cms_backgroundSkillsStatusMarker | rowCount;
 	}
 
 	bool performBackgroundTargetCounterpart()
@@ -2278,6 +2299,9 @@ namespace ClientMainNamespace
 				return performBackgroundSurrenderMusicianMaster()
 					? 1
 					: 0;
+
+			case BIC_showAllProfessions:
+				return performBackgroundShowAllProfessions();
 
 			default:
 				return 0;

@@ -266,11 +266,12 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_surrenderMusicianKnowledgeThree",
             "BIC_surrenderMusicianKnowledgeFour",
             "BIC_surrenderMusicianMaster",
+            "BIC_showAllProfessions",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 83", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 83", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 84", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 84", self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
@@ -602,6 +603,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianKnowledgeThree": 114,
             "SurrenderMusicianKnowledgeFour": 115,
             "SurrenderMusicianMaster": 116,
+            "ShowAllProfessions": 117,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1070,6 +1072,7 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianKnowledgeThree",
             "SurrenderMusicianKnowledgeFour",
             "SurrenderMusicianMaster",
+            "ShowAllProfessions",
             "Stand",
         ):
             with self.subTest(action=action):
