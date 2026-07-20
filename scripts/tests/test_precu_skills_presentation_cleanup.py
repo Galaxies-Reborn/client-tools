@@ -182,6 +182,27 @@ class PrecuSkillsPresentationCleanupSourceTests(unittest.TestCase):
             populate.index("m_dsProfTree->Clear()"),
         )
 
+    def test_all_professions_honors_publish14_root_searchability(self) -> None:
+        populate = function_body(
+            self.source, "void SwgCuiSkills::populateProfessionList()"
+        )
+        show_all = populate[
+            populate.index("if (showAll)") : populate.index("\n\telse", populate.index("if (showAll)"))
+        ]
+        for contract in (
+            "stripNoviceSuffix(nov)",
+            "skillMgr.getSkill(rootName)",
+            "root->isProfession()",
+            "root->isSearchable()",
+            "noviceSet.insert(nov)",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, show_all)
+        self.assertLess(
+            show_all.index("root->isSearchable()"),
+            show_all.index("noviceSet.insert(nov)"),
+        )
+
     def test_master_links_derive_from_runtime_novice_prerequisites(self) -> None:
         graph = function_body(
             self.source, "bool SwgCuiSkills::tryPopulateGraph4x4("
