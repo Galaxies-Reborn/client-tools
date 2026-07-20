@@ -1227,10 +1227,95 @@ void SwgCuiSkills::populateSelectedProfession()
 
 void SwgCuiSkills::hideAllGraphs()
 {
+	resetGraph4x4Presentation();
+	if (m_pageGraphs)         m_pageGraphs->SetVisible(false);
 	if (m_pageGraph4x4)     m_pageGraph4x4->SetVisible(false);
 	if (m_pageGraph2x4)     m_pageGraph2x4->SetVisible(false);
 	if (m_pageGraph1x4)     m_pageGraph1x4->SetVisible(false);
 	if (m_pageGraphPyramid) m_pageGraphPyramid->SetVisible(false);
+}
+
+//-----------------------------------------------------------------------
+
+void SwgCuiSkills::resetGraph4x4Presentation()
+{
+	m_buttonSkills.clear();
+	m_linkSkills.clear();
+
+	if (!m_pageGraph4x4)
+		return;
+
+	// Publish 14's ui_skill.inc is an editor-authored template. Every graph
+	// button and transition label contains visible sample text, so a character
+	// with no profession (or an unrecognized profession) must explicitly erase
+	// the complete template before the graph can fail closed.
+	char path[64];
+	for (int col = 0; col < 4; ++col)
+	{
+		for (int row = 0; row < 4; ++row)
+		{
+			snprintf(path, sizeof(path), "graph.row%d.%d", row, col);
+			UIBaseObject * const object =
+				m_pageGraph4x4->GetObjectFromPath(path, TUIButton);
+			if (!object)
+				continue;
+
+			UIButton * const button = static_cast<UIButton *>(object);
+			button->SetText(Unicode::emptyString);
+			button->SetLocalTooltip(Unicode::emptyString);
+		}
+
+		for (int slot = 0; slot < 6; ++slot)
+		{
+			snprintf(path, sizeof(path), "graph.disciplineNext.%d.%d", col, slot);
+			UIBaseObject * const object =
+				m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+			if (!object)
+				continue;
+
+			UIText * const text = static_cast<UIText *>(object);
+			text->SetLocalText(Unicode::emptyString);
+			text->SetVisible(false);
+		}
+	}
+
+	char const * const terminalButtons[] =
+	{
+		"graph.master.b",
+		"graph.novice.b"
+	};
+	for (int terminal = 0; terminal < 2; ++terminal)
+	{
+		UIBaseObject * const object =
+			m_pageGraph4x4->GetObjectFromPath(terminalButtons[terminal], TUIButton);
+		if (!object)
+			continue;
+
+		UIButton * const button = static_cast<UIButton *>(object);
+		button->SetText(Unicode::emptyString);
+		button->SetLocalTooltip(Unicode::emptyString);
+	}
+
+	for (int slot = 0; slot < 4; ++slot)
+	{
+		char const * const linkGroups[] =
+		{
+			"graph.next.%d",
+			"graph.prev.%d"
+		};
+		for (int group = 0; group < 2; ++group)
+		{
+			snprintf(path, sizeof(path), linkGroups[group], slot);
+			UIBaseObject * const object =
+				m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+			if (!object)
+				continue;
+
+			UIText * const text = static_cast<UIText *>(object);
+			text->SetLocalText(Unicode::emptyString);
+			text->SetVisible(false);
+		}
+	}
 }
 
 //-----------------------------------------------------------------------
@@ -1301,10 +1386,8 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 	REPORT_LOG(true, ("SwgCuiSkills::tryPopulateGraph4x4: using ProfessionDef for '%s' (master=%s)\n",
 		def->displayName, def->masterSkill ? def->masterSkill : "(none)"));
 
-	// Reset the per-cell skill mapping for the new profession's tree
-	// before re-registering buttons + populating labels.
-	m_buttonSkills.clear();
-	m_linkSkills.clear();
+	// hideAllGraphs() reset the complete authentic graph template before this
+	// valid definition was selected. Re-register only the live cells and links.
 	std::string const masterName = (def->masterSkill && def->masterSkill[0])
 		? std::string(def->masterSkill)
 		: stripNoviceSuffix(novice->getSkillName()) + "_master";

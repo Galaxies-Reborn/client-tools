@@ -99,6 +99,43 @@ class PrecuSkillsPresentationCleanupSourceTests(unittest.TestCase):
             graph.index("t->SetVisible(true)", prev_reset),
         )
 
+    def test_graph_template_fails_closed_before_profession_resolution(self) -> None:
+        reset = function_body(
+            self.source, "void SwgCuiSkills::resetGraph4x4Presentation()"
+        )
+        for contract in (
+            "m_buttonSkills.clear()",
+            "m_linkSkills.clear()",
+            'snprintf(path, sizeof(path), "graph.row%d.%d", row, col)',
+            "button->SetText(Unicode::emptyString)",
+            "button->SetLocalTooltip(Unicode::emptyString)",
+            '"graph.master.b"',
+            '"graph.novice.b"',
+            '"graph.next.%d"',
+            '"graph.prev.%d"',
+            '"graph.disciplineNext.%d.%d"',
+            "text->SetLocalText(Unicode::emptyString)",
+            "text->SetVisible(false)",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, reset)
+
+        hide = function_body(self.source, "void SwgCuiSkills::hideAllGraphs()")
+        self.assertIn("resetGraph4x4Presentation()", hide)
+        self.assertIn("m_pageGraphs->SetVisible(false)", hide)
+
+        populate = function_body(
+            self.source, "void SwgCuiSkills::populateSelectedProfession()"
+        )
+        self.assertLess(
+            populate.index("hideAllGraphs()"),
+            populate.index("if (m_selectedProfession.empty())"),
+        )
+        self.assertLess(
+            populate.index("hideAllGraphs()"),
+            populate.index("SkillManager::getInstance().getSkill"),
+        )
+
     def test_master_links_derive_from_runtime_novice_prerequisites(self) -> None:
         graph = function_body(
             self.source, "bool SwgCuiSkills::tryPopulateGraph4x4("
