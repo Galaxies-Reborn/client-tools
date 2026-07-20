@@ -283,6 +283,31 @@ class PrecuSkillsPresentationCleanupSourceTests(unittest.TestCase):
         self.assertIn("&creature == Game::getPlayerCreature()", handler)
         self.assertIn("populateCertifications()", handler)
 
+    def test_profession_back_links_follow_runtime_novice_prerequisites(self) -> None:
+        graph = function_body(
+            self.source, "bool SwgCuiSkills::tryPopulateGraph4x4("
+        )
+        self.assertIn(
+            "novice->getPrerequisiteSkills()",
+            graph,
+        )
+        self.assertIn(
+            "prerequisiteName == candidate.masterSkill",
+            graph,
+        )
+        self.assertIn(
+            "prerequisiteName == candidate.branchSkills[col][row]",
+            graph,
+        )
+        self.assertIn(
+            "std::set<ProfessionDef const *> displayed",
+            graph,
+        )
+        self.assertNotIn(
+            "rootName == lr",
+            graph,
+        )
+
 
 class PrecuSkillsPresentationCleanupAssetTests(unittest.TestCase):
     @classmethod
