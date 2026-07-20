@@ -1098,13 +1098,20 @@ void SwgCuiSkills::populateProfessionList()
 	if (showAll)
 	{
 		// "All Professions": iterate the canonical k_professionDefs table
-		// (derived from the SWG Profession Calculator). Include each
-		// entry whose novice skill exists in SkillManager.
+		// (derived from the SWG Profession Calculator), but let the restored
+		// Publish 14 root row remain authoritative for public visibility.
+		// Force-sensitive and Jedi progression roots are valid graph definitions
+		// with SEARCHABLE=0 and must not leak into the trainer-facing list.
 		SkillManager & skillMgr = SkillManager::getInstance();
 		for (int i = 0; i < k_professionDefCount; ++i)
 		{
 			char const * const nov = k_professionDefs[i].noviceSkill;
-			if (nov && skillMgr.getSkill(nov))
+			if (!nov || !skillMgr.getSkill(nov))
+				continue;
+
+			std::string const rootName = stripNoviceSuffix(nov);
+			SkillObject const * const root = skillMgr.getSkill(rootName);
+			if (root && root->isProfession() && root->isSearchable())
 				noviceSet.insert(nov);
 		}
 	}
