@@ -589,3 +589,12 @@ pistol with `EquipCdefPistol` and wait for replication before queueing. The
 status route exposes pistol type 2 and mask `0x0004`; RANDOM-pool resolution,
 `stoppingshot` prose, and generated `fire_1_special_single` ranged playback
 remain authoritative server results.
+
+## Core3 Crippling Shot diagnostics
+
+Background-input protocol 140 adds `QueueCripplingShot` at fixed ID 178 and
+`CripplingShotWeaponStatus` at fixed ID 179. Equip the identity-bound CDEF
+carbine with `EquipCdefCarbine` and wait for replication before queueing. The
+status route exposes carbine type 1 and mask `0x0002`; RANDOM-pool resolution,
+`cripplingshot` prose, and generated `fire_5_single` ranged playback remain
+authoritative server results.
