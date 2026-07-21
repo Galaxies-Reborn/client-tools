@@ -282,11 +282,15 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_melee1hSpinAttack1WeaponStatus",
             "BIC_queueMelee2hSpinAttack1",
             "BIC_melee2hSpinAttack1WeaponStatus",
+            "BIC_queueBodyShot2",
+            "BIC_bodyShot2WeaponStatus",
+            "BIC_queueBodyShot3",
+            "BIC_bodyShot3WeaponStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 99", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 99", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 103", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 103", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -330,6 +334,32 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "Melee1hSpinAttack1WeaponStatus = 130",
             "QueueMelee2hSpinAttack1 = 131",
             "Melee2hSpinAttack1WeaponStatus = 132",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_body_shot_continuation(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1("bodyShot2"',
+            'performBackgroundQueueMarksmanTier1("bodyShot3"',
+            'getBackgroundGeneratedCombatWeaponStatus("bodyShot2")',
+            'getBackgroundGeneratedCombatWeaponStatus("bodyShot3")',
+            "BIC_queueBodyShot2",
+            "BIC_bodyShot2WeaponStatus",
+            "BIC_queueBodyShot3",
+            "BIC_bodyShot3WeaponStatus",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.client_main)
+        for token in [
+            '"QueueBodyShot2"',
+            '"BodyShot2WeaponStatus"',
+            '"QueueBodyShot3"',
+            '"BodyShot3WeaponStatus"',
+            "QueueBodyShot2 = 133",
+            "BodyShot2WeaponStatus = 134",
+            "QueueBodyShot3 = 135",
+            "BodyShot3WeaponStatus = 136",
         ]:
             with self.subTest(token=token):
                 self.assertIn(token, self.helper)
@@ -688,6 +718,15 @@ $results | ConvertTo-Json -Compress
         self.assertIn("$pressedModifiers.Count - 1", sequence)
         self.assertIn("$command.InputReset", sequence)
         self.assertIn("$actionError", sequence)
+
+    def test_helper_resolves_nonactivating_recreated_client_window(self):
+        self.assertIn("FindTopLevelWindow", self.helper)
+        self.assertIn("EnumWindows", self.helper)
+        self.assertIn("GetWindowThreadProcessId", self.helper)
+        resolver = function_body(self.helper, "function Resolve-ClientWindow")
+        self.assertIn("$client.MainWindowHandle", resolver)
+        self.assertIn("$fallbackWindow", resolver)
+        self.assertIn("MainWindowHandle = $fallbackWindow", resolver)
 
     def test_remote_character_sheet_action_is_narrow_and_target_guarded(self):
         action = function_body(
@@ -1048,6 +1087,10 @@ $results | ConvertTo-Json -Compress
             "EquipCdefRifle",
             "QueueBodyShot1",
             "QueueLegShot1",
+            "QueueBodyShot2",
+            "BodyShot2WeaponStatus",
+            "QueueBodyShot3",
+            "BodyShot3WeaponStatus",
             "EquipCdefPistol",
             "EquipCdefCarbine",
             "EquipFixtureLightsaber",
