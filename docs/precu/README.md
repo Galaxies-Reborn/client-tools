@@ -424,6 +424,25 @@ actions plus production queue and weapon-mask diagnostics for
 .\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueMelee2hSpinAttack1 -Repeat 1 -ClientProcessId <pid>
 ```
 
+## Core3 body-shot continuation diagnostics
+
+Background-input protocol 103 adds production queue and generated-combat
+status routes for `bodyShot2` and `bodyShot3`. Use the existing
+`EquipCdefPistol` route after the identity-bound server fixture has prepared
+its reversible pistol object:
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action EquipCdefPistol -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action BodyShot2WeaponStatus -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueBodyShot2 -Repeat 1 -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action BodyShot3WeaponStatus -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueBodyShot3 -Repeat 1 -ClientProcessId <pid>
+```
+
+The helper also falls back to direct top-level HWND enumeration when the
+non-activating Direct3D window recreation clears .NET's `MainWindowHandle`.
+The bridge still targets only the selected process and never requests focus.
+
 The Release Win32 `DataTableTool` project also carries the minimal modern
 linker compatibility needed to compile these legacy tables with the v143
 toolchain: the existing Unicode library, legacy stdio definitions, and
