@@ -261,11 +261,14 @@ namespace ClientMainNamespace
 		BIC_queueBodyShot2,
 		BIC_bodyShot2WeaponStatus,
 		BIC_queueBodyShot3,
-		BIC_bodyShot3WeaponStatus
+		BIC_bodyShot3WeaponStatus,
+		BIC_headShot2WeaponStatus,
+		BIC_queueHeadShot3,
+		BIC_headShot3WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 103;
+	LRESULT const cms_backgroundInputProtocolVersion = 106;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2489,6 +2492,18 @@ namespace ClientMainNamespace
 
 			case BIC_bodyShot3WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("bodyShot3");
+
+			case BIC_headShot2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("headShot2");
+
+			case BIC_queueHeadShot3:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1("headShot3", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_headShot3WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("headShot3");
 
 			default:
 				return 0;

@@ -286,11 +286,14 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_bodyShot2WeaponStatus",
             "BIC_queueBodyShot3",
             "BIC_bodyShot3WeaponStatus",
+            "BIC_headShot2WeaponStatus",
+            "BIC_queueHeadShot3",
+            "BIC_headShot3WeaponStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 103", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 103", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 106", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 106", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -360,6 +363,28 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BodyShot2WeaponStatus = 134",
             "QueueBodyShot3 = 135",
             "BodyShot3WeaponStatus = 136",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_head_shot_continuation(self):
+        for token in [
+            'getBackgroundGeneratedCombatWeaponStatus("headShot2")',
+            'performBackgroundQueueMarksmanTier1("headShot3"',
+            'getBackgroundGeneratedCombatWeaponStatus("headShot3")',
+            "BIC_headShot2WeaponStatus",
+            "BIC_queueHeadShot3",
+            "BIC_headShot3WeaponStatus",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.client_main)
+        for token in [
+            '"HeadShot2WeaponStatus"',
+            '"QueueHeadShot3"',
+            '"HeadShot3WeaponStatus"',
+            "HeadShot2WeaponStatus = 137",
+            "QueueHeadShot3 = 138",
+            "HeadShot3WeaponStatus = 139",
         ]:
             with self.subTest(token=token):
                 self.assertIn(token, self.helper)
@@ -1091,6 +1116,9 @@ $results | ConvertTo-Json -Compress
             "BodyShot2WeaponStatus",
             "QueueBodyShot3",
             "BodyShot3WeaponStatus",
+            "HeadShot2WeaponStatus",
+            "QueueHeadShot3",
+            "HeadShot3WeaponStatus",
             "EquipCdefPistol",
             "EquipCdefCarbine",
             "EquipFixtureLightsaber",
