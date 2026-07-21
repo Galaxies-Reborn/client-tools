@@ -580,3 +580,12 @@ with `EquipCdefPistol` and wait for replication before queueing. The status
 route exposes pistol type 2 and mask `0x0004`; RANDOM-pool resolution,
 `doubletap` prose, and generated `fire_7_single` ranged playback remain
 authoritative server results.
+
+## Core3 Stopping Shot diagnostics
+
+Background-input protocol 139 adds `QueueStoppingShot` at fixed ID 176 and
+`StoppingShotWeaponStatus` at fixed ID 177. Equip the identity-bound CDEF
+pistol with `EquipCdefPistol` and wait for replication before queueing. The
+status route exposes pistol type 2 and mask `0x0004`; RANDOM-pool resolution,
+`stoppingshot` prose, and generated `fire_1_special_single` ranged playback
+remain authoritative server results.
