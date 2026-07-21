@@ -298,11 +298,13 @@ namespace ClientMainNamespace
 		BIC_queueBurstShot1,
 		BIC_burstShot1WeaponStatus,
 		BIC_queueDisarmingShot1,
-		BIC_disarmingShot1WeaponStatus
+		BIC_disarmingShot1WeaponStatus,
+		BIC_queueDoubleTap,
+		BIC_doubleTapWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 137;
+	LRESULT const cms_backgroundInputProtocolVersion = 138;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2708,6 +2710,16 @@ namespace ClientMainNamespace
 
 			case BIC_disarmingShot1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("disarmingShot1");
+
+			case BIC_queueDoubleTap:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"doubleTap", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_doubleTapWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("doubleTap");
 
 			default:
 				return 0;
