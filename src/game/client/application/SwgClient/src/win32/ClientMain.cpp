@@ -304,11 +304,13 @@ namespace ClientMainNamespace
 		BIC_queueStoppingShot,
 		BIC_stoppingShotWeaponStatus,
 		BIC_queueCripplingShot,
-		BIC_cripplingShotWeaponStatus
+		BIC_cripplingShotWeaponStatus,
+		BIC_queuePointBlankSingle2,
+		BIC_pointBlankSingle2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 140;
+	LRESULT const cms_backgroundInputProtocolVersion = 141;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2744,6 +2746,16 @@ namespace ClientMainNamespace
 
 			case BIC_cripplingShotWeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("cripplingShot");
+
+			case BIC_queuePointBlankSingle2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"pointBlankSingle2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_pointBlankSingle2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("pointBlankSingle2");
 
 			default:
 				return 0;

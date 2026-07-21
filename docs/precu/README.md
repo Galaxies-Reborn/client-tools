@@ -598,3 +598,13 @@ carbine with `EquipCdefCarbine` and wait for replication before queueing. The
 status route exposes carbine type 1 and mask `0x0002`; RANDOM-pool resolution,
 `cripplingshot` prose, and generated `fire_5_single` ranged playback remain
 authoritative server results.
+
+## Core3 Point Blank Single II diagnostics
+
+Background-input protocol 141 adds `QueuePointBlankSingle2` at fixed ID 180
+and `PointBlankSingle2WeaponStatus` at fixed ID 181. Equip the identity-bound
+CDEF pistol with `EquipCdefPistol`, place the counterpart within 10 meters,
+and wait for replication before queueing. The status route exposes pistol
+type 2 and mask `0x0004`; RANDOM-pool resolution, `pointblankblast` prose,
+and generated `fire_5_single` ranged playback remain authoritative server
+results.
