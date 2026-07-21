@@ -16,6 +16,7 @@
 #include "clientDirectInput/DirectInput.h"
 #include "clientDirectInput/SetupClientDirectInput.h"
 #include "clientGame/ClientCommandQueue.h"
+#include "clientGame/ClientCommandChecks.h"
 #include "clientGame/ClientObject.h"
 #include "clientGame/ContainerInterface.h"
 #include "clientGame/Game.h"
@@ -51,6 +52,7 @@
 #include "sharedDebug/SetupSharedDebug.h"
 #include "sharedFile/SetupSharedFile.h"
 #include "sharedFile/TreeFile.h"
+#include "sharedFoundation/ConstCharCrcLowerString.h"
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/ApplicationVersion.h"
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/Branch.h"
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/Binary.h"
@@ -63,6 +65,7 @@
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/SetupSharedFoundation.h"
 #include "../../../../../../engine/shared/library/sharedFoundation/include/public/sharedFoundation/ConfigSharedFoundation.h"
 #include "sharedGame/CommoditiesAdvancedSearchAttribute.h"
+#include "sharedGame/CommandTable.h"
 #include "sharedGame/SetupSharedGame.h"
 #include "sharedImage/SetupSharedImage.h"
 #include "sharedIoWin/IoWinManager.h"
@@ -81,6 +84,8 @@
 #include "sharedObject/Object.h"
 #include "sharedObject/ObjectTemplate.h"
 #include "sharedObject/SetupSharedObject.h"
+#include "sharedObject/SlotIdManager.h"
+#include "sharedObject/SlottedContainer.h"
 #include "sharedPathfinding/SetupSharedPathfinding.h"
 #include "sharedRandom/SetupSharedRandom.h"
 #include "sharedRegex/SetupSharedRegex.h"
@@ -238,11 +243,17 @@ namespace ClientMainNamespace
 		BIC_surrenderMusicianKnowledgeFour,
 		BIC_surrenderMusicianMaster,
 		BIC_showAllProfessions,
-		BIC_selectAllProfession
+		BIC_selectAllProfession,
+		BIC_equipFixturePolearm,
+		BIC_unequipHeldWeapon,
+		BIC_queuePolearmLegHit1,
+		BIC_queueUnarmedHeadHit1,
+		BIC_polearmLegHit1WeaponStatus,
+		BIC_unarmedHeadHit1WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 85;
+	LRESULT const cms_backgroundInputProtocolVersion = 91;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1734,6 +1745,33 @@ namespace ClientMainNamespace
 		return performBackgroundEquipCdefWeapon("pistol_dl44_metal.iff");
 	}
 
+	bool performBackgroundEquipFixturePolearm()
+	{
+		return performBackgroundEquipCdefWeapon("lance_staff_wood_s2.iff");
+	}
+
+	bool performBackgroundUnequipHeldWeapon()
+	{
+	Object * const player = Game::getPlayer();
+		if (!player || Game::getPlayerNetworkId().getValueString() != "44003778")
+			return false;
+
+		SlottedContainer * const container =
+			ContainerInterface::getSlottedContainer(*player);
+		if (!container)
+			return false;
+
+		Container::ContainerErrorCode error = Container::CEC_Success;
+		CachedNetworkId const weaponId = container->getObjectInSlot(
+			SlotIdManager::findSlotId(ConstCharCrcLowerString("hold_r")),
+			error);
+		if (weaponId == NetworkId::cms_invalid)
+			return true;
+
+		CuiInventoryManager::unequipObject(weaponId);
+		return true;
+	}
+
 	LRESULT getBackgroundCombatQueueStatus()
 	{
 		CuiCombatManager::IntVector sequenceIds;
@@ -1787,6 +1825,29 @@ namespace ClientMainNamespace
 		result |= static_cast<LRESULT>(maxMilliseconds & 0xffff) << 32;
 		result |= static_cast<LRESULT>(currentMilliseconds & 0xffff) << 48;
 		return result;
+	}
+
+	LRESULT getBackgroundGeneratedCombatWeaponStatus(char const * const commandName)
+	{
+		uint64 result = 0x57440000ULL;
+		CreatureObject const * const player = Game::getPlayerCreature();
+		int const weaponType =
+			ClientCommandChecks::getCurrentWeaponTypeForDiagnostics(player);
+
+		Command const & command =
+			CommandTable::getCommand(Crc::normalizeAndCalculate(commandName));
+		if (!command.isNull())
+			result |= 0x00000200ULL;
+		if (weaponType >= 0 && !command.isNull() &&
+			!ClientCommandChecks::doesWeaponInvalidateCommand(&command, player))
+		{
+			result |= 0x00000100ULL;
+		}
+
+		result |= static_cast<uint64>((weaponType >= 0 ? weaponType : 0xff) & 0xff);
+		result |= static_cast<uint64>(command.m_weaponTypesValid & 0xffffU) << 32;
+		result |= static_cast<uint64>(command.m_weaponTypesInvalid & 0xffffU) << 48;
+		return static_cast<LRESULT>(result);
 	}
 
 	LRESULT CALLBACK backgroundInputWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -2326,6 +2387,32 @@ namespace ClientMainNamespace
 
 			case BIC_selectAllProfession:
 				return performBackgroundSelectAllProfession(static_cast<int>(lParam));
+
+			case BIC_equipFixturePolearm:
+				return performBackgroundEquipFixturePolearm() ? 1 : 0;
+
+			case BIC_unequipHeldWeapon:
+				return performBackgroundUnequipHeldWeapon() ? 1 : 0;
+
+			case BIC_queuePolearmLegHit1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"polearmLegHit1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueUnarmedHeadHit1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"unarmedHeadHit1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_polearmLegHit1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("polearmLegHit1");
+
+			case BIC_unarmedHeadHit1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("unarmedHeadHit1");
 
 			default:
 				return 0;

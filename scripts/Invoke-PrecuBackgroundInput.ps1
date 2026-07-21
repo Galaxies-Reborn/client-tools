@@ -34,7 +34,7 @@ Queues text only when the target client is already the foreground window.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "SelectCloneLocation", "StartDanceRhythmic", "FlourishOne", "StopDance", "StartMusicStarwars1", "StopMusic", "StartBandStarwars1", "BandFlourishOne", "StopBand", "StartMusicRock", "SurrenderEntertainerMusicOne", "StartMusicStarwars2", "SurrenderEntertainerMusicTwo", "StartMusicFolk", "SurrenderEntertainerMusicThree", "StartMusicStarwars3", "SurrenderEntertainerMusicFour", "StartMusicCeremonial", "SurrenderEntertainerMaster", "StartDanceBasicTwo", "SurrenderEntertainerDanceOne", "StartDanceRhythmicTwo", "SurrenderEntertainerDanceTwo", "StartDanceFootloose", "SurrenderEntertainerDanceThree", "StartDanceFormal", "SurrenderEntertainerDanceFour", "SurrenderEntertainerHairstyleOne", "SurrenderEntertainerHairstyleTwo", "SurrenderEntertainerHairstyleThree", "SurrenderEntertainerHairstyleFour", "StartDancePopular", "SurrenderDancerNovice", "SurrenderDancerAbilityOne", "SurrenderDancerAbilityTwo", "SurrenderDancerAbilityThree", "SurrenderDancerAbilityFour", "SurrenderDancerWoundOne", "SurrenderDancerWoundTwo", "SurrenderDancerWoundThree", "SurrenderDancerWoundFour", "SurrenderDancerShockOne", "SurrenderDancerShockTwo", "SurrenderDancerShockThree", "SurrenderDancerShockFour", "SurrenderDancerKnowledgeOne", "SurrenderDancerKnowledgeTwo", "SurrenderDancerKnowledgeThree", "SurrenderDancerKnowledgeFour", "SurrenderDancerMaster", "SurrenderMusicianNovice", "SurrenderMusicianAbilityOne", "SurrenderMusicianAbilityTwo", "SurrenderMusicianAbilityThree", "SurrenderMusicianAbilityFour", "SurrenderMusicianWoundOne", "SurrenderMusicianWoundTwo", "SurrenderMusicianWoundThree", "SurrenderMusicianWoundFour", "SurrenderMusicianShockOne", "SurrenderMusicianShockTwo", "SurrenderMusicianShockThree", "SurrenderMusicianShockFour", "SurrenderMusicianKnowledgeOne", "SurrenderMusicianKnowledgeTwo", "SurrenderMusicianKnowledgeThree", "SurrenderMusicianKnowledgeFour", "SurrenderMusicianMaster", "ShowAllProfessions", "SelectAllProfession", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "Stand")]
+    [ValidateSet("Ping", "Move", "LeftClick", "RightClick", "MiddleClick", "Key", "Chord", "Text", "Reset", "ExamineCharacterSheet", "InviteTarget", "JoinGroup", "DisbandGroup", "OpenStatMigration", "StartImageDesign", "TargetCounterpart", "QueueCombatCanary", "QueueBodyShot1", "QueueLegShot1", "QueueDurationControl", "QueueHealWound", "QueueHealDamage", "QueueTendDamage", "QueueTendWound", "QueueDiagnose", "QueueMedicalForage", "QueueFirstAid", "QueueDragIncapacitatedPlayer", "QueueQuickHeal", "QueueHealState", "QueueCurePoison", "QueueHealEnhance", "QueueExtinguishFire", "QueueCureDisease", "QueueRevivePlayer", "QueueDeathBlow", "SelectCloneLocation", "StartDanceRhythmic", "FlourishOne", "StopDance", "StartMusicStarwars1", "StopMusic", "StartBandStarwars1", "BandFlourishOne", "StopBand", "StartMusicRock", "SurrenderEntertainerMusicOne", "StartMusicStarwars2", "SurrenderEntertainerMusicTwo", "StartMusicFolk", "SurrenderEntertainerMusicThree", "StartMusicStarwars3", "SurrenderEntertainerMusicFour", "StartMusicCeremonial", "SurrenderEntertainerMaster", "StartDanceBasicTwo", "SurrenderEntertainerDanceOne", "StartDanceRhythmicTwo", "SurrenderEntertainerDanceTwo", "StartDanceFootloose", "SurrenderEntertainerDanceThree", "StartDanceFormal", "SurrenderEntertainerDanceFour", "SurrenderEntertainerHairstyleOne", "SurrenderEntertainerHairstyleTwo", "SurrenderEntertainerHairstyleThree", "SurrenderEntertainerHairstyleFour", "StartDancePopular", "SurrenderDancerNovice", "SurrenderDancerAbilityOne", "SurrenderDancerAbilityTwo", "SurrenderDancerAbilityThree", "SurrenderDancerAbilityFour", "SurrenderDancerWoundOne", "SurrenderDancerWoundTwo", "SurrenderDancerWoundThree", "SurrenderDancerWoundFour", "SurrenderDancerShockOne", "SurrenderDancerShockTwo", "SurrenderDancerShockThree", "SurrenderDancerShockFour", "SurrenderDancerKnowledgeOne", "SurrenderDancerKnowledgeTwo", "SurrenderDancerKnowledgeThree", "SurrenderDancerKnowledgeFour", "SurrenderDancerMaster", "SurrenderMusicianNovice", "SurrenderMusicianAbilityOne", "SurrenderMusicianAbilityTwo", "SurrenderMusicianAbilityThree", "SurrenderMusicianAbilityFour", "SurrenderMusicianWoundOne", "SurrenderMusicianWoundTwo", "SurrenderMusicianWoundThree", "SurrenderMusicianWoundFour", "SurrenderMusicianShockOne", "SurrenderMusicianShockTwo", "SurrenderMusicianShockThree", "SurrenderMusicianShockFour", "SurrenderMusicianKnowledgeOne", "SurrenderMusicianKnowledgeTwo", "SurrenderMusicianKnowledgeThree", "SurrenderMusicianKnowledgeFour", "SurrenderMusicianMaster", "ShowAllProfessions", "SelectAllProfession", "ClearCombatQueue", "CombatQueueStatus", "CombatTimerStatus", "EquipCdefRifle", "EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "EquipFixturePolearm", "UnequipHeldWeapon", "QueuePolearmLegHit1", "QueueUnarmedHeadHit1", "PolearmLegHit1WeaponStatus", "UnarmedHeadHit1WeaponStatus", "Stand")]
     [string]$Action,
 
     [ValidateRange(1, [int]::MaxValue)]
@@ -73,7 +73,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 85
+$expectedProtocolVersion = 91
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -194,6 +194,12 @@ $command = @{
     SurrenderMusicianMaster = 116
     ShowAllProfessions = 117
     SelectAllProfession = 118
+    EquipFixturePolearm = 119
+    UnequipHeldWeapon = 120
+    QueuePolearmLegHit1 = 121
+    QueueUnarmedHeadHit1 = 122
+    PolearmLegHit1WeaponStatus = 123
+    UnarmedHeadHit1WeaponStatus = 124
 }
 $dikByName = @{
     Escape    = 0x01
@@ -494,6 +500,24 @@ function ConvertTo-CombatTimerStatusDetail {
     return "available=true command=$commandName currentMs=$currentMilliseconds maxMs=$maxMilliseconds packed=0x$($PackedStatus.ToString('x16'))"
 }
 
+function ConvertTo-GeneratedCombatWeaponStatusDetail {
+    param(
+        [Parameter(Mandatory = $true)]
+        [long]$PackedStatus
+    )
+
+    if (($PackedStatus -band 0xffff0000L) -ne 0x57440000L) {
+        throw ("Unexpected generated-combat weapon status marker 0x{0:x8}." -f $PackedStatus)
+    }
+
+    $weaponType = $PackedStatus -band 0xffL
+    $satisfies = ($PackedStatus -band 0x100L) -ne 0
+    $commandFound = ($PackedStatus -band 0x200L) -ne 0
+    $validMask = ($PackedStatus -shr 32) -band 0xffffL
+    $invalidMask = ($PackedStatus -shr 48) -band 0xffffL
+    return "commandFound=$($commandFound.ToString().ToLowerInvariant()) weaponType=$weaponType validMask=0x$($validMask.ToString('x4')) invalidMask=0x$($invalidMask.ToString('x4')) satisfies=$($satisfies.ToString().ToLowerInvariant()) packed=0x$($PackedStatus.ToString('x16'))"
+}
+
 function Send-BridgeKeySequence {
     param(
         [Parameter(Mandatory = $true)]
@@ -718,7 +742,7 @@ switch ($Action) {
         $detail = "repeat=$Repeat $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
     }
 
-    { $_ -in @("QueueBodyShot1", "QueueLegShot1") } {
+    { $_ -in @("QueueBodyShot1", "QueueLegShot1", "QueuePolearmLegHit1", "QueueUnarmedHeadHit1") } {
         [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command[$Action] -Data $Repeat
         $detail = "command=$($Action.Replace('Queue', '')) repeat=$Repeat $(ConvertTo-CombatQueueStatusDetail -PackedStatus $packedStatus)"
     }
@@ -736,6 +760,11 @@ switch ($Action) {
     "CombatTimerStatus" {
         [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command.CombatTimerStatus
         $detail = ConvertTo-CombatTimerStatusDetail -PackedStatus $packedStatus
+    }
+
+    { $_ -in @("PolearmLegHit1WeaponStatus", "UnarmedHeadHit1WeaponStatus") } {
+        [long]$packedStatus = Invoke-BridgeQuery -Window $window -Message $message -Command $command[$Action]
+        $detail = ConvertTo-GeneratedCombatWeaponStatusDetail -PackedStatus $packedStatus
     }
 
     "QueueDurationControl" {
@@ -1552,9 +1581,14 @@ switch ($Action) {
         $detail = "equipAccepted=$([bool]$equipResult) result=$equipResult for the bound combat fixture player"
     }
 
-    { $_ -in @("EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword") } {
+    { $_ -in @("EquipCdefPistol", "EquipCdefCarbine", "EquipFixtureLightsaber", "EquipFixtureFallbackSword", "EquipFixturePolearm") } {
         [long]$equipResult = Invoke-BridgeQuery -Window $window -Message $message -Command $command[$Action]
         $detail = "equipAccepted=$([bool]$equipResult) result=$equipResult for the bound combat fixture player"
+    }
+
+    "UnequipHeldWeapon" {
+        [long]$unequipResult = Invoke-BridgeQuery -Window $window -Message $message -Command $command.UnequipHeldWeapon
+        $detail = "unequipAccepted=$([bool]$unequipResult) result=$unequipResult for the bound combat fixture player"
     }
 
     "Stand" {
