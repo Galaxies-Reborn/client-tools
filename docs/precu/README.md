@@ -544,3 +544,12 @@ for `melee2hSpinAttack2`. Equip the identity-bound two-handed fixture, then
 use `Melee2hSpinAttack2WeaponStatus` and `QueueMelee2hSpinAttack2`.
 RANDOM HAM resolution, `spinslam` prose, the 16-meter area shape, and
 generated `combo_4b` intensity playback remain authoritative server results.
+
+## Core3 Body Shot I closure diagnostics
+
+M216 reuses protocol 135's existing `QueueBodyShot1`, `EquipCdefPistol`, and
+`CombatQueueStatus` routes; no client binary or protocol change is required.
+The production queue proved the corrected one-second command row and
+`bodyshot_hit` server output. The reusable Marksman fixture now distinguishes
+real reversible state from diagnostic-only objvars, allowing a fresh prepare
+without disabling retained combat diagnostics.
