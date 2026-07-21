@@ -443,6 +443,25 @@ The helper also falls back to direct top-level HWND enumeration when the
 non-activating Direct3D window recreation clears .NET's `MainWindowHandle`.
 The bridge still targets only the selected process and never requests focus.
 
+## Core3 head-shot continuation diagnostics
+
+Background-input protocol 106 extends the production bridge for the exact
+Core3 rifle continuation. `QueueDurationControl` remains the `headShot2`
+queue route retained from the duration pilot; the explicit status route and
+the new `headShot3` pair make both commands independently auditable:
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action EquipCdefRifle -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action HeadShot2WeaponStatus -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueDurationControl -Repeat 1 -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action HeadShot3WeaponStatus -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueHeadShot3 -Repeat 1 -ClientProcessId <pid>
+```
+
+The status records expose the compiled rifle mask and replicated weapon type.
+Damage, Mind-pool selection, spam, hit location, and generated animation remain
+authoritative server results.
+
 The Release Win32 `DataTableTool` project also carries the minimal modern
 linker compatibility needed to compile these legacy tables with the v143
 toolchain: the existing Unicode library, legacy stdio definitions, and
