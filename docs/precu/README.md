@@ -626,3 +626,12 @@ Background-input protocol 143 adds `QueuePointBlankArea2` at fixed ID 184 and
 proves concrete pistol admission before the client queues Core3's 12-meter,
 60-degree cone action. The server remains authoritative for cone selection,
 RANDOM-pool resolution, `areashot` prose, and generated-intensity playback.
+
+## Core3 Multi-Target Pistol Shot diagnostics
+
+Background-input protocol 144 adds `QueueMultiTargetPistolShot` at fixed ID
+186 and `MultiTargetPistolShotWeaponStatus` at fixed ID 187. The reversible
+Master Pistoleer fixture is layered over the established Marksman/CDEF-pistol
+fixture. The client proves concrete pistol admission and queues the production
+command; the server remains authoritative for the 32-meter area, RANDOM HAM
+selection, `pistolmultishot` prose, and generated-ranged animation.

@@ -310,11 +310,13 @@ namespace ClientMainNamespace
 		BIC_queuePointBlankArea1,
 		BIC_pointBlankArea1WeaponStatus,
 		BIC_queuePointBlankArea2,
-		BIC_pointBlankArea2WeaponStatus
+		BIC_pointBlankArea2WeaponStatus,
+		BIC_queueMultiTargetPistolShot,
+		BIC_multiTargetPistolShotWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 143;
+	LRESULT const cms_backgroundInputProtocolVersion = 144;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2786,6 +2788,16 @@ namespace ClientMainNamespace
 
 			case BIC_pointBlankArea2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("pointBlankArea2");
+
+			case BIC_queueMultiTargetPistolShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"multiTargetPistolShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_multiTargetPistolShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("multiTargetPistolShot");
 
 			default:
 				return 0;
