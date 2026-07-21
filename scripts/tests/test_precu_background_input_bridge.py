@@ -292,8 +292,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 118", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 118", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 126", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 126", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -456,6 +456,33 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]:
             with self.subTest(token=token):
                 self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_basic_melee_hit_family(self):
+        commands = [
+            ("melee1hHit1", "QueueMelee1hHit1", 152),
+            ("melee1hHit2", "QueueMelee1hHit2", 154),
+            ("melee2hHit1", "QueueMelee2hHit1", 156),
+            ("melee2hHit2", "QueueMelee2hHit2", 158),
+        ]
+        for command, action, number in commands:
+            status_action = action.replace("Queue", "") + "WeaponStatus"
+            client_enum = "BIC_" + action[0].lower() + action[1:]
+            client_status_enum = "BIC_" + status_action[0].lower() + status_action[1:]
+            for token in [
+                command,
+                client_enum,
+                client_status_enum,
+            ]:
+                with self.subTest(command=command, client_token=token):
+                    self.assertIn(token, self.client_main)
+            for token in [
+                f'"{action}"',
+                f'"{status_action}"',
+                f"{action} = {number}",
+                f"{status_action} = {number + 1}",
+            ]:
+                with self.subTest(command=command, helper_token=token):
+                    self.assertIn(token, self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [

@@ -508,3 +508,12 @@ toolchain: the existing Unicode library, legacy stdio definitions, and
 non-SAFESEH third-party objects. Its legacy lexer requires relative input and
 output filenames; invoke it from the table's directory rather than passing an
 absolute Windows path.
+
+## Core3 basic melee-hit diagnostics
+
+Background-input protocol 126 adds independent queue and weapon-status routes
+for `melee1hHit1`, `melee1hHit2`, `melee2hHit1`, and `melee2hHit2`. Use
+`EquipFixtureOneHand` with the `Melee1hHit*WeaponStatus`/`QueueMelee1hHit*`
+actions, or `EquipFixtureTwoHand` with their `Melee2hHit*` counterparts.
+Random HAM resolution, exact combat spam, hit location, and generated
+intensity animation remain authoritative server results.

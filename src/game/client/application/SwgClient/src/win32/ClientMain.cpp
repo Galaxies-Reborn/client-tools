@@ -276,11 +276,19 @@ namespace ClientMainNamespace
 		BIC_queueMelee2hHeadHit2,
 		BIC_melee2hHeadHit2WeaponStatus,
 		BIC_queueMelee2hHeadHit3,
-		BIC_melee2hHeadHit3WeaponStatus
+		BIC_melee2hHeadHit3WeaponStatus,
+		BIC_queueMelee1hHit1,
+		BIC_melee1hHit1WeaponStatus,
+		BIC_queueMelee1hHit2,
+		BIC_melee1hHit2WeaponStatus,
+		BIC_queueMelee2hHit1,
+		BIC_melee2hHit1WeaponStatus,
+		BIC_queueMelee2hHit2,
+		BIC_melee2hHit2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 118;
+	LRESULT const cms_backgroundInputProtocolVersion = 126;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2576,6 +2584,46 @@ namespace ClientMainNamespace
 
 			case BIC_melee2hHeadHit3WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("melee2hHeadHit3");
+
+			case BIC_queueMelee1hHit1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee1hHit1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee1hHit1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee1hHit1");
+
+			case BIC_queueMelee1hHit2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee1hHit2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee1hHit2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee1hHit2");
+
+			case BIC_queueMelee2hHit1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee2hHit1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee2hHit1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee2hHit1");
+
+			case BIC_queueMelee2hHit2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee2hHit2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee2hHit2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee2hHit2");
 
 			default:
 				return 0;
