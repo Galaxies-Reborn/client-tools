@@ -385,3 +385,25 @@ The tool refuses to overwrite an existing file unless `--force` is supplied.
 Generated differences must be reviewed against the pinned Core3 snapshot,
 client TRE evidence, and the umbrella repository's provenance policy before
 replacing the checked-in header.
+
+## Core3 RANDOM area-action diagnostics
+
+Background-input protocol 93 adds the first deferred area-action pilot:
+`QueuePolearmSpinAttack1` and `PolearmSpinAttack1WeaponStatus`. The status
+query reports whether the compiled command row exists, the current weapon type,
+the valid and invalid weapon masks, and the final weapon-admission result.
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action PolearmSpinAttack1WeaponStatus `
+  -ClientProcessId <dedicated-precu-client-pid>
+
+.\scripts\Invoke-PrecuBackgroundInput.ps1 `
+  -Action QueuePolearmSpinAttack1 `
+  -Repeat 1 `
+  -ClientProcessId <dedicated-precu-client-pid>
+```
+
+The helper only drives production client admission. The server remains
+authoritative for area target selection and Core3's per-defender RANDOM HAM
+pool resolution.
