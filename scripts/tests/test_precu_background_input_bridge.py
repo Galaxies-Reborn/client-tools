@@ -292,8 +292,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 126", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 126", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 130", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 130", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -472,6 +472,29 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
                 command,
                 client_enum,
                 client_status_enum,
+            ]:
+                with self.subTest(command=command, client_token=token):
+                    self.assertIn(token, self.client_main)
+            for token in [
+                f'"{action}"',
+                f'"{status_action}"',
+                f"{action} = {number}",
+                f"{status_action} = {number + 1}",
+            ]:
+                with self.subTest(command=command, helper_token=token):
+                    self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_polearm_leg_hit_continuation(self):
+        commands = [
+            ("polearmLegHit2", "QueuePolearmLegHit2", 160),
+            ("polearmLegHit3", "QueuePolearmLegHit3", 162),
+        ]
+        for command, action, number in commands:
+            status_action = action.replace("Queue", "") + "WeaponStatus"
+            for token in [
+                command,
+                "BIC_" + action[0].lower() + action[1:],
+                "BIC_" + status_action[0].lower() + status_action[1:],
             ]:
                 with self.subTest(command=command, client_token=token):
                     self.assertIn(token, self.client_main)

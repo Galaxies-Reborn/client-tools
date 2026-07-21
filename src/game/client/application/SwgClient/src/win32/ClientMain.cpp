@@ -284,11 +284,15 @@ namespace ClientMainNamespace
 		BIC_queueMelee2hHit1,
 		BIC_melee2hHit1WeaponStatus,
 		BIC_queueMelee2hHit2,
-		BIC_melee2hHit2WeaponStatus
+		BIC_melee2hHit2WeaponStatus,
+		BIC_queuePolearmLegHit2,
+		BIC_polearmLegHit2WeaponStatus,
+		BIC_queuePolearmLegHit3,
+		BIC_polearmLegHit3WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 126;
+	LRESULT const cms_backgroundInputProtocolVersion = 130;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2624,6 +2628,26 @@ namespace ClientMainNamespace
 
 			case BIC_melee2hHit2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("melee2hHit2");
+
+			case BIC_queuePolearmLegHit2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"polearmLegHit2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_polearmLegHit2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("polearmLegHit2");
+
+			case BIC_queuePolearmLegHit3:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"polearmLegHit3", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_polearmLegHit3WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("polearmLegHit3");
 
 			default:
 				return 0;
