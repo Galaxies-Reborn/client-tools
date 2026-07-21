@@ -553,3 +553,12 @@ The production queue proved the corrected one-second command row and
 `bodyshot_hit` server output. The reusable Marksman fixture now distinguishes
 real reversible state from diagnostic-only objvars, allowing a fresh prepare
 without disabling retained combat diagnostics.
+
+## Core3 Burst Shot I diagnostics
+
+Background-input protocol 136 adds `QueueBurstShot1` at fixed ID 170 and
+`BurstShot1WeaponStatus` at fixed ID 171. Equip the identity-bound CDEF
+carbine with `EquipCdefCarbine` and wait for replication before queueing.
+The status route exposes the compiled carbine mask; RANDOM-pool resolution,
+`burstshot` prose, and generated `fire_7_single` ranged playback remain
+authoritative server results.
