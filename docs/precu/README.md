@@ -562,3 +562,12 @@ carbine with `EquipCdefCarbine` and wait for replication before queueing.
 The status route exposes the compiled carbine mask; RANDOM-pool resolution,
 `burstshot` prose, and generated `fire_7_single` ranged playback remain
 authoritative server results.
+
+## Core3 Disarming Shot I diagnostics
+
+Background-input protocol 137 adds `QueueDisarmingShot1` at fixed ID 172 and
+`DisarmingShot1WeaponStatus` at fixed ID 173. Equip the identity-bound CDEF
+pistol with `EquipCdefPistol` and wait for replication before queueing. The
+status route exposes pistol type 2 and mask `0x0004`; RANDOM-pool resolution,
+`disarmshot` prose, and generated `fire_3_single` ranged playback remain
+authoritative server results.
