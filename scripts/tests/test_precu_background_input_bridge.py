@@ -276,11 +276,17 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_unarmedHeadHit1WeaponStatus",
             "BIC_queuePolearmSpinAttack1",
             "BIC_polearmSpinAttack1WeaponStatus",
+            "BIC_equipFixtureOneHand",
+            "BIC_equipFixtureTwoHand",
+            "BIC_queueMelee1hSpinAttack1",
+            "BIC_melee1hSpinAttack1WeaponStatus",
+            "BIC_queueMelee2hSpinAttack1",
+            "BIC_melee2hSpinAttack1WeaponStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 93", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 93", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 99", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 99", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -296,6 +302,34 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"PolearmSpinAttack1WeaponStatus"',
             "QueuePolearmSpinAttack1 = 125",
             "PolearmSpinAttack1WeaponStatus = 126",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_one_and_two_hand_area_actions(self):
+        for token in [
+            'performBackgroundEquipCdefWeapon("sword_rantok.iff")',
+            'performBackgroundEquipCdefWeapon("2h_sword_cleaver.iff")',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee1hSpinAttack1"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee2hSpinAttack1"',
+            'getBackgroundGeneratedCombatWeaponStatus("melee1hSpinAttack1")',
+            'getBackgroundGeneratedCombatWeaponStatus("melee2hSpinAttack1")',
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.client_main)
+        for token in [
+            '"EquipFixtureOneHand"',
+            '"EquipFixtureTwoHand"',
+            '"QueueMelee1hSpinAttack1"',
+            '"QueueMelee2hSpinAttack1"',
+            '"Melee1hSpinAttack1WeaponStatus"',
+            '"Melee2hSpinAttack1WeaponStatus"',
+            "EquipFixtureOneHand = 127",
+            "EquipFixtureTwoHand = 128",
+            "QueueMelee1hSpinAttack1 = 129",
+            "Melee1hSpinAttack1WeaponStatus = 130",
+            "QueueMelee2hSpinAttack1 = 131",
+            "Melee2hSpinAttack1WeaponStatus = 132",
         ]:
             with self.subTest(token=token):
                 self.assertIn(token, self.helper)

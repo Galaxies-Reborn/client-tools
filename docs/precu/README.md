@@ -407,3 +407,26 @@ the valid and invalid weapon masks, and the final weapon-admission result.
 The helper only drives production client admission. The server remains
 authoritative for area target selection and Core3's per-defender RANDOM HAM
 pool resolution.
+
+## Core3 one-handed/two-handed spin diagnostics
+
+Background-input protocol 99 adds identity-bound Rantok and cleaver equip
+actions plus production queue and weapon-mask diagnostics for
+`melee1hSpinAttack1` and `melee2hSpinAttack1`:
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action EquipFixtureOneHand -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Melee1hSpinAttack1WeaponStatus -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueMelee1hSpinAttack1 -Repeat 1 -ClientProcessId <pid>
+
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action EquipFixtureTwoHand -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Melee2hSpinAttack1WeaponStatus -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueMelee2hSpinAttack1 -Repeat 1 -ClientProcessId <pid>
+```
+
+The Release Win32 `DataTableTool` project also carries the minimal modern
+linker compatibility needed to compile these legacy tables with the v143
+toolchain: the existing Unicode library, legacy stdio definitions, and
+non-SAFESEH third-party objects. Its legacy lexer requires relative input and
+output filenames; invoke it from the table's directory rather than passing an
+absolute Windows path.
