@@ -635,3 +635,12 @@ Master Pistoleer fixture is layered over the established Marksman/CDEF-pistol
 fixture. The client proves concrete pistol admission and queues the production
 command; the server remains authoritative for the 32-meter area, RANDOM HAM
 selection, `pistolmultishot` prose, and generated-ranged animation.
+
+## Core3 Disarming Shot II diagnostics
+
+Background-input protocol 145 adds `QueueDisarmingShot2` at fixed ID 188 and
+`DisarmingShot2WeaponStatus` at fixed ID 189. The reversible Master Pistoleer
+fixture is layered over the established Marksman/CDEF-pistol fixture. The client
+proves concrete pistol admission and queues the production command; the server
+remains authoritative for the 15-degree cone, RANDOM HAM selection,
+`disarmblast` prose, and generated-ranged animation.
