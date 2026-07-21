@@ -517,3 +517,12 @@ for `melee1hHit1`, `melee1hHit2`, `melee2hHit1`, and `melee2hHit2`. Use
 actions, or `EquipFixtureTwoHand` with their `Melee2hHit*` counterparts.
 Random HAM resolution, exact combat spam, hit location, and generated
 intensity animation remain authoritative server results.
+
+## Core3 polearm leg-hit continuation diagnostics
+
+Background-input protocol 130 adds independent queue and wooden-staff status
+routes for `polearmLegHit2` and `polearmLegHit3`. Equip the identity-bound
+polearm fixture, then use `PolearmLegHit2WeaponStatus`/`QueuePolearmLegHit2`
+or `PolearmLegHit3WeaponStatus`/`QueuePolearmLegHit3`. Action damage,
+`legsmasher`/`legbreaker` prose, hit location, and distinct generated
+intensity animations remain authoritative server results.
