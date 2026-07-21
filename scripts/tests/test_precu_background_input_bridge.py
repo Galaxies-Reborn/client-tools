@@ -292,8 +292,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 108", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 108", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 112", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 112", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -395,6 +395,14 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             'getBackgroundGeneratedCombatWeaponStatus("melee1hBodyHit1")',
             "BIC_queueMelee1hBodyHit1",
             "BIC_melee1hBodyHit1WeaponStatus",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee1hBodyHit2"',
+            'getBackgroundGeneratedCombatWeaponStatus("melee1hBodyHit2")',
+            "BIC_queueMelee1hBodyHit2",
+            "BIC_melee1hBodyHit2WeaponStatus",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee1hBodyHit3"',
+            'getBackgroundGeneratedCombatWeaponStatus("melee1hBodyHit3")',
+            "BIC_queueMelee1hBodyHit3",
+            "BIC_melee1hBodyHit3WeaponStatus",
         ]:
             with self.subTest(token=token):
                 self.assertIn(token, self.client_main)
@@ -403,6 +411,14 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"Melee1hBodyHit1WeaponStatus"',
             "QueueMelee1hBodyHit1 = 140",
             "Melee1hBodyHit1WeaponStatus = 141",
+            '"QueueMelee1hBodyHit2"',
+            '"Melee1hBodyHit2WeaponStatus"',
+            "QueueMelee1hBodyHit2 = 142",
+            "Melee1hBodyHit2WeaponStatus = 143",
+            '"QueueMelee1hBodyHit3"',
+            '"Melee1hBodyHit3WeaponStatus"',
+            "QueueMelee1hBodyHit3 = 144",
+            "Melee1hBodyHit3WeaponStatus = 145",
         ]:
             with self.subTest(token=token):
                 self.assertIn(token, self.helper)

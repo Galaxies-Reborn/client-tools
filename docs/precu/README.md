@@ -477,6 +477,23 @@ The status route exposes the compiled one-handed mask and replicated weapon
 type. Health damage, `saimai` prose, hit location, and generated intensity
 animation remain authoritative server results.
 
+## Core3 one-hand body-hit continuation diagnostics
+
+Background-input protocol 112 extends the same identity-bound Rantok path for
+`melee1hBodyHit2` and `melee1hBodyHit3`:
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action EquipFixtureOneHand -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Melee1hBodyHit2WeaponStatus -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueMelee1hBodyHit2 -Repeat 1 -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Melee1hBodyHit3WeaponStatus -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueMelee1hBodyHit3 -Repeat 1 -ClientProcessId <pid>
+```
+
+The two status routes expose compiled mask and replicated weapon type. Health
+damage, `saisun`/`saitok` prose, hit location, and generated intensity
+animation remain authoritative server results.
+
 The Release Win32 `DataTableTool` project also carries the minimal modern
 linker compatibility needed to compile these legacy tables with the v143
 toolchain: the existing Unicode library, legacy stdio definitions, and

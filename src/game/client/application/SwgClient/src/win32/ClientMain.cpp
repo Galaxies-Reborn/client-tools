@@ -266,11 +266,15 @@ namespace ClientMainNamespace
 		BIC_queueHeadShot3,
 		BIC_headShot3WeaponStatus,
 		BIC_queueMelee1hBodyHit1,
-		BIC_melee1hBodyHit1WeaponStatus
+		BIC_melee1hBodyHit1WeaponStatus,
+		BIC_queueMelee1hBodyHit2,
+		BIC_melee1hBodyHit2WeaponStatus,
+		BIC_queueMelee1hBodyHit3,
+		BIC_melee1hBodyHit3WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 108;
+	LRESULT const cms_backgroundInputProtocolVersion = 112;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2516,6 +2520,26 @@ namespace ClientMainNamespace
 
 			case BIC_melee1hBodyHit1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("melee1hBodyHit1");
+
+			case BIC_queueMelee1hBodyHit2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee1hBodyHit2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee1hBodyHit2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee1hBodyHit2");
+
+			case BIC_queueMelee1hBodyHit3:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee1hBodyHit3", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee1hBodyHit3WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee1hBodyHit3");
 
 			default:
 				return 0;
