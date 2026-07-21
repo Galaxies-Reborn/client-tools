@@ -292,8 +292,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 112", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 112", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 118", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 118", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -419,6 +419,40 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"Melee1hBodyHit3WeaponStatus"',
             "QueueMelee1hBodyHit3 = 144",
             "Melee1hBodyHit3WeaponStatus = 145",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_two_hand_head_hit_continuation(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee2hHeadHit1"',
+            'getBackgroundGeneratedCombatWeaponStatus("melee2hHeadHit1")',
+            "BIC_queueMelee2hHeadHit1",
+            "BIC_melee2hHeadHit1WeaponStatus",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee2hHeadHit2"',
+            'getBackgroundGeneratedCombatWeaponStatus("melee2hHeadHit2")',
+            "BIC_queueMelee2hHeadHit2",
+            "BIC_melee2hHeadHit2WeaponStatus",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee2hHeadHit3"',
+            'getBackgroundGeneratedCombatWeaponStatus("melee2hHeadHit3")',
+            "BIC_queueMelee2hHeadHit3",
+            "BIC_melee2hHeadHit3WeaponStatus",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.client_main)
+        for token in [
+            '"QueueMelee2hHeadHit1"',
+            '"Melee2hHeadHit1WeaponStatus"',
+            "QueueMelee2hHeadHit1 = 146",
+            "Melee2hHeadHit1WeaponStatus = 147",
+            '"QueueMelee2hHeadHit2"',
+            '"Melee2hHeadHit2WeaponStatus"',
+            "QueueMelee2hHeadHit2 = 148",
+            "Melee2hHeadHit2WeaponStatus = 149",
+            '"QueueMelee2hHeadHit3"',
+            '"Melee2hHeadHit3WeaponStatus"',
+            "QueueMelee2hHeadHit3 = 150",
+            "Melee2hHeadHit3WeaponStatus = 151",
         ]:
             with self.subTest(token=token):
                 self.assertIn(token, self.helper)
