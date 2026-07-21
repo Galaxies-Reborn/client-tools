@@ -462,6 +462,21 @@ The status records expose the compiled rifle mask and replicated weapon type.
 Damage, Mind-pool selection, spam, hit location, and generated animation remain
 authoritative server results.
 
+## Core3 one-hand body-hit-one diagnostics
+
+Background-input protocol 108 adds production queue and generated-weapon
+status routes for `melee1hBodyHit1`. Reuse the identity-bound Rantok fixture:
+
+```powershell
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action EquipFixtureOneHand -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action Melee1hBodyHit1WeaponStatus -ClientProcessId <pid>
+.\scripts\Invoke-PrecuBackgroundInput.ps1 -Action QueueMelee1hBodyHit1 -Repeat 1 -ClientProcessId <pid>
+```
+
+The status route exposes the compiled one-handed mask and replicated weapon
+type. Health damage, `saimai` prose, hit location, and generated intensity
+animation remain authoritative server results.
+
 The Release Win32 `DataTableTool` project also carries the minimal modern
 linker compatibility needed to compile these legacy tables with the v143
 toolchain: the existing Unicode library, legacy stdio definitions, and
