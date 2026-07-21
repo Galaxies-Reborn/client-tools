@@ -292,8 +292,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 141", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 141", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 142", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 142", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -653,6 +653,30 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"PointBlankSingle2WeaponStatus"',
             "QueuePointBlankSingle2 = 180",
             "PointBlankSingle2WeaponStatus = 181",
+        ]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_point_blank_area_one(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"pointBlankArea1"',
+            'getBackgroundGeneratedCombatWeaponStatus("pointBlankArea1")',
+            "BIC_queuePointBlankArea1",
+            "BIC_pointBlankArea1WeaponStatus",
+            "uint64 result = 0x00005400ULL;",
+            "result |= static_cast<uint64>(static_cast<uint32>(command.m_weaponTypesValid)) << 16;",
+            "result |= static_cast<uint64>(command.m_weaponTypesInvalid & 0xffffU) << 48;",
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in [
+            '"QueuePointBlankArea1"',
+            '"PointBlankArea1WeaponStatus"',
+            "QueuePointBlankArea1 = 182",
+            "PointBlankArea1WeaponStatus = 183",
+            "($PackedStatus -band 0xfc00L) -ne 0x5400L",
+            "$validMask = ($PackedStatus -shr 16) -band 0xffffffffL",
+            "validMask=0x$($validMask.ToString('x8'))",
         ]:
             with self.subTest(helper_token=token):
                 self.assertIn(token, self.helper)
