@@ -571,3 +571,12 @@ pistol with `EquipCdefPistol` and wait for replication before queueing. The
 status route exposes pistol type 2 and mask `0x0004`; RANDOM-pool resolution,
 `disarmshot` prose, and generated `fire_3_single` ranged playback remain
 authoritative server results.
+
+## Core3 Double Tap diagnostics
+
+Background-input protocol 138 adds `QueueDoubleTap` at fixed ID 174 and
+`DoubleTapWeaponStatus` at fixed ID 175. Equip the identity-bound CDEF pistol
+with `EquipCdefPistol` and wait for replication before queueing. The status
+route exposes pistol type 2 and mask `0x0004`; RANDOM-pool resolution,
+`doubletap` prose, and generated `fire_7_single` ranged playback remain
+authoritative server results.
