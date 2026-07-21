@@ -608,3 +608,13 @@ and wait for replication before queueing. The status route exposes pistol
 type 2 and mask `0x0004`; RANDOM-pool resolution, `pointblankblast` prose,
 and generated `fire_5_single` ranged playback remain authoritative server
 results.
+
+## Core3 Point Blank Area I diagnostics
+
+Background-input protocol 142 adds `QueuePointBlankArea1` at fixed ID 182 and
+`PointBlankArea1WeaponStatus` at fixed ID 183. The command accepts any ranged
+weapon; the identity-bound CDEF pistol therefore validates type 2 against the
+generated `RANGED` mask before the client queues Core3's 15-meter area action
+at its explicit 12-meter command range. Protocol 142 dedicates the middle 32
+status bits to the complete valid-weapon mask, preserving aggregate-family
+bits; live acceptance reports `0x08000000` rather than a truncated zero.

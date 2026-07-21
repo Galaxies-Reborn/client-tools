@@ -306,11 +306,13 @@ namespace ClientMainNamespace
 		BIC_queueCripplingShot,
 		BIC_cripplingShotWeaponStatus,
 		BIC_queuePointBlankSingle2,
-		BIC_pointBlankSingle2WeaponStatus
+		BIC_pointBlankSingle2WeaponStatus,
+		BIC_queuePointBlankArea1,
+		BIC_pointBlankArea1WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 141;
+	LRESULT const cms_backgroundInputProtocolVersion = 142;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1896,7 +1898,9 @@ namespace ClientMainNamespace
 
 	LRESULT getBackgroundGeneratedCombatWeaponStatus(char const * const commandName)
 	{
-		uint64 result = 0x57440000ULL;
+		// Six marker bits live above the type/flag byte so the middle 32 bits
+		// remain available for the complete command valid-weapon mask.
+		uint64 result = 0x00005400ULL;
 		CreatureObject const * const player = Game::getPlayerCreature();
 		int const weaponType =
 			ClientCommandChecks::getCurrentWeaponTypeForDiagnostics(player);
@@ -1912,7 +1916,11 @@ namespace ClientMainNamespace
 		}
 
 		result |= static_cast<uint64>((weaponType >= 0 ? weaponType : 0xff) & 0xff);
-		result |= static_cast<uint64>(command.m_weaponTypesValid & 0xffffU) << 32;
+		// Aggregate command families (for example RANGED at bit 27) do not fit
+		// in the legacy 16-bit diagnostic slice. Protocol 142 gives the valid
+		// mask the full middle 32 bits while retaining the low flags/type and
+		// the lower 16 bits of the invalid mask.
+		result |= static_cast<uint64>(static_cast<uint32>(command.m_weaponTypesValid)) << 16;
 		result |= static_cast<uint64>(command.m_weaponTypesInvalid & 0xffffU) << 48;
 		return static_cast<LRESULT>(result);
 	}
@@ -2756,6 +2764,16 @@ namespace ClientMainNamespace
 
 			case BIC_pointBlankSingle2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("pointBlankSingle2");
+
+			case BIC_queuePointBlankArea1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"pointBlankArea1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_pointBlankArea1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("pointBlankArea1");
 
 			default:
 				return 0;
