@@ -4,6 +4,23 @@ This is the isolated `x64-dx9` restoration line in
 `swgsais/pre-cu-reborn-tools`, seeded from the `reborn-master` client-tools
 tree. It must not absorb unrelated DX11 renderer work from other worktrees.
 
+Protocol v91 closes the first generated Core3 combat pair. The bridge can
+equip the identity-bound fixture staff, unequip to the replicated default
+unarmed weapon, and enqueue `polearmLegHit1` or `unarmedHeadHit1` through the
+ordinary production command queue. Read-only weapon-status actions expose
+whether each command was loaded, the replicated weapon type, valid/invalid
+masks, and the result of the same `WeaponObject::weaponTypeSatisfies` check
+used by toolbar admission.
+
+The live gate proved staff type 7 against `0x0080` and unarmed type 6 against
+`0x0040`. It also exposed an older loose `command_table.iff` shadowing the
+new compatibility TRE; the assets staging script now synchronizes both
+generated IFFs into that higher-precedence loose overlay.
+
+`Capture-PrecuClientWindow.ps1` uses `PrintWindow` against one explicit client
+PID, so visual evidence can be captured without moving the cursor or taking
+foreground focus.
+
 ## Combat queue baseline
 
 The first queue slice restores the direct HUD-owned `SwgCuiCombatQueue`
