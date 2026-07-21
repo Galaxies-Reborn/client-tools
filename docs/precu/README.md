@@ -618,3 +618,11 @@ generated `RANGED` mask before the client queues Core3's 15-meter area action
 at its explicit 12-meter command range. Protocol 142 dedicates the middle 32
 status bits to the complete valid-weapon mask, preserving aggregate-family
 bits; live acceptance reports `0x08000000` rather than a truncated zero.
+
+## Core3 Point Blank Area II diagnostics
+
+Background-input protocol 143 adds `QueuePointBlankArea2` at fixed ID 184 and
+`PointBlankArea2WeaponStatus` at fixed ID 185. The identity-bound CDEF pistol
+proves concrete pistol admission before the client queues Core3's 12-meter,
+60-degree cone action. The server remains authoritative for cone selection,
+RANDOM-pool resolution, `areashot` prose, and generated-intensity playback.
