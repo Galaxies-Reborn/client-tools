@@ -494,6 +494,14 @@ The two status routes expose compiled mask and replicated weapon type. Health
 damage, `saisun`/`saitok` prose, hit location, and generated intensity
 animation remain authoritative server results.
 
+## Core3 two-hand head-hit diagnostics
+
+Background-input protocol 118 adds queue and cleaver-status routes for
+`melee2hHeadHit1`, `melee2hHeadHit2`, and `melee2hHeadHit3`. Equip the
+identity-bound two-hand fixture, then use the matching `QueueMelee2hHeadHit*`
+and `Melee2hHeadHit*WeaponStatus` actions. Mind damage, scalp prose, hit
+location, and generated intensity animation remain server-authoritative.
+
 The Release Win32 `DataTableTool` project also carries the minimal modern
 linker compatibility needed to compile these legacy tables with the v143
 toolchain: the existing Unicode library, legacy stdio definitions, and

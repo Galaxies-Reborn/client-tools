@@ -270,11 +270,17 @@ namespace ClientMainNamespace
 		BIC_queueMelee1hBodyHit2,
 		BIC_melee1hBodyHit2WeaponStatus,
 		BIC_queueMelee1hBodyHit3,
-		BIC_melee1hBodyHit3WeaponStatus
+		BIC_melee1hBodyHit3WeaponStatus,
+		BIC_queueMelee2hHeadHit1,
+		BIC_melee2hHeadHit1WeaponStatus,
+		BIC_queueMelee2hHeadHit2,
+		BIC_melee2hHeadHit2WeaponStatus,
+		BIC_queueMelee2hHeadHit3,
+		BIC_melee2hHeadHit3WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 112;
+	LRESULT const cms_backgroundInputProtocolVersion = 118;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2540,6 +2546,36 @@ namespace ClientMainNamespace
 
 			case BIC_melee1hBodyHit3WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("melee1hBodyHit3");
+
+			case BIC_queueMelee2hHeadHit1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee2hHeadHit1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee2hHeadHit1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee2hHeadHit1");
+
+			case BIC_queueMelee2hHeadHit2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee2hHeadHit2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee2hHeadHit2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee2hHeadHit2");
+
+			case BIC_queueMelee2hHeadHit3:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee2hHeadHit3", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee2hHeadHit3WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee2hHeadHit3");
 
 			default:
 				return 0;
