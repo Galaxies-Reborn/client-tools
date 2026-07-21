@@ -536,3 +536,11 @@ routes for `polearmHit1` and `polearmArea1`. Use
 identity-bound polearm fixture. RANDOM HAM resolution, exact combat prose,
 the 16-meter area shape, and generated intensity animations remain
 authoritative server results.
+
+## Core3 two-hand spin-attack continuation diagnostics
+
+Background-input protocol 135 adds independent queue and cleaver-status routes
+for `melee2hSpinAttack2`. Equip the identity-bound two-handed fixture, then
+use `Melee2hSpinAttack2WeaponStatus` and `QueueMelee2hSpinAttack2`.
+RANDOM HAM resolution, `spinslam` prose, the 16-meter area shape, and
+generated `combo_4b` intensity playback remain authoritative server results.
