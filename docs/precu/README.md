@@ -526,3 +526,13 @@ polearm fixture, then use `PolearmLegHit2WeaponStatus`/`QueuePolearmLegHit2`
 or `PolearmLegHit3WeaponStatus`/`QueuePolearmLegHit3`. Action damage,
 `legsmasher`/`legbreaker` prose, hit location, and distinct generated
 intensity animations remain authoritative server results.
+
+## Core3 polearm hit-and-area diagnostics
+
+Background-input protocol 134 adds independent queue and wooden-staff status
+routes for `polearmHit1` and `polearmArea1`. Use
+`PolearmHit1WeaponStatus`/`QueuePolearmHit1` or
+`PolearmArea1WeaponStatus`/`QueuePolearmArea1` after equipping the
+identity-bound polearm fixture. RANDOM HAM resolution, exact combat prose,
+the 16-meter area shape, and generated intensity animations remain
+authoritative server results.
