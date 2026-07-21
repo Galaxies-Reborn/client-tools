@@ -251,11 +251,17 @@ namespace ClientMainNamespace
 		BIC_polearmLegHit1WeaponStatus,
 		BIC_unarmedHeadHit1WeaponStatus,
 		BIC_queuePolearmSpinAttack1,
-		BIC_polearmSpinAttack1WeaponStatus
+		BIC_polearmSpinAttack1WeaponStatus,
+		BIC_equipFixtureOneHand,
+		BIC_equipFixtureTwoHand,
+		BIC_queueMelee1hSpinAttack1,
+		BIC_melee1hSpinAttack1WeaponStatus,
+		BIC_queueMelee2hSpinAttack1,
+		BIC_melee2hSpinAttack1WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 93;
+	LRESULT const cms_backgroundInputProtocolVersion = 99;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1752,6 +1758,16 @@ namespace ClientMainNamespace
 		return performBackgroundEquipCdefWeapon("lance_staff_wood_s2.iff");
 	}
 
+	bool performBackgroundEquipFixtureOneHand()
+	{
+		return performBackgroundEquipCdefWeapon("sword_rantok.iff");
+	}
+
+	bool performBackgroundEquipFixtureTwoHand()
+	{
+		return performBackgroundEquipCdefWeapon("2h_sword_cleaver.iff");
+	}
+
 	bool performBackgroundUnequipHeldWeapon()
 	{
 	Object * const player = Game::getPlayer();
@@ -2425,6 +2441,32 @@ namespace ClientMainNamespace
 
 			case BIC_polearmSpinAttack1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("polearmSpinAttack1");
+
+			case BIC_equipFixtureOneHand:
+				return performBackgroundEquipFixtureOneHand() ? 1 : 0;
+
+			case BIC_equipFixtureTwoHand:
+				return performBackgroundEquipFixtureTwoHand() ? 1 : 0;
+
+			case BIC_queueMelee1hSpinAttack1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee1hSpinAttack1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee1hSpinAttack1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee1hSpinAttack1");
+
+			case BIC_queueMelee2hSpinAttack1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee2hSpinAttack1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee2hSpinAttack1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("melee2hSpinAttack1");
 
 			default:
 				return 0;
