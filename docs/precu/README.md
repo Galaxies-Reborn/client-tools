@@ -644,3 +644,12 @@ fixture is layered over the established Marksman/CDEF-pistol fixture. The client
 proves concrete pistol admission and queues the production command; the server
 remains authoritative for the 15-degree cone, RANDOM HAM selection,
 `disarmblast` prose, and generated-ranged animation.
+
+## Core3 Fan Shot diagnostics
+
+Background-input protocol 146 adds `QueueFanShot` at fixed ID 190 and
+`FanShotWeaponStatus` at fixed ID 191. The existing reversible Master
+Pistoleer fixture supplies Ability IV ownership. The client proves concrete
+pistol admission and queues the production command; the server remains
+authoritative for the 60-degree cone, RANDOM HAM selection, `fanshot` prose,
+and generated-intensity animation.
