@@ -709,3 +709,15 @@ overcharge route proves a concrete CDEF rifle against aggregate-ranged mask
 `0x08000000`. Both routes queue the production commands while the server
 remains authoritative for RANDOM pool selection, combat prose, area or
 single-target geometry, and generated animation playback.
+
+## Core3 special-heavy diagnostics
+
+Background-input protocol 152 adds `EquipFixtureAcid`,
+`QueueFireAcidSingle1`, and `FireAcidSingle1WeaponStatus` at fixed IDs
+208/209/210, plus `EquipFixtureLightning`, `QueueFireLightningSingle1`, and
+`FireLightningSingle1WeaponStatus` at IDs 211/212/213. The acid status route
+proves canonical ground-targeting weapon type 12 against HEAVY mask
+`0x00000008`; the lightning route proves rifle type 0 against mask
+`0x00000001`. Both authenticated routes returned production Success while
+the server remained authoritative for exact template gating, RANDOM pool
+selection, combat prose, HAM costs, and generated-intensity playback.

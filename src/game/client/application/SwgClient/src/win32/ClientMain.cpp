@@ -332,11 +332,17 @@ namespace ClientMainNamespace
 		BIC_queueUnarmedSpinAttack2,
 		BIC_unarmedSpinAttack2WeaponStatus,
 		BIC_queueOverChargeShot2,
-		BIC_overChargeShot2WeaponStatus
+		BIC_overChargeShot2WeaponStatus,
+		BIC_equipFixtureAcid,
+		BIC_queueFireAcidSingle1,
+		BIC_fireAcidSingle1WeaponStatus,
+		BIC_equipFixtureLightning,
+		BIC_queueFireLightningSingle1,
+		BIC_fireLightningSingle1WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 151;
+	LRESULT const cms_backgroundInputProtocolVersion = 152;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1844,6 +1850,16 @@ namespace ClientMainNamespace
 		return performBackgroundEquipCdefWeapon("2h_sword_cleaver.iff");
 	}
 
+	bool performBackgroundEquipFixtureAcid()
+	{
+		return performBackgroundEquipCdefWeapon("heavy_acid_beam.iff");
+	}
+
+	bool performBackgroundEquipFixtureLightning()
+	{
+		return performBackgroundEquipCdefWeapon("rifle_lightning.iff");
+	}
+
 	bool performBackgroundUnequipHeldWeapon()
 	{
 	Object * const player = Game::getPlayer();
@@ -2919,6 +2935,32 @@ namespace ClientMainNamespace
 
 			case BIC_overChargeShot2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("overChargeShot2");
+
+			case BIC_equipFixtureAcid:
+				return performBackgroundEquipFixtureAcid() ? 1 : 0;
+
+			case BIC_queueFireAcidSingle1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"fireAcidSingle1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_fireAcidSingle1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("fireAcidSingle1");
+
+			case BIC_equipFixtureLightning:
+				return performBackgroundEquipFixtureLightning() ? 1 : 0;
+
+			case BIC_queueFireLightningSingle1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"fireLightningSingle1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_fireLightningSingle1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("fireLightningSingle1");
 
 			default:
 				return 0;
