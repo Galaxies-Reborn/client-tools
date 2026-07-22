@@ -316,11 +316,13 @@ namespace ClientMainNamespace
 		BIC_queueDisarmingShot2,
 		BIC_disarmingShot2WeaponStatus,
 		BIC_queueFanShot,
-		BIC_fanShotWeaponStatus
+		BIC_fanShotWeaponStatus,
+		BIC_queueBurstShot2,
+		BIC_burstShot2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 146;
+	LRESULT const cms_backgroundInputProtocolVersion = 147;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -386,6 +388,7 @@ namespace ClientMainNamespace
 	HWND s_backgroundInputWindow = 0;
 	WNDPROC s_backgroundInputPreviousWindowProc = 0;
 	bool s_backgroundInputInstalled = false;
+	bool s_backgroundInputOwnsWindow = false;
 	BackgroundCombatTimerCapture s_backgroundCombatTimerCapture;
 	BackgroundCombatTimerReceiver * s_backgroundCombatTimerReceiver = 0;
 
@@ -2823,6 +2826,16 @@ namespace ClientMainNamespace
 			case BIC_fanShotWeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("fanShot");
 
+			case BIC_queueBurstShot2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"burstShot2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_burstShot2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("burstShot2");
+
 			default:
 				return 0;
 			}
@@ -2842,17 +2855,38 @@ namespace ClientMainNamespace
 		if (s_backgroundInputInstalled)
 			return true;
 
-		HWND const window = Os::getWindow();
-		if (!window)
+		HWND window = Os::getWindow();
+		bool ownsWindow = false;
+		if (!window || !IsWindowVisible(window))
 		{
-			WARNING(true, ("Pre-CU background input bridge has no client window"));
-			return false;
+			window = CreateWindowExA(
+				0,
+				"STATIC",
+				"SWGSource Pre-CU Background Input",
+				WS_POPUP,
+				0,
+				0,
+				0,
+				0,
+				0,
+				0,
+				GetModuleHandle(0),
+				0);
+			if (!window)
+			{
+				WARNING(true, ("Pre-CU background input bridge could not create its hidden fallback window"));
+				return false;
+			}
+
+			ownsWindow = true;
 		}
 
 		UINT const registeredMessage = RegisterWindowMessageA(cms_backgroundInputMessageName);
 		if (!registeredMessage)
 		{
 			WARNING(true, ("Pre-CU background input bridge could not register its window message"));
+			if (ownsWindow)
+				DestroyWindow(window);
 			return false;
 		}
 
@@ -2864,6 +2898,8 @@ namespace ClientMainNamespace
 		if (previousWindowProc == 0 && GetLastError() != ERROR_SUCCESS)
 		{
 			WARNING(true, ("Pre-CU background input bridge could not subclass the client window"));
+			if (ownsWindow)
+				DestroyWindow(window);
 			return false;
 		}
 
@@ -2871,6 +2907,7 @@ namespace ClientMainNamespace
 		s_backgroundInputWindow = window;
 		s_backgroundInputPreviousWindowProc = reinterpret_cast<WNDPROC>(previousWindowProc);
 		s_backgroundInputInstalled = true;
+		s_backgroundInputOwnsWindow = ownsWindow;
 		clearBackgroundCombatTimerCapture();
 		s_backgroundCombatTimerReceiver = new BackgroundCombatTimerReceiver;
 
@@ -2907,7 +2944,11 @@ namespace ClientMainNamespace
 			}
 		}
 
+		if (s_backgroundInputOwnsWindow && s_backgroundInputWindow && IsWindow(s_backgroundInputWindow))
+			DestroyWindow(s_backgroundInputWindow);
+
 		s_backgroundInputInstalled = false;
+		s_backgroundInputOwnsWindow = false;
 		delete s_backgroundCombatTimerReceiver;
 		s_backgroundCombatTimerReceiver = 0;
 		clearBackgroundCombatTimerCapture();
