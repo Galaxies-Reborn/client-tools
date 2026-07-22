@@ -668,3 +668,12 @@ window may remain unavailable to the bridge. Protocol 147 therefore creates a
 zero-size hidden process-local fallback HWND, subclasses it with the same
 bounded bridge procedure, and destroys it during normal teardown. It is never
 shown or activated and does not broaden command admission.
+
+## Core3 Unarmed Hit I diagnostics
+
+Background-input protocol 148 adds `QueueUnarmedHit1` at fixed ID 194 and
+`UnarmedHit1WeaponStatus` at fixed ID 195. The reversible headshot fixture
+owns Brawler Unarmed I while the attacker remains genuinely unarmed. The
+client proves weapon type 6 against mask `0x00000040` and queues the production
+command; the server remains authoritative for RANDOM HAM selection,
+`steelhands` prose, and generated-intensity playback.
