@@ -57,6 +57,8 @@ public:
 	void                       onSceneChanged        (bool const &);
 	int                        showAllProfessionsForBackgroundValidation ();
 	int                        selectAllProfessionForBackgroundValidation (int row);
+	int                        showMyProfessionsForBackgroundValidation ();
+	int                        selectMyProfessionForBackgroundValidation (int row);
 
 protected:
 	virtual void               performActivate       ();
@@ -80,10 +82,13 @@ private:
 	void                       clearPendingSurrender ();
 	void                       reconcilePendingSurrender ();
 	void                       onCommandRemoving     (ClientCommandQueue::Messages::Removing::Payload const & payload);
+	bool                       tryPopulateGraph       (SkillObject const * novice, std::set<std::string> const & playerSkills);
 	bool                       tryPopulateGraph4x4    (SkillObject const * novice, std::set<std::string> const & playerSkills);
-	void                       applyTreeBox           (char const * path, std::string const & skillName, std::set<std::string> const & playerSkills);
+	bool                       tryPopulateSpecialGraph (SkillObject const * novice, std::set<std::string> const & playerSkills);
+	void                       applyTreeBox           (UIPage * graphPage, char const * path, std::string const & skillName, std::set<std::string> const & playerSkills);
 	void                       hideAllGraphs          ();
 	void                       resetGraph4x4Presentation ();
+	void                       resetSpecialGraphPresentation (UIPage * graphPage, int graphType);
 
 	// Top-level page bindings (resolved via CodeData on the /Skill.skills page).
 	UITabbedPane *             m_tabs;

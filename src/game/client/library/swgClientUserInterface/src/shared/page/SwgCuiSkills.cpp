@@ -994,6 +994,39 @@ int SwgCuiSkills::selectAllProfessionForBackgroundValidation(int row)
 
 //-----------------------------------------------------------------------
 
+int SwgCuiSkills::showMyProfessionsForBackgroundValidation()
+{
+	if (!m_tabs || !m_treeProf)
+		return -1;
+
+	m_tabs->SetActiveTab(0);
+	populateProfessionList();
+	populateSelectedProfession();
+	return static_cast<int>(m_treeProf->GetRowCount());
+}
+
+//-----------------------------------------------------------------------
+
+int SwgCuiSkills::selectMyProfessionForBackgroundValidation(int row)
+{
+	int const rowCount = showMyProfessionsForBackgroundValidation();
+	if (!m_treeProf || row < 0 || row >= rowCount)
+		return -1;
+
+	UIDataSourceContainer const * const data =
+		m_treeProf->GetDataSourceContainerAtRow(static_cast<long>(row));
+	if (!data)
+		return -1;
+
+	m_selectedProfession = data->GetName();
+	m_selectedSkill.clear();
+	synchronizeProfessionTreeSelection();
+	populateSelectedProfession();
+	return row;
+}
+
+//-----------------------------------------------------------------------
+
 void SwgCuiSkills::populateExperience()
 {
 	if (m_dsExpName)  m_dsExpName->Clear();
@@ -1127,7 +1160,7 @@ void SwgCuiSkills::populateProfessionList()
 		// Force-sensitive and Jedi progression roots are valid graph definitions
 		// with SEARCHABLE=0 and must not leak into the trainer-facing list.
 		SkillManager & skillMgr = SkillManager::getInstance();
-		for (int i = 0; i < k_professionDefCount; ++i)
+		for (int i = 0; i < k_publicProfessionDefCount; ++i)
 		{
 			char const * const nov = k_professionDefs[i].noviceSkill;
 			if (!nov || !skillMgr.getSkill(nov))
@@ -1144,7 +1177,7 @@ void SwgCuiSkills::populateProfessionList()
 		// "My Character": canonical professions the player has any skill
 		// from. Walk parent chain (getPrevSkill) for each granted skill
 		// until we find a pre-CU profession root; ignore NGE expertise /
-		// chronicler / pilot trees whose roots aren't pre-CU.
+		// chronicler trees whose roots aren't in the authoritative matrix.
 		CreatureObject const * const player = Game::getPlayerCreature();
 		if (player)
 		{
@@ -1253,7 +1286,7 @@ void SwgCuiSkills::populateSelectedProfession()
 		}
 	}
 
-	bool const handledVisually = tryPopulateGraph4x4(profSkill, playerSkillNames);
+	bool const handledVisually = tryPopulateGraph(profSkill, playerSkillNames);
 	if (handledVisually)
 	{
 		if (m_textProfessionBody)
@@ -1301,11 +1334,81 @@ void SwgCuiSkills::populateSelectedProfession()
 void SwgCuiSkills::hideAllGraphs()
 {
 	resetGraph4x4Presentation();
+	resetSpecialGraphPresentation(m_pageGraph1x4, 1);
+	resetSpecialGraphPresentation(m_pageGraphPyramid, 5);
 	if (m_pageGraphs)         m_pageGraphs->SetVisible(false);
 	if (m_pageGraph4x4)     m_pageGraph4x4->SetVisible(false);
 	if (m_pageGraph2x4)     m_pageGraph2x4->SetVisible(false);
 	if (m_pageGraph1x4)     m_pageGraph1x4->SetVisible(false);
 	if (m_pageGraphPyramid) m_pageGraphPyramid->SetVisible(false);
+}
+
+//-----------------------------------------------------------------------
+
+void SwgCuiSkills::resetSpecialGraphPresentation(UIPage * graphPage, int graphType)
+{
+	if (!graphPage)
+		return;
+
+	int const rowWidths[4] = { graphType == 5 ? 4 : 1,
+		graphType == 5 ? 3 : 1, graphType == 5 ? 2 : 1, 1 };
+	char path[64];
+	for (int row = 0; row < 4; ++row)
+	{
+		for (int col = 0; col < rowWidths[row]; ++col)
+		{
+			snprintf(path, sizeof(path), "graph.row%d.%d", row, col);
+			std::string const buttonPath = std::string(path) + ".b";
+			UIBaseObject * object = graphPage->GetObjectFromPath(buttonPath.c_str(), TUIButton);
+			if (!object)
+				object = graphPage->GetObjectFromPath(path, TUIButton);
+			if (object)
+			{
+				UIButton * const button = static_cast<UIButton *>(object);
+				button->SetText(Unicode::emptyString);
+				button->SetLocalTooltip(Unicode::emptyString);
+			}
+		}
+	}
+
+	char const * const terminalButtons[] = { "graph.master.b", "graph.novice.b" };
+	for (int terminal = 0; terminal < 2; ++terminal)
+	{
+		UIBaseObject * const object = graphPage->GetObjectFromPath(terminalButtons[terminal], TUIButton);
+		if (object)
+		{
+			UIButton * const button = static_cast<UIButton *>(object);
+			button->SetText(Unicode::emptyString);
+			button->SetLocalTooltip(Unicode::emptyString);
+		}
+	}
+
+	for (int slot = 0; slot < 7; ++slot)
+	{
+		snprintf(path, sizeof(path), "graph.disciplineNext.0.%d", slot);
+		UIBaseObject * const object = graphPage->GetObjectFromPath(path, TUIText);
+		if (object)
+		{
+			UIText * const text = static_cast<UIText *>(object);
+			text->SetLocalText(Unicode::emptyString);
+			text->SetVisible(false);
+		}
+	}
+	for (int slot = 0; slot < 4; ++slot)
+	{
+		char const * const groups[] = { "graph.next.%d", "graph.prev.%d" };
+		for (int group = 0; group < 2; ++group)
+		{
+			snprintf(path, sizeof(path), groups[group], slot);
+			UIBaseObject * const object = graphPage->GetObjectFromPath(path, TUIText);
+			if (object)
+			{
+				UIText * const text = static_cast<UIText *>(object);
+				text->SetLocalText(Unicode::emptyString);
+				text->SetVisible(false);
+			}
+		}
+	}
 }
 
 //-----------------------------------------------------------------------
@@ -1393,19 +1496,19 @@ void SwgCuiSkills::resetGraph4x4Presentation()
 
 //-----------------------------------------------------------------------
 
-void SwgCuiSkills::applyTreeBox(char const * path, std::string const & skillName,
+void SwgCuiSkills::applyTreeBox(UIPage * graphPage, char const * path, std::string const & skillName,
                                 std::set<std::string> const & playerSkills)
 {
-	if (!m_pageGraph4x4 || !path || !path[0])
+	if (!graphPage || !path || !path[0])
 		return;
 
 	// Publish 14 uses a nested .b button for novice/master and bare buttons for
 	// branch rows. Resolve both authentic shapes without requiring per-box
 	// child widgets from a modified asset.
 	std::string const btnPath = std::string(path) + ".b";
-	UIBaseObject * obj = m_pageGraph4x4->GetObjectFromPath(btnPath.c_str(), TUIButton);
+	UIBaseObject * obj = graphPage->GetObjectFromPath(btnPath.c_str(), TUIButton);
 	if (!obj)
-		obj = m_pageGraph4x4->GetObjectFromPath(path, TUIButton);
+		obj = graphPage->GetObjectFromPath(path, TUIButton);
 	if (!obj)
 		return;
 
@@ -1434,6 +1537,77 @@ void SwgCuiSkills::applyTreeBox(char const * path, std::string const & skillName
 
 //-----------------------------------------------------------------------
 
+bool SwgCuiSkills::tryPopulateGraph(SkillObject const * novice, std::set<std::string> const & playerSkills)
+{
+	ProfessionDef const * const def = novice ? findProfessionDef(novice->getSkillName()) : 0;
+	if (!def || def->graphType == 0)
+		return tryPopulateGraph4x4(novice, playerSkills);
+	return tryPopulateSpecialGraph(novice, playerSkills);
+}
+
+//-----------------------------------------------------------------------
+
+bool SwgCuiSkills::tryPopulateSpecialGraph(SkillObject const * novice, std::set<std::string> const & playerSkills)
+{
+	if (!novice)
+		return false;
+	ProfessionDef const * const def = findProfessionDef(novice->getSkillName());
+	if (!def || (def->graphType != 1 && def->graphType != 5))
+		return false;
+
+	UIPage * const graphPage = def->graphType == 1 ? m_pageGraph1x4 : m_pageGraphPyramid;
+	if (!graphPage)
+		return false;
+
+	char path[64];
+	if (def->graphType == 1)
+	{
+		for (int row = 0; row < 4; ++row)
+		{
+			snprintf(path, sizeof(path), "graph.row%d.0", row);
+			applyTreeBox(graphPage, path, def->branchSkills[0][row], playerSkills);
+		}
+	}
+	else
+	{
+		int skill = 0;
+		int const rowWidths[4] = { 4, 3, 2, 1 };
+		for (int row = 0; row < 4; ++row)
+		{
+			for (int col = 0; col < rowWidths[row]; ++col, ++skill)
+			{
+				snprintf(path, sizeof(path), "graph.row%d.%d", row, col);
+				applyTreeBox(graphPage, path, def->pyramidSkills[skill], playerSkills);
+			}
+		}
+	}
+
+	applyTreeBox(graphPage, "graph.master.b", def->masterSkill, playerSkills);
+	applyTreeBox(graphPage, "graph.novice.b", def->noviceSkill, playerSkills);
+	if (m_pageGraphs)
+		m_pageGraphs->SetVisible(true);
+	if (m_pageProfession)
+		m_pageProfession->SetVisible(true);
+	graphPage->SetVisible(true);
+
+	bool selectionStillVisible = false;
+	for (std::map<UIWidget *, std::string>::const_iterator it = m_buttonSkills.begin();
+		it != m_buttonSkills.end(); ++it)
+	{
+		if (it->second == m_selectedSkill)
+		{
+			selectionStillVisible = true;
+			break;
+		}
+	}
+	if (!selectionStillVisible)
+		m_selectedSkill = novice->getSkillName();
+	populateSelectedSkill();
+	return true;
+}
+
+//-----------------------------------------------------------------------
+
 bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std::string> const & playerSkills)
 {
 	REPORT_LOG(true, ("SwgCuiSkills::tryPopulateGraph4x4: pageGraph4x4=%p novice=%p (%s)\n",
@@ -1450,7 +1624,7 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 	// or alphabetical-sort name pattern guessing.
 	std::string const noviceName = novice->getSkillName();
 	ProfessionDef const * const def = findProfessionDef(noviceName);
-	if (!def)
+	if (!def || def->graphType != 0)
 	{
 		REPORT_LOG(true, ("SwgCuiSkills::tryPopulateGraph4x4: no ProfessionDef for '%s'\n", noviceName.c_str()));
 		return false;
@@ -1600,7 +1774,7 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 
 			char path[64];
 			snprintf(path, sizeof(path), "graph.row%d.%d", row, col);
-			applyTreeBox(path, skillName, playerSkills);
+			applyTreeBox(m_pageGraph4x4, path, skillName, playerSkills);
 		}
 	}
 
@@ -1610,8 +1784,8 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 	// "xxx skill_five_a" placeholder. Now we fill the real boxes
 	// and register them clickable so their mods/commands populate the panels.
 	{
-		applyTreeBox("graph.master.b", masterName,             playerSkills);
-		applyTreeBox("graph.novice.b", novice->getSkillName(), playerSkills);
+		applyTreeBox(m_pageGraph4x4, "graph.master.b", masterName,             playerSkills);
+		applyTreeBox(m_pageGraph4x4, "graph.novice.b", novice->getSkillName(), playerSkills);
 	}
 
 	// Back-links at the bottom (graph.prev.*): every profession which supplies

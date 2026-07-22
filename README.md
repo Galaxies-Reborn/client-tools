@@ -54,6 +54,10 @@ This repository and code has undergone extensive renovations and refactoring sin
 ## Contributing and More Information
 Contributions and improvements are welcome and encouraged, please submit a pull request. If you have any questions or are looking for more information and haven't already joined us in Discord, you can join [here](https://discord.gg/Va8e6n8). Please note that any changes to the client-tools that requires a rebuild of the SwgClient, will also mean a newly compiled client binary must be added to the [client-assets repository](https://github.com/swg-source/client-assets) so it can be shipped to end users.
 
+The Publish 14.1 Skills mediator supports the complete 54-root profession
+matrix without exposing the 21 specialized roots in the ordinary 33-row
+catalog. See [the nonstandard profession graph guide](docs/precu-nonstandard-profession-graphs.md).
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
