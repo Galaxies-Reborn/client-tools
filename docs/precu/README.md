@@ -677,3 +677,12 @@ owns Brawler Unarmed I while the attacker remains genuinely unarmed. The
 client proves weapon type 6 against mask `0x00000040` and queues the production
 command; the server remains authoritative for RANDOM HAM selection,
 `steelhands` prose, and generated-intensity playback.
+
+## Core3 Unarmed Hit II diagnostics
+
+Background-input protocol 149 adds `QueueUnarmedHit2` at fixed ID 196 and
+`UnarmedHit2WeaponStatus` at fixed ID 197. The reversible headshot fixture
+owns the Teras Kasi novice command while the attacker remains genuinely
+unarmed. The client proves weapon type 6 against mask `0x00000040` and queues
+the production command; the server remains authoritative for RANDOM HAM
+selection, `goraxsmash` prose, and generated-intensity playback.
