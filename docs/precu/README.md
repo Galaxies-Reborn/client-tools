@@ -686,3 +686,15 @@ owns the Teras Kasi novice command while the attacker remains genuinely
 unarmed. The client proves weapon type 6 against mask `0x00000040` and queues
 the production command; the server remains authoritative for RANDOM HAM
 selection, `goraxsmash` prose, and generated-intensity playback.
+
+## Core3 batched unarmed diagnostics
+
+Background-input protocol 150 adds `QueueUnarmedBodyHit1` and
+`UnarmedBodyHit1WeaponStatus` at fixed IDs 198/199,
+`QueueUnarmedLegHit1` and `UnarmedLegHit1WeaponStatus` at IDs 200/201, and
+`QueueUnarmedSpinAttack1` and `UnarmedSpinAttack1WeaponStatus` at IDs
+202/203. The reversible fixture owns each command while the attacker remains
+genuinely unarmed. Every status route proves weapon type 6 against mask
+`0x00000040`; the server remains authoritative for fixed Health, fixed
+Action, or RANDOM area targeting, combat prose, and generated-intensity
+playback.

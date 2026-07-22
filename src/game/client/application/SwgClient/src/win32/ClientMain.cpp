@@ -322,11 +322,17 @@ namespace ClientMainNamespace
 		BIC_queueUnarmedHit1,
 		BIC_unarmedHit1WeaponStatus,
 		BIC_queueUnarmedHit2,
-		BIC_unarmedHit2WeaponStatus
+		BIC_unarmedHit2WeaponStatus,
+		BIC_queueUnarmedBodyHit1,
+		BIC_unarmedBodyHit1WeaponStatus,
+		BIC_queueUnarmedLegHit1,
+		BIC_unarmedLegHit1WeaponStatus,
+		BIC_queueUnarmedSpinAttack1,
+		BIC_unarmedSpinAttack1WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 149;
+	LRESULT const cms_backgroundInputProtocolVersion = 150;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2859,6 +2865,36 @@ namespace ClientMainNamespace
 
 			case BIC_unarmedHit2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("unarmedHit2");
+
+			case BIC_queueUnarmedBodyHit1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"unarmedBodyHit1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_unarmedBodyHit1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("unarmedBodyHit1");
+
+			case BIC_queueUnarmedLegHit1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"unarmedLegHit1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_unarmedLegHit1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("unarmedLegHit1");
+
+			case BIC_queueUnarmedSpinAttack1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"unarmedSpinAttack1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_unarmedSpinAttack1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("unarmedSpinAttack1");
 
 			default:
 				return 0;
