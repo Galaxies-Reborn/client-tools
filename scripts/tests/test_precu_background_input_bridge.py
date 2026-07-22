@@ -310,8 +310,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 152", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 152", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 153", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 153", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -895,6 +895,30 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
                       "QueueFireLightningSingle1 = 212", "FireLightningSingle1WeaponStatus = 213"]:
             with self.subTest(helper_token=token):
                 self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_special_heavy_family_closure(self):
+        commands = [
+            ("fireAcidCone1", "QueueFireAcidCone1", "FireAcidCone1WeaponStatus", 214),
+            ("fireAcidCone2", "QueueFireAcidCone2", "FireAcidCone2WeaponStatus", 216),
+            ("fireAcidSingle2", "QueueFireAcidSingle2", "FireAcidSingle2WeaponStatus", 218),
+            ("fireLightningCone1", "QueueFireLightningCone1", "FireLightningCone1WeaponStatus", 220),
+            ("fireLightningCone2", "QueueFireLightningCone2", "FireLightningCone2WeaponStatus", 222),
+            ("fireLightningSingle2", "QueueFireLightningSingle2", "FireLightningSingle2WeaponStatus", 224),
+        ]
+        for command, queue_action, status_action, queue_id in commands:
+            with self.subTest(command=command):
+                self.assertIn(
+                    'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"' + command + '"',
+                    self.client_main,
+                )
+                self.assertIn(
+                    'getBackgroundGeneratedCombatWeaponStatus("' + command + '")',
+                    self.client_main,
+                )
+                self.assertIn('"' + queue_action + '"', self.helper)
+                self.assertIn('"' + status_action + '"', self.helper)
+                self.assertIn(queue_action + " = " + str(queue_id), self.helper)
+                self.assertIn(status_action + " = " + str(queue_id + 1), self.helper)
 
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
