@@ -338,11 +338,23 @@ namespace ClientMainNamespace
 		BIC_fireAcidSingle1WeaponStatus,
 		BIC_equipFixtureLightning,
 		BIC_queueFireLightningSingle1,
-		BIC_fireLightningSingle1WeaponStatus
+		BIC_fireLightningSingle1WeaponStatus,
+		BIC_queueFireAcidCone1,
+		BIC_fireAcidCone1WeaponStatus,
+		BIC_queueFireAcidCone2,
+		BIC_fireAcidCone2WeaponStatus,
+		BIC_queueFireAcidSingle2,
+		BIC_fireAcidSingle2WeaponStatus,
+		BIC_queueFireLightningCone1,
+		BIC_fireLightningCone1WeaponStatus,
+		BIC_queueFireLightningCone2,
+		BIC_fireLightningCone2WeaponStatus,
+		BIC_queueFireLightningSingle2,
+		BIC_fireLightningSingle2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 152;
+	LRESULT const cms_backgroundInputProtocolVersion = 153;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2961,6 +2973,66 @@ namespace ClientMainNamespace
 
 			case BIC_fireLightningSingle1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("fireLightningSingle1");
+
+			case BIC_queueFireAcidCone1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"fireAcidCone1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_fireAcidCone1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("fireAcidCone1");
+
+			case BIC_queueFireAcidCone2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"fireAcidCone2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_fireAcidCone2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("fireAcidCone2");
+
+			case BIC_queueFireAcidSingle2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"fireAcidSingle2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_fireAcidSingle2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("fireAcidSingle2");
+
+			case BIC_queueFireLightningCone1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"fireLightningCone1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_fireLightningCone1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("fireLightningCone1");
+
+			case BIC_queueFireLightningCone2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"fireLightningCone2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_fireLightningCone2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("fireLightningCone2");
+
+			case BIC_queueFireLightningSingle2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"fireLightningSingle2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_fireLightningSingle2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("fireLightningSingle2");
 
 			default:
 				return 0;
