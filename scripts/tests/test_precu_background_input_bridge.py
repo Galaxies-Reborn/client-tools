@@ -310,8 +310,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 153", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 153", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 154", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 154", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1252,6 +1252,8 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianMaster": 116,
             "ShowAllProfessions": 117,
             "SelectAllProfession": 118,
+            "ShowMyProfessions": 226,
+            "SelectMyProfession": 227,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1738,6 +1740,8 @@ $results | ConvertTo-Json -Compress
             "SurrenderMusicianMaster",
             "ShowAllProfessions",
             "SelectAllProfession",
+            "ShowMyProfessions",
+            "SelectMyProfession",
             "Stand",
         ):
             with self.subTest(action=action):

@@ -9,6 +9,8 @@ struct ProfessionDef
 	char const * branchSkills[4][4]; // [column][row] = skill name
 	char const * branchLinks[4][3];  // [column][slot] = profession root the branch leads into
 	char const * category;            // "basic" / "elite" / "fs" / "jedi"
+	int graphType;                    // 0/default=fourByFour, 1=oneByFour, 5=pyramid
+	char const * pyramidSkills[10];   // rank_01..rank_10 for the native pyramid template
 };
 
 static ProfessionDef const k_professionDefs[] = {
@@ -558,9 +560,160 @@ static ProfessionDef const k_professionDefs[] = {
 			{ "", "", "" },
 			{ "", "", "" },
 		}, "jedi" },
+	{ "Shipwright", "crafting_shipwright_novice", "crafting_shipwright_master",
+		{
+			{ "crafting_shipwright_engineering_01", "crafting_shipwright_engineering_02", "crafting_shipwright_engineering_03", "crafting_shipwright_engineering_04" },
+			{ "crafting_shipwright_propulsion_01", "crafting_shipwright_propulsion_02", "crafting_shipwright_propulsion_03", "crafting_shipwright_propulsion_04" },
+			{ "crafting_shipwright_systems_01", "crafting_shipwright_systems_02", "crafting_shipwright_systems_03", "crafting_shipwright_systems_04" },
+			{ "crafting_shipwright_defense_01", "crafting_shipwright_defense_02", "crafting_shipwright_defense_03", "crafting_shipwright_defense_04" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "specialized" },
+	{ "Imperial Navy Pilot", "pilot_imperial_navy_novice", "pilot_imperial_navy_master",
+		{
+			{ "pilot_imperial_navy_starships_01", "pilot_imperial_navy_starships_02", "pilot_imperial_navy_starships_03", "pilot_imperial_navy_starships_04" },
+			{ "pilot_imperial_navy_weapons_01", "pilot_imperial_navy_weapons_02", "pilot_imperial_navy_weapons_03", "pilot_imperial_navy_weapons_04" },
+			{ "pilot_imperial_navy_procedures_01", "pilot_imperial_navy_procedures_02", "pilot_imperial_navy_procedures_03", "pilot_imperial_navy_procedures_04" },
+			{ "pilot_imperial_navy_droid_01", "pilot_imperial_navy_droid_02", "pilot_imperial_navy_droid_03", "pilot_imperial_navy_droid_04" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "specialized" },
+	{ "Freelance Pilot", "pilot_neutral_novice", "pilot_neutral_master",
+		{
+			{ "pilot_neutral_starships_01", "pilot_neutral_starships_02", "pilot_neutral_starships_03", "pilot_neutral_starships_04" },
+			{ "pilot_neutral_weapons_01", "pilot_neutral_weapons_02", "pilot_neutral_weapons_03", "pilot_neutral_weapons_04" },
+			{ "pilot_neutral_procedures_01", "pilot_neutral_procedures_02", "pilot_neutral_procedures_03", "pilot_neutral_procedures_04" },
+			{ "pilot_neutral_droid_01", "pilot_neutral_droid_02", "pilot_neutral_droid_03", "pilot_neutral_droid_04" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "specialized" },
+	{ "Rebel Navy Pilot", "pilot_rebel_navy_novice", "pilot_rebel_navy_master",
+		{
+			{ "pilot_rebel_navy_starships_01", "pilot_rebel_navy_starships_02", "pilot_rebel_navy_starships_03", "pilot_rebel_navy_starships_04" },
+			{ "pilot_rebel_navy_weapons_01", "pilot_rebel_navy_weapons_02", "pilot_rebel_navy_weapons_03", "pilot_rebel_navy_weapons_04" },
+			{ "pilot_rebel_navy_procedures_01", "pilot_rebel_navy_procedures_02", "pilot_rebel_navy_procedures_03", "pilot_rebel_navy_procedures_04" },
+			{ "pilot_rebel_navy_droid_01", "pilot_rebel_navy_droid_02", "pilot_rebel_navy_droid_03", "pilot_rebel_navy_droid_04" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "specialized" },
+	{ "Dark Jedi Journeyman", "jedi_dark_side_journeyman_novice", "jedi_dark_side_journeyman_master",
+		{
+			{ "jedi_dark_side_journeyman_saber_01", "jedi_dark_side_journeyman_saber_02", "jedi_dark_side_journeyman_saber_03", "jedi_dark_side_journeyman_saber_04" },
+			{ "jedi_dark_side_journeyman_healing_01", "jedi_dark_side_journeyman_healing_02", "jedi_dark_side_journeyman_healing_03", "jedi_dark_side_journeyman_healing_04" },
+			{ "jedi_dark_side_journeyman_force_power_01", "jedi_dark_side_journeyman_force_power_02", "jedi_dark_side_journeyman_force_power_03", "jedi_dark_side_journeyman_force_power_04" },
+			{ "jedi_dark_side_journeyman_force_manipulation_01", "jedi_dark_side_journeyman_force_manipulation_02", "jedi_dark_side_journeyman_force_manipulation_03", "jedi_dark_side_journeyman_force_manipulation_04" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "jedi" },
+	{ "Dark Jedi Master", "jedi_dark_side_master_novice", "jedi_dark_side_master_master",
+		{
+			{ "jedi_dark_side_master_saber_01", "jedi_dark_side_master_saber_02", "jedi_dark_side_master_saber_03", "jedi_dark_side_master_saber_04" },
+			{ "jedi_dark_side_master_healing_01", "jedi_dark_side_master_healing_02", "jedi_dark_side_master_healing_03", "jedi_dark_side_master_healing_04" },
+			{ "jedi_dark_side_master_force_power_01", "jedi_dark_side_master_force_power_02", "jedi_dark_side_master_force_power_03", "jedi_dark_side_master_force_power_04" },
+			{ "jedi_dark_side_master_force_manipulation_01", "jedi_dark_side_master_force_manipulation_02", "jedi_dark_side_master_force_manipulation_03", "jedi_dark_side_master_force_manipulation_04" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "jedi" },
+	{ "Light Jedi Journeyman", "jedi_light_side_journeyman_novice", "jedi_light_side_journeyman_master",
+		{
+			{ "jedi_light_side_journeyman_saber_01", "jedi_light_side_journeyman_saber_02", "jedi_light_side_journeyman_saber_03", "jedi_light_side_journeyman_saber_04" },
+			{ "jedi_light_side_journeyman_healing_01", "jedi_light_side_journeyman_healing_02", "jedi_light_side_journeyman_healing_03", "jedi_light_side_journeyman_healing_04" },
+			{ "jedi_light_side_journeyman_force_power_01", "jedi_light_side_journeyman_force_power_02", "jedi_light_side_journeyman_force_power_03", "jedi_light_side_journeyman_force_power_04" },
+			{ "jedi_light_side_journeyman_force_manipulation_01", "jedi_light_side_journeyman_force_manipulation_02", "jedi_light_side_journeyman_force_manipulation_03", "jedi_light_side_journeyman_force_manipulation_04" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "jedi" },
+	{ "Light Jedi Master", "jedi_light_side_master_novice", "jedi_light_side_master_master",
+		{
+			{ "jedi_light_side_master_saber_01", "jedi_light_side_master_saber_02", "jedi_light_side_master_saber_03", "jedi_light_side_master_saber_04" },
+			{ "jedi_light_side_master_healing_01", "jedi_light_side_master_healing_02", "jedi_light_side_master_healing_03", "jedi_light_side_master_healing_04" },
+			{ "jedi_light_side_master_force_power_01", "jedi_light_side_master_force_power_02", "jedi_light_side_master_force_power_03", "jedi_light_side_master_force_power_04" },
+			{ "jedi_light_side_master_force_manipulation_01", "jedi_light_side_master_force_manipulation_02", "jedi_light_side_master_force_manipulation_03", "jedi_light_side_master_force_manipulation_04" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "jedi" },
+	{ "Jedi Padawan", "jedi_padawan_novice", "jedi_padawan_master",
+		{
+			{ "jedi_padawan_saber_01", "jedi_padawan_saber_02", "jedi_padawan_saber_03", "jedi_padawan_saber_04" },
+			{ "jedi_padawan_healing_01", "jedi_padawan_healing_02", "jedi_padawan_healing_03", "jedi_padawan_healing_04" },
+			{ "jedi_padawan_force_power_01", "jedi_padawan_force_power_02", "jedi_padawan_force_power_03", "jedi_padawan_force_power_04" },
+			{ "jedi_padawan_force_manipulation_01", "jedi_padawan_force_manipulation_02", "jedi_padawan_force_manipulation_03", "jedi_padawan_force_manipulation_04" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "jedi" },
+	{ "Jedi Title", "force_title_jedi_novice", "force_title_jedi_master",
+		{
+			{ "force_title_jedi_rank_01", "force_title_jedi_rank_02", "force_title_jedi_rank_03", "force_title_jedi_rank_04" },
+			{ "", "", "", "" },
+			{ "", "", "", "" },
+			{ "", "", "", "" },
+		},
+		{
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+			{ "", "", "" },
+		}, "jedi", 1 },
+	{ "Dark Force Rank", "force_rank_dark_novice", "force_rank_dark_master",
+		{
+			{ "", "", "", "" }, { "", "", "", "" },
+			{ "", "", "", "" }, { "", "", "", "" },
+		},
+		{
+			{ "", "", "" }, { "", "", "" },
+			{ "", "", "" }, { "", "", "" },
+		}, "jedi", 5,
+		{ "force_rank_dark_rank_01", "force_rank_dark_rank_02", "force_rank_dark_rank_03", "force_rank_dark_rank_04", "force_rank_dark_rank_05", "force_rank_dark_rank_06", "force_rank_dark_rank_07", "force_rank_dark_rank_08", "force_rank_dark_rank_09", "force_rank_dark_rank_10" } },
+	{ "Light Force Rank", "force_rank_light_novice", "force_rank_light_master",
+		{
+			{ "", "", "", "" }, { "", "", "", "" },
+			{ "", "", "", "" }, { "", "", "", "" },
+		},
+		{
+			{ "", "", "" }, { "", "", "" },
+			{ "", "", "" }, { "", "", "" },
+		}, "jedi", 5,
+		{ "force_rank_light_rank_01", "force_rank_light_rank_02", "force_rank_light_rank_03", "force_rank_light_rank_04", "force_rank_light_rank_05", "force_rank_light_rank_06", "force_rank_light_rank_07", "force_rank_light_rank_08", "force_rank_light_rank_09", "force_rank_light_rank_10" } },
 };
 
-static int const k_professionDefCount = sizeof(k_professionDefs) / sizeof(k_professionDefs[0]); // 42 entries
+static int const k_publicProfessionDefCount = 33;
+static int const k_professionDefCount = sizeof(k_professionDefs) / sizeof(k_professionDefs[0]); // 54 entries
 
 // Pre-CU skill point cap.
 static int const k_skillPointCap = 250;

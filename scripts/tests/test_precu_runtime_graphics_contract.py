@@ -24,6 +24,7 @@ STAGE_SCRIPT = REPOSITORY_ROOT / "scripts" / "Stage-X64Client.ps1"
 BUILD_SCRIPT = REPOSITORY_ROOT / "scripts" / "Build-X64Client.ps1"
 
 EXPECTED_TRE_ORDER = (
+    "precu_runtime.tre",
     "default_patch.tre",
     "patch_sku1_14_00.tre",
     "patch_14_00.tre",
@@ -113,13 +114,13 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
             r"(?m)^\s*disable\s*=\s*true\s*$",
         )
 
-    def test_live_manifest_is_the_canonical_51_tre_stack(self):
+    def test_live_manifest_is_the_canonical_52_tre_stack(self):
         config = LIVE_CONFIG.read_text(encoding="utf-8")
         trees = tuple(
             re.findall(r"(?m)^\s*searchTree_[^=]+\s*=\s*([^\s#]+)\s*$", config)
         )
         self.assertEqual(trees, EXPECTED_TRE_ORDER)
-        self.assertIn("maxSearchPriority=26", config)
+        self.assertIn("maxSearchPriority=27", config)
         self.assertNotIn("swgsource_3.0.tre", config.lower())
 
     def test_renderer_hard_override_cannot_be_reenabled_by_the_ui(self):

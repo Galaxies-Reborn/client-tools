@@ -12,6 +12,7 @@ SKILLS_CPP = ROOT / (
     "SwgCuiSkills.cpp"
 )
 SKILLS_HEADER = SKILLS_CPP.with_suffix(".h")
+SKILLS_DATA = SKILLS_CPP.with_name("SwgCuiSkillsData.h")
 
 ASSET_OVERRIDE = os.environ.get("PRECU_SKILLS_ASSET")
 SKILLS_ASSET = (
@@ -68,6 +69,7 @@ class PrecuSkillsPresentationCleanupSourceTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.source = SKILLS_CPP.read_text(encoding="utf-8")
         cls.header = SKILLS_HEADER.read_text(encoding="utf-8")
+        cls.data = SKILLS_DATA.read_text(encoding="utf-8")
 
     def test_all_publish14_graph_placeholder_slots_are_cleared(self) -> None:
         graph = function_body(
@@ -202,6 +204,67 @@ class PrecuSkillsPresentationCleanupSourceTests(unittest.TestCase):
             show_all.index("root->isSearchable()"),
             show_all.index("noviceSet.insert(nov)"),
         )
+
+    def test_public_list_stays_33_while_all_54_graphs_are_canonical(self) -> None:
+        self.assertIn("k_publicProfessionDefCount = 33", self.data)
+        self.assertIn("// 54 entries", self.data)
+        populate = function_body(
+            self.source, "void SwgCuiSkills::populateProfessionList()"
+        )
+        self.assertIn("i < k_publicProfessionDefCount", populate)
+        for novice in (
+            "crafting_shipwright_novice",
+            "pilot_imperial_navy_novice",
+            "pilot_neutral_novice",
+            "pilot_rebel_navy_novice",
+            "force_rank_dark_novice",
+            "force_rank_light_novice",
+            "force_title_jedi_novice",
+            "jedi_dark_side_journeyman_novice",
+            "jedi_dark_side_master_novice",
+            "jedi_light_side_journeyman_novice",
+            "jedi_light_side_master_novice",
+            "jedi_padawan_novice",
+        ):
+            with self.subTest(novice=novice):
+                self.assertIn(novice, self.data)
+
+    def test_special_graphs_use_native_one_by_four_and_pyramid_templates(self) -> None:
+        dispatch = function_body(self.source, "bool SwgCuiSkills::tryPopulateGraph(")
+        special = function_body(
+            self.source, "bool SwgCuiSkills::tryPopulateSpecialGraph("
+        )
+        self.assertIn("def->graphType == 0", dispatch)
+        for contract in (
+            "m_pageGraph1x4",
+            "m_pageGraphPyramid",
+            '"graph.row%d.0"',
+            "rowWidths[4] = { 4, 3, 2, 1 }",
+            "def->pyramidSkills[skill]",
+            '"graph.master.b"',
+            '"graph.novice.b"',
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, special)
+
+    def test_background_my_profession_selection_uses_production_graph_path(self) -> None:
+        show = function_body(
+            self.source,
+            "int SwgCuiSkills::showMyProfessionsForBackgroundValidation()",
+        )
+        self.assertIn("m_tabs->SetActiveTab(0)", show)
+        self.assertIn("populateProfessionList()", show)
+        selection = function_body(
+            self.source,
+            "int SwgCuiSkills::selectMyProfessionForBackgroundValidation(int row)",
+        )
+        for contract in (
+            "showMyProfessionsForBackgroundValidation()",
+            "GetDataSourceContainerAtRow",
+            "m_selectedProfession = data->GetName()",
+            "populateSelectedProfession()",
+        ):
+            self.assertIn(contract, selection)
 
     def test_background_profession_selection_uses_production_graph_path(self) -> None:
         selection = function_body(

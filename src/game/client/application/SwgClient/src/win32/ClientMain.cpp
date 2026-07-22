@@ -350,11 +350,13 @@ namespace ClientMainNamespace
 		BIC_queueFireLightningCone2,
 		BIC_fireLightningCone2WeaponStatus,
 		BIC_queueFireLightningSingle2,
-		BIC_fireLightningSingle2WeaponStatus
+		BIC_fireLightningSingle2WeaponStatus,
+		BIC_showMyProfessions,
+		BIC_selectMyProfession
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 153;
+	LRESULT const cms_backgroundInputProtocolVersion = 154;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -563,6 +565,40 @@ namespace ClientMainNamespace
 		if (selectedRow < 0 || selectedRow > 0xffff)
 			return 0;
 
+		return cms_backgroundSkillsSelectionMarker | selectedRow;
+	}
+
+	LRESULT performBackgroundShowMyProfessions()
+	{
+		if (!Game::getPlayer())
+			return 0;
+
+		CuiMediator * const mediator = CuiMediatorFactory::activateInWorkspace(
+			CuiMediatorTypes::WS_Skills);
+		SwgCuiSkills * const skills = dynamic_cast<SwgCuiSkills *>(mediator);
+		if (!skills)
+			return 0;
+
+		int const rowCount = skills->showMyProfessionsForBackgroundValidation();
+		if (rowCount < 0 || rowCount > 0xffff)
+			return 0;
+		return cms_backgroundSkillsStatusMarker | rowCount;
+	}
+
+	LRESULT performBackgroundSelectMyProfession(int selectionIndex)
+	{
+		if (!Game::getPlayer())
+			return 0;
+
+		CuiMediator * const mediator = CuiMediatorFactory::activateInWorkspace(
+			CuiMediatorTypes::WS_Skills);
+		SwgCuiSkills * const skills = dynamic_cast<SwgCuiSkills *>(mediator);
+		if (!skills)
+			return 0;
+
+		int const selectedRow = skills->selectMyProfessionForBackgroundValidation(selectionIndex);
+		if (selectedRow < 0 || selectedRow > 0xffff)
+			return 0;
 		return cms_backgroundSkillsSelectionMarker | selectedRow;
 	}
 
@@ -2515,6 +2551,12 @@ namespace ClientMainNamespace
 
 			case BIC_selectAllProfession:
 				return performBackgroundSelectAllProfession(static_cast<int>(lParam));
+
+			case BIC_showMyProfessions:
+				return performBackgroundShowMyProfessions();
+
+			case BIC_selectMyProfession:
+				return performBackgroundSelectMyProfession(static_cast<int>(lParam));
 
 			case BIC_equipFixturePolearm:
 				return performBackgroundEquipFixturePolearm() ? 1 : 0;
