@@ -93,6 +93,24 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             install_body.index("RegisterWindowMessageA"),
         )
 
+    def test_hidden_start_uses_a_process_local_fallback_window(self):
+        install_start = self.client_main.index("bool installBackgroundInputBridge()")
+        install_end = self.client_main.index(
+            "void removeBackgroundInputBridge()", install_start
+        )
+        install_body = self.client_main[install_start:install_end]
+        remove_body = function_body(
+            self.client_main, "void removeBackgroundInputBridge()"
+        )
+
+        self.assertIn("HWND window = Os::getWindow();", install_body)
+        self.assertIn("if (!window || !IsWindowVisible(window))", install_body)
+        self.assertIn('CreateWindowExA(', install_body)
+        self.assertIn('"SWGSource Pre-CU Background Input"', install_body)
+        self.assertIn("WS_POPUP", install_body)
+        self.assertIn("s_backgroundInputOwnsWindow = ownsWindow;", install_body)
+        self.assertIn("DestroyWindow(s_backgroundInputWindow);", remove_body)
+
     def test_unattended_host_can_explicitly_disable_physical_input_devices(self):
         self.assertIn("static bool         getUseKeyboard();", self.direct_input_config_header)
         self.assertIn("KEY_BOOL(useKeyboard,                     true);", self.direct_input_config_source)
@@ -292,8 +310,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 146", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 146", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 147", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 147", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -739,6 +757,22 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             with self.subTest(client_token=token):
                 self.assertIn(token, self.client_main)
         for token in ['"QueueFanShot"', '"FanShotWeaponStatus"', "QueueFanShot = 190", "FanShotWeaponStatus = 191"]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_burst_shot_two(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"burstShot2"',
+            'getBackgroundGeneratedCombatWeaponStatus("burstShot2")',
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in [
+            '"QueueBurstShot2"',
+            '"BurstShot2WeaponStatus"',
+            "QueueBurstShot2 = 192",
+            "BurstShot2WeaponStatus = 193",
+        ]:
             with self.subTest(helper_token=token):
                 self.assertIn(token, self.helper)
 

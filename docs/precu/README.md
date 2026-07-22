@@ -653,3 +653,18 @@ Pistoleer fixture supplies Ability IV ownership. The client proves concrete
 pistol admission and queues the production command; the server remains
 authoritative for the 60-degree cone, RANDOM HAM selection, `fanshot` prose,
 and generated-intensity animation.
+
+## Core3 Burst Shot II diagnostics
+
+Background-input protocol 147 adds `QueueBurstShot2` at fixed ID 192 and
+`BurstShot2WeaponStatus` at fixed ID 193. The reversible Marksman/Carbineer
+fixture owns Ability I through III and the CDEF carbine certification. The
+client proves concrete carbine admission and queues the production command;
+the server remains authoritative for the 30-degree cone, RANDOM HAM selection,
+`burstblast` prose, and generated-ranged animation.
+
+When Windows starts the opted-in client with `SW_HIDE`, the legacy foundation
+window may remain unavailable to the bridge. Protocol 147 therefore creates a
+zero-size hidden process-local fallback HWND, subclasses it with the same
+bounded bridge procedure, and destroys it during normal teardown. It is never
+shown or activated and does not broaden command admission.
