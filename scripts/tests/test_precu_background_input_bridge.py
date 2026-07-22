@@ -310,8 +310,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 149", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 149", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 150", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 150", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -805,6 +805,42 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "QueueUnarmedHit2 = 196",
             "UnarmedHit2WeaponStatus = 197",
         ]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_unarmed_body_hit_one(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"unarmedBodyHit1"',
+            'getBackgroundGeneratedCombatWeaponStatus("unarmedBodyHit1")',
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in ['"QueueUnarmedBodyHit1"', '"UnarmedBodyHit1WeaponStatus"',
+                      "QueueUnarmedBodyHit1 = 198", "UnarmedBodyHit1WeaponStatus = 199"]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_unarmed_leg_hit_one(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"unarmedLegHit1"',
+            'getBackgroundGeneratedCombatWeaponStatus("unarmedLegHit1")',
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in ['"QueueUnarmedLegHit1"', '"UnarmedLegHit1WeaponStatus"',
+                      "QueueUnarmedLegHit1 = 200", "UnarmedLegHit1WeaponStatus = 201"]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_unarmed_spin_attack_one(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"unarmedSpinAttack1"',
+            'getBackgroundGeneratedCombatWeaponStatus("unarmedSpinAttack1")',
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in ['"QueueUnarmedSpinAttack1"', '"UnarmedSpinAttack1WeaponStatus"',
+                      "QueueUnarmedSpinAttack1 = 202", "UnarmedSpinAttack1WeaponStatus = 203"]:
             with self.subTest(helper_token=token):
                 self.assertIn(token, self.helper)
 
