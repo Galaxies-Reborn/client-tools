@@ -698,3 +698,14 @@ genuinely unarmed. Every status route proves weapon type 6 against mask
 `0x00000040`; the server remains authoritative for fixed Health, fixed
 Action, or RANDOM area targeting, combat prose, and generated-intensity
 playback.
+
+## Core3 second-spin and overcharge diagnostics
+
+Background-input protocol 151 adds `QueueUnarmedSpinAttack2` and
+`UnarmedSpinAttack2WeaponStatus` at fixed IDs 204/205, plus
+`QueueOverChargeShot2` and `OverChargeShot2WeaponStatus` at fixed IDs
+206/207. The unarmed route proves type 6 against mask `0x00000040`; the
+overcharge route proves a concrete CDEF rifle against aggregate-ranged mask
+`0x08000000`. Both routes queue the production commands while the server
+remains authoritative for RANDOM pool selection, combat prose, area or
+single-target geometry, and generated animation playback.

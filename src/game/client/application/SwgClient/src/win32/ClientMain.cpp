@@ -328,11 +328,15 @@ namespace ClientMainNamespace
 		BIC_queueUnarmedLegHit1,
 		BIC_unarmedLegHit1WeaponStatus,
 		BIC_queueUnarmedSpinAttack1,
-		BIC_unarmedSpinAttack1WeaponStatus
+		BIC_unarmedSpinAttack1WeaponStatus,
+		BIC_queueUnarmedSpinAttack2,
+		BIC_unarmedSpinAttack2WeaponStatus,
+		BIC_queueOverChargeShot2,
+		BIC_overChargeShot2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 150;
+	LRESULT const cms_backgroundInputProtocolVersion = 151;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2895,6 +2899,26 @@ namespace ClientMainNamespace
 
 			case BIC_unarmedSpinAttack1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("unarmedSpinAttack1");
+
+			case BIC_queueUnarmedSpinAttack2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"unarmedSpinAttack2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_unarmedSpinAttack2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("unarmedSpinAttack2");
+
+			case BIC_queueOverChargeShot2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"overChargeShot2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_overChargeShot2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("overChargeShot2");
 
 			default:
 				return 0;

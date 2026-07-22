@@ -310,8 +310,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 150", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 150", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 151", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 151", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -841,6 +841,30 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
                 self.assertIn(token, self.client_main)
         for token in ['"QueueUnarmedSpinAttack1"', '"UnarmedSpinAttack1WeaponStatus"',
                       "QueueUnarmedSpinAttack1 = 202", "UnarmedSpinAttack1WeaponStatus = 203"]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_unarmed_spin_attack_two(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"unarmedSpinAttack2"',
+            'getBackgroundGeneratedCombatWeaponStatus("unarmedSpinAttack2")',
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in ['"QueueUnarmedSpinAttack2"', '"UnarmedSpinAttack2WeaponStatus"',
+                      "QueueUnarmedSpinAttack2 = 204", "UnarmedSpinAttack2WeaponStatus = 205"]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_overcharge_shot_two(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"overChargeShot2"',
+            'getBackgroundGeneratedCombatWeaponStatus("overChargeShot2")',
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in ['"QueueOverChargeShot2"', '"OverChargeShot2WeaponStatus"',
+                      "QueueOverChargeShot2 = 206", "OverChargeShot2WeaponStatus = 207"]:
             with self.subTest(helper_token=token):
                 self.assertIn(token, self.helper)
 
