@@ -310,8 +310,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 151", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 151", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 152", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 152", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -865,6 +865,34 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
                 self.assertIn(token, self.client_main)
         for token in ['"QueueOverChargeShot2"', '"OverChargeShot2WeaponStatus"',
                       "QueueOverChargeShot2 = 206", "OverChargeShot2WeaponStatus = 207"]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_fire_acid_single_one(self):
+        for token in [
+            'performBackgroundEquipCdefWeapon("heavy_acid_beam.iff")',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"fireAcidSingle1"',
+            'getBackgroundGeneratedCombatWeaponStatus("fireAcidSingle1")',
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in ['"EquipFixtureAcid"', '"QueueFireAcidSingle1"',
+                      '"FireAcidSingle1WeaponStatus"', "EquipFixtureAcid = 208",
+                      "QueueFireAcidSingle1 = 209", "FireAcidSingle1WeaponStatus = 210"]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
+
+    def test_bridge_exposes_core3_fire_lightning_single_one(self):
+        for token in [
+            'performBackgroundEquipCdefWeapon("rifle_lightning.iff")',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"fireLightningSingle1"',
+            'getBackgroundGeneratedCombatWeaponStatus("fireLightningSingle1")',
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in ['"EquipFixtureLightning"', '"QueueFireLightningSingle1"',
+                      '"FireLightningSingle1WeaponStatus"', "EquipFixtureLightning = 211",
+                      "QueueFireLightningSingle1 = 212", "FireLightningSingle1WeaponStatus = 213"]:
             with self.subTest(helper_token=token):
                 self.assertIn(token, self.helper)
 
