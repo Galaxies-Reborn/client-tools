@@ -352,11 +352,12 @@ namespace ClientMainNamespace
 		BIC_queueFireLightningSingle2,
 		BIC_fireLightningSingle2WeaponStatus,
 		BIC_showMyProfessions,
-		BIC_selectMyProfession
+		BIC_selectMyProfession,
+		BIC_queueSampleDna
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 154;
+	LRESULT const cms_backgroundInputProtocolVersion = 155;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -857,6 +858,14 @@ namespace ClientMainNamespace
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
 		return queued;
+	}
+
+	bool performBackgroundQueueSampleDna(LPARAM const targetValue)
+	{
+		// The bridge supplies only the fixture creature OID. The retained
+		// Publish 14 Bio-Engineer handler owns skill, HAM, range, DNA, XP,
+		// creature-survival, and completion behavior.
+		return performBackgroundQueueTending("sampleDNA", targetValue);
 	}
 
 	bool performBackgroundQueueFirstAid(LPARAM const targetValue)
@@ -2557,6 +2566,11 @@ namespace ClientMainNamespace
 
 			case BIC_selectMyProfession:
 				return performBackgroundSelectMyProfession(static_cast<int>(lParam));
+
+			case BIC_queueSampleDna:
+				if (!performBackgroundQueueSampleDna(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
 
 			case BIC_equipFixturePolearm:
 				return performBackgroundEquipFixturePolearm() ? 1 : 0;
