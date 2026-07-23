@@ -87,6 +87,11 @@ Milestone 249 advances the bridge to protocol 161 and adds
 Defense IV ownership, group eligibility, adjusted three-pool HAM cost,
 nine-attribute wound conservation, redistribution, and PvP-help authority.
 
+Milestone 250 advances the bridge to protocol 162 and adds `QueueSteadyAim`
+(command 238). It submits the authentic nonqueued Squad Leader command while
+the server owns group authority, adjusted HAM, ranged filtering, and the
+five-minute `private_aim` modifier.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
