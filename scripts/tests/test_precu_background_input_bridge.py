@@ -307,11 +307,13 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_headShot2WeaponStatus",
             "BIC_queueHeadShot3",
             "BIC_headShot3WeaponStatus",
+            "BIC_queueAreaTrack",
+            "BIC_selectAreaTrackType",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 162", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 162", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 165", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 165", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1265,6 +1267,10 @@ $results | ConvertTo-Json -Compress
             "QueueRetreat": 236,
             "QueueBoostMorale": 237,
             "QueueSteadyAim": 238,
+            "QueueApplyPoison": 239,
+            "QueueApplyDisease": 240,
+            "QueueAreaTrack": 241,
+            "SelectAreaTrackType": 242,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1647,6 +1653,34 @@ $results | ConvertTo-Json -Compress
             "ClientCommandQueue::commandsAreNowFromToolbar(false)",
             steady_aim,
         )
+        for function_name, command_name in [
+            ("performBackgroundQueueApplyPoison", "applyPoison"),
+            ("performBackgroundQueueApplyDisease", "applyDisease"),
+        ]:
+            body = function_body(
+                self.client_main,
+                f"bool {function_name}(LPARAM const targetValue)",
+            )
+            self.assertIn(
+                f'performBackgroundQueueTending("{command_name}", targetValue)',
+                body,
+            )
+        area_track = function_body(
+            self.client_main,
+            "bool performBackgroundQueueAreaTrack()",
+        )
+        self.assertIn('"44003778"', area_track)
+        self.assertIn('enqueueCommand(\n\t\t\t"areatrack"', area_track)
+        area_track_selection = function_body(
+            self.client_main,
+            "LRESULT performBackgroundSelectAreaTrackType(LPARAM const selectionIndex)",
+        )
+        self.assertIn('"44003778"', area_track_selection)
+        self.assertIn(
+            "CuiDataDrivenPageManager::selectAndConfirmSingleAreaTrackRow",
+            area_track_selection,
+        )
+        self.assertIn("selectionIndex))", area_track_selection)
         first_aid = function_body(
             self.client_main,
             "bool performBackgroundQueueFirstAid(LPARAM const targetValue)",
@@ -1896,6 +1930,10 @@ $results | ConvertTo-Json -Compress
             "QueueRetreat",
             "QueueBoostMorale",
             "QueueSteadyAim",
+            "QueueApplyPoison",
+            "QueueApplyDisease",
+            "QueueAreaTrack",
+            "SelectAreaTrackType",
             "Stand",
         ):
             with self.subTest(action=action):

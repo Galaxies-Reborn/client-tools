@@ -101,6 +101,21 @@ Milestone 250 advances the bridge to protocol 162 and adds `QueueSteadyAim`
 the server owns group authority, adjusted HAM, ranged filtering, and the
 five-minute `private_aim` modifier.
 
+Milestone 251 advances the bridge to protocol 164 and adds targeted
+`QueueApplyPoison` and `QueueApplyDisease` actions (commands 239 and 240).
+They submit the authentic nonqueued Combat Medic commands with an explicit
+target OID; the server remains authoritative for ownership, organic/PvP/LOS
+admission, medicine selection, range, Mind cost, recovery, DOT resistance,
+area targeting, combat effects, XP, and charge consumption.
+
+Milestone 252 advances the bridge to protocol 165 and adds `QueueAreaTrack`
+and `SelectAreaTrackType` (commands 241 and 242). The queue action submits the
+authentic nonqueued Ranger command. The selector accepts only the exact
+`skl_use:scan_type_d` production page, chooses one real row, and dispatches
+the mediator's ordinary selection and OK callbacks; the server remains
+authoritative for skill tiers, cooldown, movement/combat aborts, scan range,
+candidate filters, direction, distance, and result construction.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

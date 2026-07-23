@@ -52,6 +52,12 @@ public:
 	// opt-in acceptance bridge.
 	static int selectOrConfirmSingleListRow (int row, bool confirm);
 
+	// Background acceptance seam for the identity-bound Area Track lifecycle.
+	// Accepts only one active Script.listBox with the exact server-authored
+	// Area Track option prompt, then emits the normal row-selection and OK
+	// callbacks. Returns 1 on success or a diagnostic observation mask.
+	static int selectAndConfirmSingleAreaTrackRow (int row);
+
 private:
 	//disabled
 	CuiDataDrivenPageManager            (const CuiDataDrivenPageManager &rhs);

@@ -321,6 +321,78 @@ int CuiDataDrivenPageManager::selectOrConfirmSingleListRow(
 
 //-----------------------------------------------------------------
 
+int CuiDataDrivenPageManager::selectAndConfirmSingleAreaTrackRow(
+	int const row)
+{
+	if (row < 0 || row > 2)
+		return 0x10000;
+
+	UIList * candidateList = 0;
+	UIButton * candidateOk = 0;
+	int observations = 0;
+	for (PageMap::iterator iterator = ms_pages.begin();
+		iterator != ms_pages.end(); ++iterator)
+	{
+		CuiDataDrivenPage * const page = iterator->second;
+		if (!page || !page->isActive() || page->isClosed())
+			continue;
+		observations |= 0x001;
+
+		UIList * const list = dynamic_cast<UIList *>(
+			page->getPage().GetObjectFromPath("List.lstList", TUIList));
+		UIButton * const ok = dynamic_cast<UIButton *>(
+			page->getPage().GetObjectFromPath("btnOk", TUIButton));
+		UIText const * const prompt = dynamic_cast<UIText const *>(
+			page->getPage().GetObjectFromPath("Prompt.lblPrompt", TUIText));
+		if (list) observations |= 0x002;
+		if (ok) observations |= 0x004;
+		if (ok && ok->IsEnabled()) observations |= 0x008;
+		if (prompt) observations |= 0x010;
+
+		UIString promptText;
+		UIString promptLocalText;
+		bool const hasPromptText = prompt &&
+			prompt->GetProperty(UIText::PropertyName::Text, promptText);
+		bool const hasPromptLocalText = prompt &&
+			prompt->GetProperty(UIText::PropertyName::LocalText,
+				promptLocalText);
+		if (hasPromptText) observations |= 0x020;
+		if (hasPromptLocalText) observations |= 0x040;
+		bool const isAreaTrackPrompt =
+			(hasPromptText && Unicode::wideToNarrow(promptText).find(
+				"skl_use:scan_type_d") != std::string::npos) ||
+			(hasPromptLocalText && Unicode::wideToNarrow(promptLocalText).find(
+				"skl_use:scan_type_d") != std::string::npos);
+		if (isAreaTrackPrompt) observations |= 0x080;
+		if (!list || !ok || !ok->IsEnabled() || !isAreaTrackPrompt)
+			continue;
+
+		UIDataSource const * const dataSource = list->GetDataSource();
+		if (dataSource) observations |= 0x100;
+		if (dataSource && row < static_cast<int>(dataSource->GetChildCount()))
+			observations |= 0x200;
+		if (!dataSource || row >= static_cast<int>(dataSource->GetChildCount()))
+			continue;
+		if (candidateList)
+			return 0x20000 | observations;
+		candidateList = list;
+		candidateOk = ok;
+	}
+
+	if (!candidateList || !candidateOk)
+		return 0x10000 | observations;
+	if (candidateList->IsRowSelected(row))
+		candidateList->SelectRow(-1, false);
+	candidateList->SelectRow(row);
+	if (!candidateList->IsRowSelected(row) ||
+		!candidateList->GetDataAtRow(row))
+		return 0x30000 | observations;
+	candidateOk->Press();
+	return 1;
+}
+
+//-----------------------------------------------------------------
+
 void CuiDataDrivenPageManager::handleSceneChange()
 {
 	PageMap::iterator i;
