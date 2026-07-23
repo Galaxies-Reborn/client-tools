@@ -732,3 +732,13 @@ command. The server remains authoritative for exact adjusted three-pool costs,
 Action-only direct damage and bleeding, generated ranged animation, `sapshot`
 combat prose, posture immunity and defense, posture transition, and the
 30-second recovery rule.
+
+## Core3 Action Shot II cone diagnostics
+
+Background-input protocol 177 adds `QueueActionShot2` at fixed ID 258 and
+`ActionShot2WeaponStatus` at fixed ID 259. The existing reversible CDEF
+carbine proves weapon type 1 against mask `0x00000002` before the client queues
+the production command. The server remains authoritative for the 15-degree
+cone, 2.0 damage and speed multipliers, exact adjusted three-pool costs,
+Action-only direct damage and bleeding, `fire_5_special_single` generated
+animation, `sapblast` prose, posture defense, transition, and recovery.

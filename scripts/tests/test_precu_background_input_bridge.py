@@ -324,11 +324,13 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_mindShot1WeaponStatus",
             "BIC_queueActionShot1",
             "BIC_actionShot1WeaponStatus",
+            "BIC_queueActionShot2",
+            "BIC_actionShot2WeaponStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 176", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 176", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 177", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 177", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1001,6 +1003,23 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         self.assertIn(queue_action + " = 256", self.helper)
         self.assertIn(status_action + " = 257", self.helper)
 
+    def test_bridge_exposes_core3_action_shot_two_cone(self):
+        command = "actionShot2"
+        queue_action = "QueueActionShot2"
+        status_action = "ActionShot2WeaponStatus"
+        self.assertIn(
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"actionShot2"',
+            self.client_main,
+        )
+        self.assertIn(
+            'getBackgroundGeneratedCombatWeaponStatus("actionShot2")',
+            self.client_main,
+        )
+        self.assertIn('"' + queue_action + '"', self.helper)
+        self.assertIn('"' + status_action + '"', self.helper)
+        self.assertIn(queue_action + " = 258", self.helper)
+        self.assertIn(status_action + " = 259", self.helper)
+
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
             "IoWinManager::queueSetSystemMouseCursorPosition",
@@ -1365,6 +1384,8 @@ $results | ConvertTo-Json -Compress
             "MindShot1WeaponStatus": 255,
             "QueueActionShot1": 256,
             "ActionShot1WeaponStatus": 257,
+            "QueueActionShot2": 258,
+            "ActionShot2WeaponStatus": 259,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
