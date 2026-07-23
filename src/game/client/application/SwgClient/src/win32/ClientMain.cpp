@@ -356,11 +356,12 @@ namespace ClientMainNamespace
 		BIC_queueSampleDna,
 		BIC_queueTame,
 		BIC_queueEmboldenPets,
-		BIC_queueHealMind
+		BIC_queueHealMind,
+		BIC_queueBerserk1
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 155;
+	LRESULT const cms_backgroundInputProtocolVersion = 156;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -903,6 +904,23 @@ namespace ClientMainNamespace
 		// Combat Medic ownership, target type, PvP help, range, line of sight,
 		// Mind damage, treatment power, and the healer's wound/BF transaction.
 		return performBackgroundQueueTending("healMind", targetValue);
+	}
+
+	bool performBackgroundQueueBerserk1()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Berserk I is an optional-target, nonqueued self-state command. The
+		// server owns Brawler skill, melee/unarmed, chance, HAM, and duration.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"berserk1",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
 	}
 
 	bool performBackgroundQueueFirstAid(LPARAM const targetValue)
@@ -2621,6 +2639,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueHealMind:
 				if (!performBackgroundQueueHealMind(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueBerserk1:
+				if (!performBackgroundQueueBerserk1())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
