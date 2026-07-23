@@ -360,11 +360,12 @@ namespace ClientMainNamespace
 		BIC_queueBerserk1,
 		BIC_queueBerserk2,
 		BIC_targetSquadCounterpart,
-		BIC_queueFormup
+		BIC_queueFormup,
+		BIC_queueRetreat
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 159;
+	LRESULT const cms_backgroundInputProtocolVersion = 160;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -971,6 +972,23 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"formup",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueRetreat()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Retreat is a nonqueued Squad Leader command. The server owns group
+		// eligibility, HAM, speed/acceleration application, and expiry.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"retreat",
 			NetworkId::cms_invalid,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -2711,6 +2729,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueFormup:
 				if (!performBackgroundQueueFormup())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueRetreat:
+				if (!performBackgroundQueueRetreat())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
