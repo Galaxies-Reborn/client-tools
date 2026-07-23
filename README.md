@@ -143,6 +143,13 @@ the server remains authoritative for the 12/0/0 adjusted HAM cost, five-second
 `STATE_AIMING`/`private_aim` lifecycle, no-refresh repeat rule, expiry, and
 consumption by the next successful combat action.
 
+Milestone 260 advances the bridge to protocol 181 and adds
+`QueueSuppressionFire1` and `SuppressionFire1WeaponStatus` at commands
+270/271. The reversible CDEF rifle proves the aggregate-ranged mask before
+the native client queues production `suppressionFire1`; the server remains
+authoritative for exact HAM costs, Health damage, combat prose, exact
+posture-down playback, state application, defense, and timed recovery.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

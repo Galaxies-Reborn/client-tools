@@ -776,3 +776,14 @@ the pinned Core3 lifecycle: a five-second `STATE_AIMING` state carrying the
 sum of `aim` and weapon-family aim modifiers as `private_aim`, repeat charging
 without duration refresh, natural expiry, and removal after the next
 successful combat action.
+
+## Core3 Suppression Fire I
+
+Background-input protocol 181 adds `QueueSuppressionFire1` and
+`SuppressionFire1WeaponStatus` at fixed IDs 270/271. A reversible CDEF rifle
+proves weapon type 0 against aggregate-ranged mask `0x08000000` before the
+authenticated client queues production `suppressionFire1`. The server owns
+the exact adjusted three-pool costs, Health-targeted direct damage,
+`suppressionfire` prose, exact `fire_defender_posture_change_down` playback,
+the 100% posture-down attempt, defender recovery defense, and the 30-second
+recovery lifecycle.
