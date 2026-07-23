@@ -357,11 +357,12 @@ namespace ClientMainNamespace
 		BIC_queueTame,
 		BIC_queueEmboldenPets,
 		BIC_queueHealMind,
-		BIC_queueBerserk1
+		BIC_queueBerserk1,
+		BIC_queueBerserk2
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 156;
+	LRESULT const cms_backgroundInputProtocolVersion = 157;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -917,6 +918,23 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"berserk1",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueBerserk2()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Berserk II is the Brawler-master, optional-target, nonqueued tier.
+		// The server owns the modifier, chance, adjusted HAM, and 40s state.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"berserk2",
 			NetworkId::cms_invalid,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -2644,6 +2662,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueBerserk1:
 				if (!performBackgroundQueueBerserk1())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueBerserk2:
+				if (!performBackgroundQueueBerserk2())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
