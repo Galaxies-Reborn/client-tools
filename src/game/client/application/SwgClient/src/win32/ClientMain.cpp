@@ -361,11 +361,12 @@ namespace ClientMainNamespace
 		BIC_queueBerserk2,
 		BIC_targetSquadCounterpart,
 		BIC_queueFormup,
-		BIC_queueRetreat
+		BIC_queueRetreat,
+		BIC_queueBoostMorale
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 160;
+	LRESULT const cms_backgroundInputProtocolVersion = 161;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -989,6 +990,23 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"retreat",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueBoostMorale()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Boost Morale is a nonqueued Squad Leader command. The server owns
+		// group eligibility, adjusted HAM, and lossless wound redistribution.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"boostmorale",
 			NetworkId::cms_invalid,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -2734,6 +2752,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueRetreat:
 				if (!performBackgroundQueueRetreat())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueBoostMorale:
+				if (!performBackgroundQueueBoostMorale())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
