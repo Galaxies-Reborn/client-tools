@@ -58,6 +58,11 @@ The Publish 14.1 Skills mediator supports the complete 54-root profession
 matrix without exposing the 21 specialized roots in the ordinary 33-row
 catalog. See [the nonstandard profession graph guide](docs/precu-nonstandard-profession-graphs.md).
 
+The background-input bridge also exposes the milestone-243
+`QueueEmboldenPets` action. It admits the real nonqueued `emboldenpets`
+command with no explicit target so the server-owned active-pet transaction can
+be proved through an authenticated client session.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

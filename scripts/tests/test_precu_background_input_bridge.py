@@ -1256,6 +1256,7 @@ $results | ConvertTo-Json -Compress
             "SelectMyProfession": 227,
             "QueueSampleDNA": 228,
             "QueueTame": 229,
+            "QueueEmboldenPets": 230,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1522,6 +1523,20 @@ $results | ConvertTo-Json -Compress
             'performBackgroundQueueTending("tame", targetValue)',
             tame,
         )
+        embolden_pets = function_body(
+            self.client_main,
+            "bool performBackgroundQueueEmboldenPets()",
+        )
+        self.assertIn('"emboldenpets"', embolden_pets)
+        self.assertIn("NetworkId::cms_invalid", embolden_pets)
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(true)",
+            embolden_pets,
+        )
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(false)",
+            embolden_pets,
+        )
         first_aid = function_body(
             self.client_main,
             "bool performBackgroundQueueFirstAid(LPARAM const targetValue)",
@@ -1762,6 +1777,7 @@ $results | ConvertTo-Json -Compress
             "SelectMyProfession",
             "QueueSampleDNA",
             "QueueTame",
+            "QueueEmboldenPets",
             "Stand",
         ):
             with self.subTest(action=action):

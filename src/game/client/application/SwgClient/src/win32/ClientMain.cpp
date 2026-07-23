@@ -354,7 +354,8 @@ namespace ClientMainNamespace
 		BIC_showMyProfessions,
 		BIC_selectMyProfession,
 		BIC_queueSampleDna,
-		BIC_queueTame
+		BIC_queueTame,
+		BIC_queueEmboldenPets
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
@@ -875,6 +876,24 @@ namespace ClientMainNamespace
 		// Creature Handler path owns admission, phased speech, chance, PCD
 		// materialization, persistence, callable links, and XP.
 		return performBackgroundQueueTending("tame", targetValue);
+	}
+
+	bool performBackgroundQueueEmboldenPets()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Embolden Pets has an optional target and is intentionally nonqueued.
+		// The server-owned pet-master handler selects and validates the active
+		// creature pet, Mind cost, buff, range, and per-pet cooldown.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"emboldenpets",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
 	}
 
 	bool performBackgroundQueueFirstAid(LPARAM const targetValue)
@@ -2583,6 +2602,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueTame:
 				if (!performBackgroundQueueTame(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueEmboldenPets:
+				if (!performBackgroundQueueEmboldenPets())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
