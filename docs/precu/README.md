@@ -765,3 +765,14 @@ authenticated client queues either production command. The server remains
 authoritative for exact adjusted three-pool costs, RANDOM pool resolution,
 single-target geometry, direct damage, `threatenshot`/`warningshot` prose,
 and the retained ranged-versus-intensity animation modes.
+
+## Core3 Aim lifecycle
+
+Background-input protocol 180 adds `QueueAim` and `AimWeaponStatus` at fixed
+IDs 268/269. A reversible CDEF rifle proves weapon type 0 against
+aggregate-ranged mask `0x08000000` before the authenticated client queues the
+production `aim` command. The server owns the exact 12/0/0 adjusted cost and
+the pinned Core3 lifecycle: a five-second `STATE_AIMING` state carrying the
+sum of `aim` and weapon-family aim modifiers as `private_aim`, repeat charging
+without duration refresh, natural expiry, and removal after the next
+successful combat action.
