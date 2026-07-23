@@ -353,7 +353,8 @@ namespace ClientMainNamespace
 		BIC_fireLightningSingle2WeaponStatus,
 		BIC_showMyProfessions,
 		BIC_selectMyProfession,
-		BIC_queueSampleDna
+		BIC_queueSampleDna,
+		BIC_queueTame
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
@@ -866,6 +867,14 @@ namespace ClientMainNamespace
 		// Publish 14 Bio-Engineer handler owns skill, HAM, range, DNA, XP,
 		// creature-survival, and completion behavior.
 		return performBackgroundQueueTending("sampleDNA", targetValue);
+	}
+
+	bool performBackgroundQueueTame(LPARAM const targetValue)
+	{
+		// Supply only the fixture creature OID. The retained Publish 14
+		// Creature Handler path owns admission, phased speech, chance, PCD
+		// materialization, persistence, callable links, and XP.
+		return performBackgroundQueueTending("tame", targetValue);
 	}
 
 	bool performBackgroundQueueFirstAid(LPARAM const targetValue)
@@ -2569,6 +2578,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueSampleDna:
 				if (!performBackgroundQueueSampleDna(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueTame:
+				if (!performBackgroundQueueTame(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
