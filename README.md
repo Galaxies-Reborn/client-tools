@@ -114,6 +114,12 @@ queue route submits the production `actionShot1` command while the server
 remains authoritative for adjusted HAM, Action-only damage and bleeding,
 posture defense, posture transition, and recovery.
 
+Milestone 256 advances the bridge to protocol 177 and adds
+`QueueActionShot2` and `ActionShot2WeaponStatus` (commands 258 and 259). The
+same identity-bound CDEF carbine proves mask `0x00000002`; the server remains
+authoritative for the 15-degree cone, adjusted HAM, Action-only damage and
+bleeding, `sapblast` prose, posture transition, and recovery.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
