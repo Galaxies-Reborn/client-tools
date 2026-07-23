@@ -721,3 +721,14 @@ proves canonical ground-targeting weapon type 12 against HEAVY mask
 `0x00000001`. Both authenticated routes returned production Success while
 the server remained authoritative for exact template gating, RANDOM pool
 selection, combat prose, HAM costs, and generated-intensity playback.
+
+## Core3 Action Shot I posture-down diagnostics
+
+Background-input protocol 176 adds `QueueActionShot1` at fixed ID 256 and
+`ActionShot1WeaponStatus` at fixed ID 257. The identity-bound fixture creates
+and equips a reversible CDEF carbine so the status route proves weapon type 1
+against mask `0x00000002` before the authenticated client queues the production
+command. The server remains authoritative for exact adjusted three-pool costs,
+Action-only direct damage and bleeding, generated ranged animation, `sapshot`
+combat prose, posture immunity and defense, posture transition, and the
+30-second recovery rule.

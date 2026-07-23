@@ -116,6 +116,13 @@ the mediator's ordinary selection and OK callbacks; the server remains
 authoritative for skill tiers, cooldown, movement/combat aborts, scan range,
 candidate filters, direction, distance, and result construction.
 
+Milestone 255 advances the bridge to protocol 176 and adds
+`QueueActionShot1` and `ActionShot1WeaponStatus` (commands 256 and 257). The
+status route proves a concrete CDEF carbine against mask `0x00000002`; the
+queue route submits the production `actionShot1` command while the server
+remains authoritative for adjusted HAM, Action-only damage and bleeding,
+posture defense, posture transition, and recovery.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
