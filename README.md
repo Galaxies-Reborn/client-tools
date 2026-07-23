@@ -73,6 +73,11 @@ Milestone 245 advances the bridge to protocol 156 and adds `QueueBerserk1`
 target; the server retains Brawler ownership, weapon, chance, adjusted HAM,
 state-duration, persistence, and expiration authority.
 
+Milestone 246 advances the bridge to protocol 157 and adds `QueueBerserk2`
+(command 233). It submits the authentic Brawler-master tier without a target;
+the server retains the +20 modifier, chance, adjusted HAM, durable 40-second
+state, and expiration authority.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
