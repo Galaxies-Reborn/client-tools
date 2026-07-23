@@ -310,8 +310,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 157", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 157", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 159", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 159", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1260,6 +1260,8 @@ $results | ConvertTo-Json -Compress
             "QueueHealMind": 231,
             "QueueBerserk1": 232,
             "QueueBerserk2": 233,
+            "TargetSquadCounterpart": 234,
+            "QueueFormup": 235,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1346,6 +1348,7 @@ $results | ConvertTo-Json -Compress
             "OpenStatMigration",
             "StartImageDesign",
             "TargetCounterpart",
+            "TargetSquadCounterpart",
         ):
             with self.subTest(action=action):
                 self.assertIn(f'"{action}"', parameter_block)
@@ -1361,6 +1364,15 @@ $results | ConvertTo-Json -Compress
         self.assertIn('CuiCombatManager::setLookAtTarget(NetworkId("44003778"))', target_counterpart)
         self.assertNotIn("externalCommandHandler", target_counterpart)
         self.assertNotIn("lParam", target_counterpart)
+
+        squad_counterpart = function_body(
+            self.client_main, "bool performBackgroundTargetSquadCounterpart()"
+        )
+        for object_id in ("44003778", "207005062"):
+            with self.subTest(squad_object_id=object_id):
+                self.assertIn(f'"{object_id}"', squad_counterpart)
+        self.assertNotIn("39008597", squad_counterpart)
+        self.assertNotIn("lParam", squad_counterpart)
 
     def test_combat_queue_live_actions_are_fixed_guarded_and_observable(self):
         pair_guard = function_body(
@@ -1575,6 +1587,20 @@ $results | ConvertTo-Json -Compress
         self.assertIn(
             "ClientCommandQueue::commandsAreNowFromToolbar(false)",
             berserk_two,
+        )
+        formup = function_body(
+            self.client_main,
+            "bool performBackgroundQueueFormup()",
+        )
+        self.assertIn('"formup"', formup)
+        self.assertIn("NetworkId::cms_invalid", formup)
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(true)",
+            formup,
+        )
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(false)",
+            formup,
         )
         first_aid = function_body(
             self.client_main,
@@ -1820,6 +1846,8 @@ $results | ConvertTo-Json -Compress
             "QueueHealMind",
             "QueueBerserk1",
             "QueueBerserk2",
+            "TargetSquadCounterpart",
+            "QueueFormup",
             "Stand",
         ):
             with self.subTest(action=action):

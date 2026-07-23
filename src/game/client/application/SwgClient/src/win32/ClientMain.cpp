@@ -358,11 +358,13 @@ namespace ClientMainNamespace
 		BIC_queueEmboldenPets,
 		BIC_queueHealMind,
 		BIC_queueBerserk1,
-		BIC_queueBerserk2
+		BIC_queueBerserk2,
+		BIC_targetSquadCounterpart,
+		BIC_queueFormup
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 157;
+	LRESULT const cms_backgroundInputProtocolVersion = 159;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -618,6 +620,23 @@ namespace ClientMainNamespace
 		if (playerId == "44003778")
 			CuiCombatManager::setLookAtTarget(NetworkId("39008597"));
 		else if (playerId == "39008597")
+			CuiCombatManager::setLookAtTarget(NetworkId("44003778"));
+		else
+			return false;
+
+		return true;
+	}
+
+	bool performBackgroundTargetSquadCounterpart()
+	{
+		Object * const player = Game::getPlayer();
+		if (!player)
+			return false;
+
+		std::string const playerId = player->getNetworkId().getValueString();
+		if (playerId == "44003778")
+			CuiCombatManager::setLookAtTarget(NetworkId("207005062"));
+		else if (playerId == "207005062")
 			CuiCombatManager::setLookAtTarget(NetworkId("44003778"));
 		else
 			return false;
@@ -935,6 +954,23 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"berserk2",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueFormup()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Form Up is a nonqueued Squad Leader command. The client submits no
+		// target; the server owns leadership, group filtering, HAM, and states.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"formup",
 			NetworkId::cms_invalid,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -2667,6 +2703,14 @@ namespace ClientMainNamespace
 
 			case BIC_queueBerserk2:
 				if (!performBackgroundQueueBerserk2())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_targetSquadCounterpart:
+				return performBackgroundTargetSquadCounterpart() ? 1 : 0;
+
+			case BIC_queueFormup:
+				if (!performBackgroundQueueFormup())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
