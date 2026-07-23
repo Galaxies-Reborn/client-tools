@@ -69,6 +69,12 @@ Milestone 246 advances the bridge to protocol 157 and adds `QueueBerserk2`
 the server retains the +20 modifier, chance, adjusted HAM, durable 40-second
 state, and expiration authority.
 
+Milestone 247 advances the bridge to protocol 159 and adds the isolated
+`TargetSquadCounterpart` identity mapping plus `QueueFormup` (commands 234 and
+235). Two separately rooted x64 clients prove real invite/join/disband and
+submit the retained nonqueued `formup`; group, cost, member eligibility,
+state clearing, and PvP-help policy remain server-authoritative.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
