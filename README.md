@@ -145,6 +145,13 @@ server remains authoritative for exact HAM costs, RANDOM pool selection,
 direct damage, `threatenshot`/`warningshot` prose, and their distinct
 generated ranged/intensity animation semantics.
 
+Milestone 259 advances the bridge to protocol 180 and adds `QueueAim` and
+`AimWeaponStatus` at commands 268/269. The reversible CDEF rifle proves the
+aggregate-ranged mask before the native client queues the production command;
+the server remains authoritative for the 12/0/0 adjusted HAM cost, five-second
+`STATE_AIMING`/`private_aim` lifecycle, no-refresh repeat rule, expiry, and
+consumption by the next successful combat action.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
