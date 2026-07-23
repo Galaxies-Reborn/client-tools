@@ -128,6 +128,14 @@ CDEF rifle proves aggregate-ranged mask `0x08000000`; the server remains
 authoritative for exact HAM costs, RANDOM pool selection, the 12-meter
 point-blank boundary, direct damage, combat prose, and generated animation.
 
+Milestone 258 advances the bridge to protocol 179 and restores the two
+Marksman support attacks with `QueueThreatenShot`, `ThreatenShotWeaponStatus`,
+`QueueWarningShot`, and `WarningShotWeaponStatus` (commands 264 through 267).
+The reversible CDEF rifle proves aggregate-ranged mask `0x08000000`; the
+server remains authoritative for exact HAM costs, RANDOM pool selection,
+direct damage, `threatenshot`/`warningshot` prose, and their distinct
+generated ranged/intensity animation semantics.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
