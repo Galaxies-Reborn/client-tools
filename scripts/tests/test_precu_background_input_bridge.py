@@ -310,8 +310,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 160", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 160", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 161", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 161", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1263,6 +1263,7 @@ $results | ConvertTo-Json -Compress
             "TargetSquadCounterpart": 234,
             "QueueFormup": 235,
             "QueueRetreat": 236,
+            "QueueBoostMorale": 237,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
@@ -1617,6 +1618,20 @@ $results | ConvertTo-Json -Compress
             "ClientCommandQueue::commandsAreNowFromToolbar(false)",
             retreat,
         )
+        boost_morale = function_body(
+            self.client_main,
+            "bool performBackgroundQueueBoostMorale()",
+        )
+        self.assertIn('"boostmorale"', boost_morale)
+        self.assertIn("NetworkId::cms_invalid", boost_morale)
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(true)",
+            boost_morale,
+        )
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(false)",
+            boost_morale,
+        )
         first_aid = function_body(
             self.client_main,
             "bool performBackgroundQueueFirstAid(LPARAM const targetValue)",
@@ -1864,6 +1879,7 @@ $results | ConvertTo-Json -Compress
             "TargetSquadCounterpart",
             "QueueFormup",
             "QueueRetreat",
+            "QueueBoostMorale",
             "Stand",
         ):
             with self.subTest(action=action):

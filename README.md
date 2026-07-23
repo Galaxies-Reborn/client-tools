@@ -81,6 +81,12 @@ target; the server retains Squad Leader Support III ownership, group and member
 eligibility, adjusted Action/Mind cost, 1.822 speed/acceleration application,
 30-second cooldown and expiry, and PvP-help authority.
 
+Milestone 249 advances the bridge to protocol 161 and adds
+`QueueBoostMorale` (command 237). It submits the authentic nonqueued
+`boostmorale` command without a target; the server retains Squad Leader
+Defense IV ownership, group eligibility, adjusted three-pool HAM cost,
+nine-attribute wound conservation, redistribution, and PvP-help authority.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
