@@ -367,11 +367,20 @@ namespace ClientMainNamespace
 		BIC_queueApplyPoison,
 		BIC_queueApplyDisease,
 		BIC_queueAreaTrack,
-		BIC_selectAreaTrackType
+		BIC_selectAreaTrackType,
+		BIC_equipFixtureFlame,
+		BIC_queueFlameSingle1,
+		BIC_flameSingle1WeaponStatus,
+		BIC_queueFlameSingle2,
+		BIC_flameSingle2WeaponStatus,
+		BIC_queueFlameCone1,
+		BIC_flameCone1WeaponStatus,
+		BIC_queueFlameCone2,
+		BIC_flameCone2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 165;
+	LRESULT const cms_backgroundInputProtocolVersion = 174;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -2123,6 +2132,11 @@ namespace ClientMainNamespace
 		return performBackgroundEquipCdefWeapon("heavy_acid_beam.iff");
 	}
 
+	bool performBackgroundEquipFixtureFlame()
+	{
+		return performBackgroundEquipCdefWeapon("rifle_flame_thrower.iff");
+	}
+
 	bool performBackgroundEquipFixtureLightning()
 	{
 		return performBackgroundEquipCdefWeapon("rifle_lightning.iff");
@@ -3366,6 +3380,49 @@ namespace ClientMainNamespace
 
 			case BIC_fireLightningSingle2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("fireLightningSingle2");
+
+			case BIC_equipFixtureFlame:
+				return performBackgroundEquipFixtureFlame() ? 1 : 0;
+
+			case BIC_queueFlameSingle1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"flameSingle1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_flameSingle1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("flameSingle1");
+
+			case BIC_queueFlameSingle2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"flameSingle2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_flameSingle2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("flameSingle2");
+
+			case BIC_queueFlameCone1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"flameCone1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_flameCone1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("flameCone1");
+
+			case BIC_queueFlameCone2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"flameCone2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_flameCone2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("flameCone2");
 
 			default:
 				return 0;

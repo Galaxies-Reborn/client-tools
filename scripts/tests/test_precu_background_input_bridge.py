@@ -309,11 +309,20 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_headShot3WeaponStatus",
             "BIC_queueAreaTrack",
             "BIC_selectAreaTrackType",
+            "BIC_equipFixtureFlame",
+            "BIC_queueFlameSingle1",
+            "BIC_flameSingle1WeaponStatus",
+            "BIC_queueFlameSingle2",
+            "BIC_flameSingle2WeaponStatus",
+            "BIC_queueFlameCone1",
+            "BIC_flameCone1WeaponStatus",
+            "BIC_queueFlameCone2",
+            "BIC_flameCone2WeaponStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 165", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 165", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 174", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 174", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -922,6 +931,33 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
                 self.assertIn(queue_action + " = " + str(queue_id), self.helper)
                 self.assertIn(status_action + " = " + str(queue_id + 1), self.helper)
 
+    def test_bridge_exposes_core3_flame_dot_family(self):
+        self.assertIn(
+            'performBackgroundEquipCdefWeapon("rifle_flame_thrower.iff")',
+            self.client_main,
+        )
+        self.assertIn("EquipFixtureFlame = 243", self.helper)
+        commands = [
+            ("flameSingle1", "QueueFlameSingle1", "FlameSingle1WeaponStatus", 244),
+            ("flameSingle2", "QueueFlameSingle2", "FlameSingle2WeaponStatus", 246),
+            ("flameCone1", "QueueFlameCone1", "FlameCone1WeaponStatus", 248),
+            ("flameCone2", "QueueFlameCone2", "FlameCone2WeaponStatus", 250),
+        ]
+        for command, queue_action, status_action, queue_id in commands:
+            with self.subTest(command=command):
+                self.assertIn(
+                    'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"' + command + '"',
+                    self.client_main,
+                )
+                self.assertIn(
+                    'getBackgroundGeneratedCombatWeaponStatus("' + command + '")',
+                    self.client_main,
+                )
+                self.assertIn('"' + queue_action + '"', self.helper)
+                self.assertIn('"' + status_action + '"', self.helper)
+                self.assertIn(queue_action + " = " + str(queue_id), self.helper)
+                self.assertIn(status_action + " = " + str(queue_id + 1), self.helper)
+
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
             "IoWinManager::queueSetSystemMouseCursorPosition",
@@ -1271,6 +1307,15 @@ $results | ConvertTo-Json -Compress
             "QueueApplyDisease": 240,
             "QueueAreaTrack": 241,
             "SelectAreaTrackType": 242,
+            "EquipFixtureFlame": 243,
+            "QueueFlameSingle1": 244,
+            "FlameSingle1WeaponStatus": 245,
+            "QueueFlameSingle2": 246,
+            "FlameSingle2WeaponStatus": 247,
+            "QueueFlameCone1": 248,
+            "FlameCone1WeaponStatus": 249,
+            "QueueFlameCone2": 250,
+            "FlameCone2WeaponStatus": 251,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
