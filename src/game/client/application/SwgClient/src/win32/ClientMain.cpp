@@ -355,7 +355,8 @@ namespace ClientMainNamespace
 		BIC_selectMyProfession,
 		BIC_queueSampleDna,
 		BIC_queueTame,
-		BIC_queueEmboldenPets
+		BIC_queueEmboldenPets,
+		BIC_queueHealMind
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
@@ -894,6 +895,14 @@ namespace ClientMainNamespace
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
 		return queued;
+	}
+
+	bool performBackgroundQueueHealMind(LPARAM const targetValue)
+	{
+		// Heal Mind is a real nonqueued targeted command. The server validates
+		// Combat Medic ownership, target type, PvP help, range, line of sight,
+		// Mind damage, treatment power, and the healer's wound/BF transaction.
+		return performBackgroundQueueTending("healMind", targetValue);
 	}
 
 	bool performBackgroundQueueFirstAid(LPARAM const targetValue)
@@ -2607,6 +2616,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueEmboldenPets:
 				if (!performBackgroundQueueEmboldenPets())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueHealMind:
+				if (!performBackgroundQueueHealMind(lParam))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 

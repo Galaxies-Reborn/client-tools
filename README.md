@@ -63,6 +63,11 @@ The background-input bridge also exposes the milestone-243
 command with no explicit target so the server-owned active-pet transaction can
 be proved through an authenticated client session.
 
+Milestone 244 adds `QueueHealMind` (bridge command 231). It submits the real
+nonqueued `healMind` command with an explicit target OID; the server retains
+all Combat Medic ownership, PvP, range, line-of-sight, power, wound, and
+battle-fatigue authority.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
