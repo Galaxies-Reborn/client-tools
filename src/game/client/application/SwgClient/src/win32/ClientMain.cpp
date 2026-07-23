@@ -362,11 +362,12 @@ namespace ClientMainNamespace
 		BIC_targetSquadCounterpart,
 		BIC_queueFormup,
 		BIC_queueRetreat,
-		BIC_queueBoostMorale
+		BIC_queueBoostMorale,
+		BIC_queueSteadyAim
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 161;
+	LRESULT const cms_backgroundInputProtocolVersion = 162;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1007,6 +1008,23 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"boostmorale",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueSteadyAim()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Steady Aim is a nonqueued Squad Leader command. The server owns
+		// group eligibility, adjusted HAM, ranged filtering, and the buff.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"steadyaim",
 			NetworkId::cms_invalid,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -2757,6 +2775,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueBoostMorale:
 				if (!performBackgroundQueueBoostMorale())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueSteadyAim:
+				if (!performBackgroundQueueSteadyAim())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
