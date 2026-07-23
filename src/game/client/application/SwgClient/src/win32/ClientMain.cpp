@@ -363,11 +363,15 @@ namespace ClientMainNamespace
 		BIC_queueFormup,
 		BIC_queueRetreat,
 		BIC_queueBoostMorale,
-		BIC_queueSteadyAim
+		BIC_queueSteadyAim,
+		BIC_queueApplyPoison,
+		BIC_queueApplyDisease,
+		BIC_queueAreaTrack,
+		BIC_selectAreaTrackType
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 162;
+	LRESULT const cms_backgroundInputProtocolVersion = 165;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1029,6 +1033,50 @@ namespace ClientMainNamespace
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
 		return queued;
+	}
+
+	bool performBackgroundQueueApplyPoison(LPARAM const targetValue)
+	{
+		// The server owns Combat Medic admission, DOT-pack selection, range,
+		// cost, DOT resistance, XP, and charge consumption.
+		return performBackgroundQueueTending("applyPoison", targetValue);
+	}
+
+	bool performBackgroundQueueApplyDisease(LPARAM const targetValue)
+	{
+		return performBackgroundQueueTending("applyDisease", targetValue);
+	}
+
+	bool performBackgroundQueueAreaTrack()
+	{
+		Object * const player = Game::getPlayer();
+		if (!player ||
+			Game::getPlayerNetworkId().getValueString() != "44003778")
+			return false;
+
+		// The server owns Ranger tiers, outdoor/cooldown admission, option
+		// construction, the delayed scan, filtering, and result presentation.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"areatrack",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	LRESULT performBackgroundSelectAreaTrackType(LPARAM const selectionIndex)
+	{
+		Object * const player = Game::getPlayer();
+		if (!player ||
+			Game::getPlayerNetworkId().getValueString() != "44003778" ||
+			selectionIndex < 0 || selectionIndex > 2)
+			return 0;
+
+		return static_cast<LRESULT>(
+			CuiDataDrivenPageManager::selectAndConfirmSingleAreaTrackRow(
+				static_cast<int>(selectionIndex)));
 	}
 
 	bool performBackgroundQueueFirstAid(LPARAM const targetValue)
@@ -2782,6 +2830,24 @@ namespace ClientMainNamespace
 				if (!performBackgroundQueueSteadyAim())
 					return 0;
 				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueApplyPoison:
+				if (!performBackgroundQueueApplyPoison(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueApplyDisease:
+				if (!performBackgroundQueueApplyDisease(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueAreaTrack:
+				if (!performBackgroundQueueAreaTrack())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_selectAreaTrackType:
+				return performBackgroundSelectAreaTrackType(lParam);
 
 			case BIC_equipFixturePolearm:
 				return performBackgroundEquipFixturePolearm() ? 1 : 0;
