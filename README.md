@@ -120,6 +120,14 @@ same identity-bound CDEF carbine proves mask `0x00000002`; the server remains
 authoritative for the 15-degree cone, adjusted HAM, Action-only damage and
 bleeding, `sapblast` prose, posture transition, and recovery.
 
+Milestone 257 advances the bridge to protocol 178 and closes the two remaining
+Marksman-novice attacks with `QueueOverChargeShot1`,
+`OverChargeShot1WeaponStatus`, `QueuePointBlankSingle1`, and
+`PointBlankSingle1WeaponStatus` (commands 260 through 263). The reversible
+CDEF rifle proves aggregate-ranged mask `0x08000000`; the server remains
+authoritative for exact HAM costs, RANDOM pool selection, the 12-meter
+point-blank boundary, direct damage, combat prose, and generated animation.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

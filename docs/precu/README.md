@@ -742,3 +742,15 @@ the production command. The server remains authoritative for the 15-degree
 cone, 2.0 damage and speed multipliers, exact adjusted three-pool costs,
 Action-only direct damage and bleeding, `fire_5_special_single` generated
 animation, `sapblast` prose, posture defense, transition, and recovery.
+
+## Core3 Marksman-novice shot closure
+
+Background-input protocol 178 adds `QueueOverChargeShot1` and
+`OverChargeShot1WeaponStatus` at fixed IDs 260/261, plus
+`QueuePointBlankSingle1` and `PointBlankSingle1WeaponStatus` at fixed IDs
+262/263. A reversible CDEF rifle proves weapon type 0 against aggregate-ranged
+mask `0x08000000` before the authenticated client queues either production
+command. The server remains authoritative for exact adjusted three-pool costs,
+RANDOM pool resolution, single-target geometry, the point-blank 12-meter
+boundary, direct damage, `overchargeshot`/`pointblankshot` prose, and generated
+ranged animation.
