@@ -68,6 +68,11 @@ nonqueued `healMind` command with an explicit target OID; the server retains
 all Combat Medic ownership, PvP, range, line-of-sight, power, wound, and
 battle-fatigue authority.
 
+Milestone 245 advances the bridge to protocol 156 and adds `QueueBerserk1`
+(command 232). It submits the authentic nonqueued `berserk1` command without a
+target; the server retains Brawler ownership, weapon, chance, adjusted HAM,
+state-duration, persistence, and expiration authority.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
