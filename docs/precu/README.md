@@ -754,3 +754,14 @@ command. The server remains authoritative for exact adjusted three-pool costs,
 RANDOM pool resolution, single-target geometry, the point-blank 12-meter
 boundary, direct damage, `overchargeshot`/`pointblankshot` prose, and generated
 ranged animation.
+
+## Core3 Marksman support shots
+
+Background-input protocol 179 adds `QueueThreatenShot` and
+`ThreatenShotWeaponStatus` at fixed IDs 264/265, plus `QueueWarningShot` and
+`WarningShotWeaponStatus` at fixed IDs 266/267. A reversible CDEF rifle proves
+weapon type 0 against aggregate-ranged mask `0x08000000` before the
+authenticated client queues either production command. The server remains
+authoritative for exact adjusted three-pool costs, RANDOM pool resolution,
+single-target geometry, direct damage, `threatenshot`/`warningshot` prose,
+and the retained ranged-versus-intensity animation modes.

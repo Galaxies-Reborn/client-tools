@@ -388,11 +388,15 @@ namespace ClientMainNamespace
 		BIC_queueOverChargeShot1,
 		BIC_overChargeShot1WeaponStatus,
 		BIC_queuePointBlankSingle1,
-		BIC_pointBlankSingle1WeaponStatus
+		BIC_pointBlankSingle1WeaponStatus,
+		BIC_queueThreatenShot,
+		BIC_threatenShotWeaponStatus,
+		BIC_queueWarningShot,
+		BIC_warningShotWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 178;
+	LRESULT const cms_backgroundInputProtocolVersion = 179;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -3495,6 +3499,26 @@ namespace ClientMainNamespace
 
 			case BIC_pointBlankSingle1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("pointBlankSingle1");
+
+			case BIC_queueThreatenShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"threatenShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_threatenShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("threatenShot");
+
+			case BIC_queueWarningShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"warningShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_warningShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("warningShot");
 
 			default:
 				return 0;
