@@ -787,3 +787,12 @@ the exact adjusted three-pool costs, Health-targeted direct damage,
 `suppressionfire` prose, exact `fire_defender_posture_change_down` playback,
 the 100% posture-down attempt, defender recovery defense, and the 30-second
 recovery lifecycle.
+
+## Core3 Pistol Acrobatics
+
+Background-input protocol 182 adds `QueueRollShot`, `RollShotWeaponStatus`,
+`QueueDiveShot`, `DiveShotWeaponStatus`, `QueueKipUpShot`, and
+`KipUpShotWeaponStatus` at fixed IDs 272-277. The identity-bound CDEF pistol
+path proves the retained Pistol II grants and the natural
+upright-to-crouched-to-prone-to-upright Core3 posture lifecycle, including
+server-authoritative damage, HAM debit, diagnostics, and reversible cleanup.

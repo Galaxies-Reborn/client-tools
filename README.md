@@ -159,6 +159,12 @@ the native client queues production `suppressionFire1`; the server remains
 authoritative for exact HAM costs, Health damage, combat prose, exact
 posture-down playback, state application, defense, and timed recovery.
 
+Milestone 261 advances the bridge to protocol 182 and adds queue and
+generated-weapon status routes for `rollShot`, `diveShot`, and `kipUpShot` at
+commands 272-277. The reversible fixture exposes the retained Pistol II
+grants, and authenticated clients exercise the complete
+upright-to-crouched-to-prone-to-upright acrobatic posture lifecycle.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

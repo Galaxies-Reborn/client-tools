@@ -396,11 +396,17 @@ namespace ClientMainNamespace
 		BIC_queueAim,
 		BIC_aimWeaponStatus,
 		BIC_queueSuppressionFire1,
-		BIC_suppressionFire1WeaponStatus
+		BIC_suppressionFire1WeaponStatus,
+		BIC_queueRollShot,
+		BIC_rollShotWeaponStatus,
+		BIC_queueDiveShot,
+		BIC_diveShotWeaponStatus,
+		BIC_queueKipUpShot,
+		BIC_kipUpShotWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 181;
+	LRESULT const cms_backgroundInputProtocolVersion = 182;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -3544,6 +3550,36 @@ namespace ClientMainNamespace
 			case BIC_suppressionFire1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus(
 					"suppressionFire1");
+
+			case BIC_queueRollShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"rollShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_rollShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("rollShot");
+
+			case BIC_queueDiveShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"diveShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_diveShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("diveShot");
+
+			case BIC_queueKipUpShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"kipUpShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_kipUpShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("kipUpShot");
 
 			default:
 				return 0;
