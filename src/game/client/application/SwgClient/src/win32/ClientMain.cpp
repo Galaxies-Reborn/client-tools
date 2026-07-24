@@ -402,11 +402,13 @@ namespace ClientMainNamespace
 		BIC_queueDiveShot,
 		BIC_diveShotWeaponStatus,
 		BIC_queueKipUpShot,
-		BIC_kipUpShotWeaponStatus
+		BIC_kipUpShotWeaponStatus,
+		BIC_queueTakeCover,
+		BIC_takeCoverWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 182;
+	LRESULT const cms_backgroundInputProtocolVersion = 183;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -3580,6 +3582,16 @@ namespace ClientMainNamespace
 
 			case BIC_kipUpShotWeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("kipUpShot");
+
+			case BIC_queueTakeCover:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"takeCover", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_takeCoverWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("takeCover");
 
 			default:
 				return 0;
