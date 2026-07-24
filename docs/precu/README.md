@@ -818,3 +818,15 @@ the exact adjusted three-pool costs, RANDOM target-pool damage,
 Core3 dizzy, blind, and stun attempts with their independent defenses,
 duration scaling, native timed states, persistence observation, and
 ownership-safe cleanup.
+
+## Core3 Scatter Shots
+
+Background-input protocol 185 adds `QueueScatterShot1`,
+`ScatterShot1WeaponStatus`, `QueueScatterShot2`, and
+`ScatterShot2WeaponStatus` at fixed IDs 282-285. The identity-bound CDEF
+carbine path proves retained Carbineer Accuracy I and III ownership before an
+authenticated client queues production `scatterShot1` and `scatterShot2`.
+The server owns the pinned Core3 independent pool rolls, direct
+Health/Action/Mind multipliers, 8.34-percent historical spillover rule, exact
+HAM costs, `scattershot`/`scatterblast` prose, generated
+`fire_5_single` animation, persistence observation, and reversible cleanup.

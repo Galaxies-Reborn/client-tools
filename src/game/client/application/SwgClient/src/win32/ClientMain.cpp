@@ -406,11 +406,15 @@ namespace ClientMainNamespace
 		BIC_queueTakeCover,
 		BIC_takeCoverWeaponStatus,
 		BIC_queueFullAutoSingle1,
-		BIC_fullAutoSingle1WeaponStatus
+		BIC_fullAutoSingle1WeaponStatus,
+		BIC_queueScatterShot1,
+		BIC_scatterShot1WeaponStatus,
+		BIC_queueScatterShot2,
+		BIC_scatterShot2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 184;
+	LRESULT const cms_backgroundInputProtocolVersion = 185;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -3605,6 +3609,28 @@ namespace ClientMainNamespace
 			case BIC_fullAutoSingle1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus(
 					"fullAutoSingle1");
+
+			case BIC_queueScatterShot1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"scatterShot1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_scatterShot1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"scatterShot1");
+
+			case BIC_queueScatterShot2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"scatterShot2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_scatterShot2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"scatterShot2");
 
 			default:
 				return 0;
