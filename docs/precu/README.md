@@ -806,3 +806,15 @@ cover state before the authenticated client queues production `takeCover`.
 The server owns the exact Quickness-adjusted Action cost, insufficient-HAM
 failure, combat-only `10 + take_cover` chance, dizzy-fall branch, cover-state
 application, persistence observation, and reversible cleanup.
+
+## Core3 Full Auto Single I
+
+Background-input protocol 184 adds `QueueFullAutoSingle1` and
+`FullAutoSingle1WeaponStatus` at fixed IDs 280/281. The identity-bound CDEF
+carbine path proves retained Marksman Carbine II ownership before the
+authenticated client queues production `fullAutoSingle1`. The server owns
+the exact adjusted three-pool costs, RANDOM target-pool damage,
+`fullautoattack` prose, `fire_5_special_single` animation, and the pinned
+Core3 dizzy, blind, and stun attempts with their independent defenses,
+duration scaling, native timed states, persistence observation, and
+ownership-safe cleanup.
