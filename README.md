@@ -163,6 +163,14 @@ queues production `takeCover`; the server remains authoritative for the
 Quickness-adjusted Action debit, combat chance, dizzy-fall branch, cover
 state, persistence evidence, and reversible cleanup.
 
+Milestone 263 advances the bridge to protocol 184 and adds
+`QueueFullAutoSingle1` and `FullAutoSingle1WeaponStatus` at commands 280/281.
+The identity-bound CDEF carbine path proves the retained Marksman Carbine II
+grant while the authenticated client queues production `fullAutoSingle1`;
+the server remains authoritative for exact costs, random-pool damage,
+full-auto prose and animation, three independent defended timed-state
+attempts, persistence evidence, and ownership-safe cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

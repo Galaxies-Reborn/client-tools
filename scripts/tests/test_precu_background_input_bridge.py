@@ -346,11 +346,13 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_kipUpShotWeaponStatus",
             "BIC_queueTakeCover",
             "BIC_takeCoverWeaponStatus",
+            "BIC_queueFullAutoSingle1",
+            "BIC_fullAutoSingle1WeaponStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 183", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 183", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 184", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 184", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1166,6 +1168,24 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, self.helper)
 
+    def test_bridge_exposes_core3_full_auto_single_one(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"fullAutoSingle1"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"fullAutoSingle1")',
+            "BIC_queueFullAutoSingle1",
+            "BIC_fullAutoSingle1WeaponStatus",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.client_main)
+        for token in [
+            '"QueueFullAutoSingle1"',
+            '"FullAutoSingle1WeaponStatus"',
+            "QueueFullAutoSingle1 = 280",
+            "FullAutoSingle1WeaponStatus = 281",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.helper)
+
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
             "IoWinManager::queueSetSystemMouseCursorPosition",
@@ -1552,6 +1572,8 @@ $results | ConvertTo-Json -Compress
             "KipUpShotWeaponStatus": 277,
             "QueueTakeCover": 278,
             "TakeCoverWeaponStatus": 279,
+            "QueueFullAutoSingle1": 280,
+            "FullAutoSingle1WeaponStatus": 281,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
