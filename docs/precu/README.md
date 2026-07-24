@@ -796,3 +796,13 @@ Background-input protocol 182 adds `QueueRollShot`, `RollShotWeaponStatus`,
 path proves the retained Pistol II grants and the natural
 upright-to-crouched-to-prone-to-upright Core3 posture lifecycle, including
 server-authoritative damage, HAM debit, diagnostics, and reversible cleanup.
+
+## Core3 Take Cover
+
+Background-input protocol 183 adds `QueueTakeCover` and
+`TakeCoverWeaponStatus` at fixed IDs 278/279. The identity-bound fixture
+proves retained Marksman Rifle II ownership and resets only its snapshotted
+cover state before the authenticated client queues production `takeCover`.
+The server owns the exact Quickness-adjusted Action cost, insufficient-HAM
+failure, combat-only `10 + take_cover` chance, dizzy-fall branch, cover-state
+application, persistence observation, and reversible cleanup.

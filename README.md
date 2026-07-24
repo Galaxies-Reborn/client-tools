@@ -156,6 +156,13 @@ commands 272-277. The reversible fixture exposes the retained Pistol II
 grants, and authenticated clients exercise the complete
 upright-to-crouched-to-prone-to-upright acrobatic posture lifecycle.
 
+Milestone 262 advances the bridge to protocol 183 and adds `QueueTakeCover`
+and `TakeCoverWeaponStatus` at commands 278/279. The identity-bound fixture
+exposes the retained Marksman Rifle II ownership while the native client
+queues production `takeCover`; the server remains authoritative for the
+Quickness-adjusted Action debit, combat chance, dizzy-fall branch, cover
+state, persistence evidence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
