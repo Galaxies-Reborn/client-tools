@@ -338,11 +338,17 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_aimWeaponStatus",
             "BIC_queueSuppressionFire1",
             "BIC_suppressionFire1WeaponStatus",
+            "BIC_queueRollShot",
+            "BIC_rollShotWeaponStatus",
+            "BIC_queueDiveShot",
+            "BIC_diveShotWeaponStatus",
+            "BIC_queueKipUpShot",
+            "BIC_kipUpShotWeaponStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 181", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 181", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 182", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 182", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1108,6 +1114,38 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, self.helper)
 
+    def test_bridge_exposes_core3_pistol_acrobatics(self):
+        for command, enum_name in [
+            ("rollShot", "RollShot"),
+            ("diveShot", "DiveShot"),
+            ("kipUpShot", "KipUpShot"),
+        ]:
+            with self.subTest(command=command):
+                self.assertIn(
+                    f'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"{command}"',
+                    self.client_main,
+                )
+                self.assertIn(
+                    f'getBackgroundGeneratedCombatWeaponStatus("{command}")',
+                    self.client_main,
+                )
+                self.assertIn(f"BIC_queue{enum_name}", self.client_main)
+                self.assertIn(
+                    f"BIC_{command}WeaponStatus", self.client_main
+                )
+                self.assertIn(f'"Queue{enum_name}"', self.helper)
+                self.assertIn(f'"{enum_name}WeaponStatus"', self.helper)
+        for token in [
+            "QueueRollShot = 272",
+            "RollShotWeaponStatus = 273",
+            "QueueDiveShot = 274",
+            "DiveShotWeaponStatus = 275",
+            "QueueKipUpShot = 276",
+            "KipUpShotWeaponStatus = 277",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(token, self.helper)
+
     def test_bridge_queues_internal_input_events(self):
         required_calls = [
             "IoWinManager::queueSetSystemMouseCursorPosition",
@@ -1486,6 +1524,12 @@ $results | ConvertTo-Json -Compress
             "AimWeaponStatus": 269,
             "QueueSuppressionFire1": 270,
             "SuppressionFire1WeaponStatus": 271,
+            "QueueRollShot": 272,
+            "RollShotWeaponStatus": 273,
+            "QueueDiveShot": 274,
+            "DiveShotWeaponStatus": 275,
+            "QueueKipUpShot": 276,
+            "KipUpShotWeaponStatus": 277,
         }
         for name, value in expected_helper_commands.items():
             with self.subTest(command=name):
