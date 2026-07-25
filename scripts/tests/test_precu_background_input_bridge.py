@@ -352,11 +352,15 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_scatterShot1WeaponStatus",
             "BIC_queueScatterShot2",
             "BIC_scatterShot2WeaponStatus",
+            "BIC_queueLegShot2",
+            "BIC_legShot2WeaponStatus",
+            "BIC_queueLegShot3",
+            "BIC_legShot3WeaponStatus",
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 185", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 185", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 186", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 186", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1211,6 +1215,34 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "ScatterShot1WeaponStatus = 283",
             "QueueScatterShot2 = 284",
             "ScatterShot2WeaponStatus = 285",
+        ]:
+            with self.subTest(token=token):
+                self.assertIn(
+                    token,
+                    self.client_main if token.startswith("BIC_") else self.helper,
+                )
+
+    def test_bridge_exposes_core3_leg_shot_continuation(self):
+        for command in ("legShot2", "legShot3"):
+            for token in [
+                f'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"{command}"',
+                f'getBackgroundGeneratedCombatWeaponStatus("{command}")',
+            ]:
+                with self.subTest(command=command, token=token):
+                    self.assertIn(token, self.client_main)
+        for token in [
+            "BIC_queueLegShot2",
+            "BIC_legShot2WeaponStatus",
+            "BIC_queueLegShot3",
+            "BIC_legShot3WeaponStatus",
+            '"QueueLegShot2"',
+            '"LegShot2WeaponStatus"',
+            '"QueueLegShot3"',
+            '"LegShot3WeaponStatus"',
+            "QueueLegShot2 = 286",
+            "LegShot2WeaponStatus = 287",
+            "QueueLegShot3 = 288",
+            "LegShot3WeaponStatus = 289",
         ]:
             with self.subTest(token=token):
                 self.assertIn(

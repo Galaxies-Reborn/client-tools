@@ -179,6 +179,14 @@ pinned Core3 independent Health/Action/Mind distribution rolls. The server
 remains authoritative for exact costs, direct per-pool damage, historical
 spillover, prose, animation, persistence evidence, and ownership-safe cleanup.
 
+Milestone 265 advances the bridge to protocol 186 and adds queue and
+generated-weapon status routes for `legShot2` and `legShot3` at commands
+286-289. The identity-bound CDEF-carbine path proves retained Marksman
+Carbine III and Carbineer Speed I ownership while the server remains
+authoritative for Action-pool damage, exact costs, `legshot`/`kneecapshot`
+prose, exact `test_homing` animation, defended timed stun effects,
+persistence evidence, and ownership-safe cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

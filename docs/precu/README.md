@@ -830,3 +830,14 @@ The server owns the pinned Core3 independent pool rolls, direct
 Health/Action/Mind multipliers, 8.34-percent historical spillover rule, exact
 HAM costs, `scattershot`/`scatterblast` prose, generated
 `fire_5_single` animation, persistence observation, and reversible cleanup.
+
+## Core3 Leg Shot Continuation
+
+Background-input protocol 186 adds `QueueLegShot2`,
+`LegShot2WeaponStatus`, `QueueLegShot3`, and `LegShot3WeaponStatus` at fixed
+IDs 286-289. The identity-bound CDEF-carbine path proves retained Marksman
+Carbine III and Carbineer Speed I ownership before authenticated clients
+queue production `legShot2` and `legShot3`. The server owns exact Action-pool
+damage and HAM costs, `legshot`/`kneecapshot` prose, exact `test_homing`
+animation, pinned Core3 85/100-percent defended timed stun attempts,
+persistence observation, and reversible cleanup.
