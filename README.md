@@ -196,6 +196,13 @@ authoritative for Action-pool damage, exact costs, `legshot`/`kneecapshot`
 prose, exact `test_homing` animation, defended timed stun effects,
 persistence evidence, and ownership-safe cleanup.
 
+Milestone 266 advances the bridge to protocol 187 and adds queue and
+generated-weapon status routes for Carbineer-novice `fullAutoSingle2` at
+commands 290-291. The server remains authoritative for RANDOM-pool damage,
+exact costs, `s_auto` prose, generated `fire_7_single` animation, three
+independent defended timed-state attempts, persistence evidence, and
+ownership-safe cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
