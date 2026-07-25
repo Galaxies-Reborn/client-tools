@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 186", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 186", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 187", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 187", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1251,6 +1251,24 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
                 )
 
     def test_bridge_queues_internal_input_events(self):
+        for token in [
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"fullAutoSingle2"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"fullAutoSingle2")',
+            "BIC_queueFullAutoSingle2",
+            "BIC_fullAutoSingle2WeaponStatus",
+            '"QueueFullAutoSingle2"',
+            '"FullAutoSingle2WeaponStatus"',
+            "QueueFullAutoSingle2 = 290",
+            "FullAutoSingle2WeaponStatus = 291",
+        ]:
+            with self.subTest(full_auto_single_two_token=token):
+                self.assertIn(
+                    token,
+                    self.client_main if token.startswith("BIC_") or
+                    token.startswith("perform") or token.startswith("getBackground")
+                    else self.helper,
+                )
+
         required_calls = [
             "IoWinManager::queueSetSystemMouseCursorPosition",
             "IoWinManager::queueMouseButtonDown(0, 0)",

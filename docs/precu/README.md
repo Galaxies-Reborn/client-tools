@@ -841,3 +841,13 @@ queue production `legShot2` and `legShot3`. The server owns exact Action-pool
 damage and HAM costs, `legshot`/`kneecapshot` prose, exact `test_homing`
 animation, pinned Core3 85/100-percent defended timed stun attempts,
 persistence observation, and reversible cleanup.
+
+## Core3 Full Auto Single II
+
+Background-input protocol 187 adds `QueueFullAutoSingle2` and
+`FullAutoSingle2WeaponStatus` at fixed IDs 290-291. The identity-bound
+CDEF-carbine path proves retained Carbineer-novice ownership before an
+authenticated client queues production `fullAutoSingle2`. The server owns
+RANDOM-pool damage, exact HAM costs, `s_auto` prose, generated
+`fire_7_single` animation, all three defended timed-state attempts,
+persistence observation, and reversible cleanup.
