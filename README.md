@@ -292,6 +292,12 @@ identity-bound production queue remains server-authoritative for exact rifle
 admission, random-pool damage, generated animation, the defended native dizzy
 attempt, persistence evidence, and reversible cleanup.
 
+Milestone 280 advances the bridge to protocol 201 and adds
+`QueueFlurryShot2` plus `FlurryShot2WeaponStatus` at commands 318-319. The
+bounded production queue remains server-authoritative for exact rifle
+admission, 15-degree cone selection, random-pool damage, generated intensity
+animation, defended native dizzy application, persistence, and cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

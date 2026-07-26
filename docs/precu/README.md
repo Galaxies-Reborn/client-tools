@@ -980,3 +980,12 @@ path uses the standard bounded repeat count and production toolbar queue. The
 server owns Patch 12 timing and rifle admission, Core3 random-pool damage,
 generated `fire_5_special_single` animation, the defended 85% native dizzy
 attempt, persistence observation, timed recovery, and reversible cleanup.
+
+## Core3 Flurry Shot Two
+
+Background-input protocol 201 adds `QueueFlurryShot2` and
+`FlurryShot2WeaponStatus` at fixed IDs 318-319. The identity-bound CDEF-rifle
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns Patch 12 timing and rifle admission, Core3's 64-meter/15-degree
+cone, random-pool damage, generated `fire_area` intensity animation, the
+defended 100% native dizzy attempt, persistence, timed recovery, and cleanup.
