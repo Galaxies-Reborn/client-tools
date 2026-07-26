@@ -369,7 +369,7 @@ Brawler polearm tier-three chain, exact polearm admission, random-pool damage,
 Milestone 293 advances the bridge to protocol 214 and adds
 `QueueUnarmedBlind1` plus `UnarmedBlind1WeaponStatus` at commands 344-345. The
 bounded production queue remains server-authoritative for the retained
-Brawler unarmed tier-three chain, exact unarmed admission, health-pool damage,
+Brawler unarmed tier-three chain, exact unarmed admission, random-pool damage,
 50-second BLIND application, restart persistence, and reversible cleanup.
 
 ## Additional Dependencies

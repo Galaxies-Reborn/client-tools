@@ -1111,6 +1111,6 @@ Background-input protocol 214 adds `QueueUnarmedBlind1` and
 `UnarmedBlind1WeaponStatus` at fixed IDs 344-345. The identity-bound unarmed
 path uses the standard bounded repeat count and production toolbar queue. The
 server owns the retained Brawler unarmed tier-three skill chain, Patch 12
-timing, Core3 health-pool damage, exact `attack_high_center_light_1`
+timing, Core3 random-pool damage, exact `attack_high_center_light_1`
 animation, 50-second BLIND application, restart persistence, and reversible
 cleanup.
