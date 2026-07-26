@@ -882,3 +882,13 @@ authenticated client queues production `fullAutoSingle2`. The server owns
 RANDOM-pool damage, exact HAM costs, `s_auto` prose, generated
 `fire_7_single` animation, all three defended timed-state attempts,
 persistence observation, and reversible cleanup.
+
+## Core3 Full Auto Area I
+
+Background-input protocol 191 adds `QueueFullAutoArea1` and
+`FullAutoArea1WeaponStatus` at fixed IDs 298-299. The identity-bound
+CDEF-carbine path proves retained Carbineer Support I ownership before an
+authenticated client queues production `fullAutoArea1`. The server owns the
+Patch 12 zero-time queue, 30-degree cone, RANDOM-pool damage, exact HAM costs,
+`areashot` prose, generated `fire_area` intensity animation, three defended
+native state attempts, persistence observation, and reversible cleanup.

@@ -215,6 +215,13 @@ RANDOM-pool damage, exact costs, `widewildshot` prose, generated
 `fire_7_single` animation, the defended 50-percent native stun attempt,
 persistence evidence, and ownership-safe cleanup.
 
+Milestone 270 advances the bridge to protocol 191 and adds queue and
+weapon-status routes for Carbineer Support I `fullAutoArea1` at commands
+298-299. The server remains authoritative for the Patch 12 zero-time queue,
+30-degree cone, RANDOM-pool damage, exact costs, `areashot` prose, generated
+`fire_area` intensity animation, three defended native state attempts,
+persistence evidence, and ownership-safe cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
