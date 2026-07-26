@@ -912,3 +912,13 @@ authenticated client queues production `fullAutoArea2`. The server owns the
 Patch 12 zero-time queue, 30-degree cone, RANDOM-pool damage, exact HAM costs,
 `a_auto` prose, generated `fire_area` intensity animation, three defended
 native state attempts, persistence observation, and reversible cleanup.
+
+## Core3 Charge Shot II
+
+Background-input protocol 194 adds `QueueChargeShot2` and
+`ChargeShot2WeaponStatus` at fixed IDs 304-305. The identity-bound CDEF-carbine
+path proves retained Carbineer Support IV ownership before an authenticated
+client queues production `chargeShot2`. The server owns the Patch 12
+1.5-second queue, 30-degree cone, RANDOM-pool damage, exact HAM costs,
+`chargeblast` prose, the exact `charge` animation, native knockdown defense and
+recovery, persistence observation, and reversible cleanup.
