@@ -1123,3 +1123,13 @@ path uses the standard bounded repeat count and production toolbar queue. The
 server owns the retained Brawler unarmed tier-two skill chain, Patch 12
 timing, Core3 random-pool damage, generated-intensity `combo_4c` animation,
 60-second STUN application, restart persistence, and reversible cleanup.
+
+## Core3 Intimidate One
+
+Background-input protocol 216 adds `QueueIntimidate1` and
+`Intimidate1WeaponStatus` at fixed IDs 348-349. The identity-bound unarmed
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns the retained Brawler novice chain, Patch 12 timing, Core3
+zero-damage `NO_ATTRIBUTE` delivery, the `intimidate` accuracy skill,
+30-second `STATE_INTIMIDATED` application, restart persistence, and
+reversible cleanup.
