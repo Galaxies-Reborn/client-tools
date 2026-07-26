@@ -1085,3 +1085,13 @@ queue. The server owns the retained Brawler one-hand tier-three skill chain,
 Patch 12 timing, Core3 random-pool damage, generated-intensity `combo_2b`
 animation, 30-second DIZZY application, restart persistence, and reversible
 cleanup.
+
+## Core3 Two-Handed Sweep One
+
+Background-input protocol 212 adds `QueueMelee2hSweep1` and
+`Melee2hSweep1WeaponStatus` at fixed IDs 340-341. The identity-bound
+two-handed path uses the standard bounded repeat count and production toolbar
+queue. The server owns the retained Brawler two-hand tier-three skill chain,
+Patch 12 timing, Core3 random-pool damage, exact
+`lower_posture_2hmelee_3` animation, posture-down application and active
+recovery, restart persistence, and reversible cleanup.
