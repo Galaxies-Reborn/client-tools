@@ -1039,3 +1039,12 @@ server owns retained Rifleman Ability III admission, Patch 12 timing, Core3's
 15-degree cone, random-pool damage, generated `fire_area` animation, ordered
 35-second STUN and posture-up effects, active posture recovery, restart
 persistence, and reversible cleanup.
+
+## Core3 Polearm Lunge One
+
+Background-input protocol 207 adds `QueuePolearmLunge1` and
+`PolearmLunge1WeaponStatus` at fixed IDs 330-331. The identity-bound polearm
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns retained Brawler novice admission, Patch 12 timing, Core3
+random-pool damage, `lower_posture_polearm_2` animation, posture-down
+application and active recovery, restart persistence, and reversible cleanup.
