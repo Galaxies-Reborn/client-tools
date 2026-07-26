@@ -842,6 +842,16 @@ damage and HAM costs, `legshot`/`kneecapshot` prose, exact `test_homing`
 animation, pinned Core3 85/100-percent defended timed stun attempts,
 persistence observation, and reversible cleanup.
 
+## Core3 Wild Shot I
+
+Background-input protocol 189 adds `QueueWildShot1` and
+`WildShot1WeaponStatus` at fixed IDs 294-295. The identity-bound CDEF-carbine
+path proves retained Carbineer Accuracy II ownership before an authenticated
+client queues production `wildShot1`. The server owns RANDOM-pool damage,
+exact HAM costs, `wildshot` prose, generated `fire_7_single` animation, the
+defended 50-percent native stun attempt, persistence observation, and
+reversible cleanup.
+
 ## Core3 Suppression Fire II
 
 Background-input protocol 188 adds `QueueSuppressionFire2` and
