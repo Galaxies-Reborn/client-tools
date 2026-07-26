@@ -1095,3 +1095,12 @@ queue. The server owns the retained Brawler two-hand tier-three skill chain,
 Patch 12 timing, Core3 random-pool damage, exact
 `lower_posture_2hmelee_3` animation, posture-down application and active
 recovery, restart persistence, and reversible cleanup.
+
+## Core3 Polearm Stun One
+
+Background-input protocol 213 adds `QueuePolearmStun1` and
+`PolearmStun1WeaponStatus` at fixed IDs 342-343. The identity-bound polearm
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns the retained Brawler polearm tier-three skill chain, Patch 12
+timing, Core3 random-pool damage, generated-intensity `combo_4a` animation,
+30-second STUN application, restart persistence, and reversible cleanup.
