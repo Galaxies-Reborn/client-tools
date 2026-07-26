@@ -452,11 +452,13 @@ namespace ClientMainNamespace
 		BIC_queueStartleShot2,
 		BIC_startleShot2WeaponStatus,
 		BIC_queueFlushingShot1,
-		BIC_flushingShot1WeaponStatus
+		BIC_flushingShot1WeaponStatus,
+		BIC_queueFlushingShot2,
+		BIC_flushingShot2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 205;
+	LRESULT const cms_backgroundInputProtocolVersion = 206;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -3934,6 +3936,17 @@ namespace ClientMainNamespace
 			case BIC_flushingShot1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus(
 					"flushingShot1");
+
+			case BIC_queueFlushingShot2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"flushingShot2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_flushingShot2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"flushingShot2");
 
 			default:
 				return 0;
