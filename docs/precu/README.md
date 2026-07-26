@@ -999,3 +999,13 @@ server owns Rifleman-master admission, Patch 12 timing, Core3's
 64-meter/60-degree cone, random-pool damage, generated `fire_area` intensity
 animation, the defended 75% native cover removal and ten-second attack delay,
 persistence, expiry, and reversible cleanup.
+
+## Core3 Startle Shot One
+
+Background-input protocol 203 adds `QueueStartleShot1` and
+`StartleShot1WeaponStatus` at fixed IDs 322-323. The identity-bound CDEF-rifle
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns retained Rifleman ability-branch admission, Patch 12 timing,
+Core3 random-pool damage, the `fire_defender_posture_change_up` animation,
+prone-to-crouched posture-up application, active-recovery forced standing,
+restart persistence, and reversible cleanup.
