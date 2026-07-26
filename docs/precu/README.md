@@ -1133,3 +1133,13 @@ server owns the retained Brawler novice chain, Patch 12 timing, Core3
 zero-damage `NO_ATTRIBUTE` delivery, the `intimidate` accuracy skill,
 30-second `STATE_INTIMIDATED` application, restart persistence, and
 reversible cleanup.
+
+## Core3 Intimidate Two
+
+Background-input protocol 217 adds `QueueIntimidate2` and
+`Intimidate2WeaponStatus` at fixed IDs 350-351. The identity-bound unarmed
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns the retained Brawler master chain, Patch 12 timing, Core3
+zero-damage `NO_ATTRIBUTE` delivery, the master `intimidate=20` accuracy
+modifier, 120-second `STATE_INTIMIDATED` application, restart persistence,
+and reversible cleanup.
