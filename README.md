@@ -277,6 +277,12 @@ The bridge transports only the fixture-owned AI OID; production combat owns
 damage, miss accounting, distance/posture thresholds, persistence evidence,
 threat removal, and ownership-safe cleanup.
 
+Milestone 279 advances the bridge to protocol 200 and adds
+`QueueFlurryShot1` plus `FlurryShot1WeaponStatus` at commands 316-317. The
+identity-bound production queue remains server-authoritative for exact rifle
+admission, random-pool damage, generated animation, the defended native dizzy
+attempt, persistence evidence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
