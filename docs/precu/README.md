@@ -962,3 +962,12 @@ client queues production `sniperShot`. The server owns the Patch 12 1.5-second
 queue, fixed 135 random-attribute rifle damage, exact HAM costs, incapacitated
 target admission, the death-blow transition, persistence observation, and
 reversible cleanup.
+
+## Core3 Conceal Shot
+
+Background-input protocol 199 adds targeted `QueueConcealShot` and
+`ConcealShotWeaponStatus` at fixed IDs 314-315. The identity-bound bridge
+supplies only a fixture-owned AI OID and enters the normal toolbar queue. The
+server owns Patch 12 admission and costs, Core3 damage and miss accounting,
+the 40-meter and attacker-posture thresholds, AI threat removal, persistence
+observation, and reversible cleanup.

@@ -438,11 +438,13 @@ namespace ClientMainNamespace
 		BIC_queueSurpriseShot,
 		BIC_surpriseShotWeaponStatus,
 		BIC_queueSniperShot,
-		BIC_sniperShotWeaponStatus
+		BIC_sniperShotWeaponStatus,
+		BIC_queueConcealShot,
+		BIC_concealShotWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 198;
+	LRESULT const cms_backgroundInputProtocolVersion = 199;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -795,6 +797,40 @@ namespace ClientMainNamespace
 				break;
 			}
 		}
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueConcealShot(LPARAM const targetValue)
+	{
+		Object * const player = Game::getPlayer();
+		if (!player || targetValue <= 0 ||
+			Game::getPlayerNetworkId().getValueString() != "44003778")
+			return false;
+
+		char targetBuffer[32];
+		_snprintf(
+			targetBuffer,
+			sizeof(targetBuffer) - 1,
+			"%lld",
+			static_cast<long long>(targetValue));
+		targetBuffer[sizeof(targetBuffer) - 1] = '\0';
+		NetworkId const targetId(targetBuffer);
+		if (!targetId.isValid())
+			return false;
+
+		// The bridge supplies only the fixture-owned AI OID. The production
+		// queue, combat script, result pipeline, miss accounting, and AI hate
+		// map retain authority over the complete concealShot transaction.
+		CuiCombatManager::setLookAtTarget(targetId);
+		CuiCombatManager::setCombatTarget(targetId);
+		clearBackgroundCombatTimerCapture();
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"concealShot",
+			targetId,
+			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
 		return queued;
 	}
@@ -3811,6 +3847,15 @@ namespace ClientMainNamespace
 			case BIC_sniperShotWeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus(
 					"sniperShot");
+
+			case BIC_queueConcealShot:
+				if (!performBackgroundQueueConcealShot(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_concealShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"concealShot");
 
 			default:
 				return 0;
