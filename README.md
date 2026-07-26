@@ -229,6 +229,13 @@ RANDOM-pool damage, exact costs, `chargeshot` prose, the `charge` animation,
 native knockdown defense/recovery, persistence evidence, and ownership-safe
 cleanup.
 
+Milestone 272 advances the bridge to protocol 193 and adds queue and
+weapon-status routes for Carbineer Support III `fullAutoArea2` at commands
+302-303. The server remains authoritative for Patch 12's zero-time queue,
+RANDOM-pool cone damage, exact costs, `a_auto` prose, generated `fire_area`
+intensity animation, three defended native state attempts, persistence
+evidence, and ownership-safe cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
