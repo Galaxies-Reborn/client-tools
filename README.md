@@ -271,6 +271,12 @@ fixed 135 RANDOM-pool rifle damage, exact costs, incapacitated-target
 admission, death-blow semantics, persistence evidence, and ownership-safe
 cleanup.
 
+Milestone 278 advances the bridge to protocol 199 and adds targeted
+`QueueConcealShot` plus `ConcealShotWeaponStatus` routes at commands 314-315.
+The bridge transports only the fixture-owned AI OID; production combat owns
+damage, miss accounting, distance/posture thresholds, persistence evidence,
+threat removal, and ownership-safe cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
