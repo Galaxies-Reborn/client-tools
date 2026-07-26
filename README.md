@@ -217,6 +217,13 @@ costs, `wildshot` prose, generated `fire_7_single` animation, the defended
 50-percent native stun attempt, persistence evidence, and ownership-safe
 cleanup.
 
+Milestone 269 advances the bridge to protocol 190 and adds queue and
+weapon-status routes for Carbineer Accuracy IV `wildShot2` at commands
+296-297. The server remains authoritative for the 30-degree cone,
+RANDOM-pool damage, exact costs, `widewildshot` prose, generated
+`fire_7_single` animation, the defended 50-percent native stun attempt,
+persistence evidence, and ownership-safe cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
