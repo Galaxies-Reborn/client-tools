@@ -1009,3 +1009,13 @@ server owns retained Rifleman ability-branch admission, Patch 12 timing,
 Core3 random-pool damage, the `fire_defender_posture_change_up` animation,
 prone-to-crouched posture-up application, active-recovery forced standing,
 restart persistence, and reversible cleanup.
+
+## Core3 Startle Shot Two
+
+Background-input protocol 204 adds `QueueStartleShot2` and
+`StartleShot2WeaponStatus` at fixed IDs 324-325. The identity-bound CDEF-rifle
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns retained Rifleman Ability IV admission, Patch 12 timing, Core3's
+64-meter/60-degree cone, random-pool damage, the
+`fire_defender_posture_change_up` animation, posture-up application and active
+recovery, restart persistence, and reversible cleanup.

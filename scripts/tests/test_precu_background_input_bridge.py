@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 203", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 203", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 204", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 204", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1389,6 +1389,14 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"StartleShot1WeaponStatus"',
             "QueueStartleShot1 = 322",
             "StartleShot1WeaponStatus = 323",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"startleShot2"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"startleShot2")',
+            "BIC_queueStartleShot2",
+            "BIC_startleShot2WeaponStatus",
+            '"QueueStartleShot2"',
+            '"StartleShot2WeaponStatus"',
+            "QueueStartleShot2 = 324",
+            "StartleShot2WeaponStatus = 325",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
