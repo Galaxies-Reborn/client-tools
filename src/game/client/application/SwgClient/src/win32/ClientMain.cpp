@@ -468,11 +468,13 @@ namespace ClientMainNamespace
 		BIC_queueMelee2hSweep1,
 		BIC_melee2hSweep1WeaponStatus,
 		BIC_queuePolearmStun1,
-		BIC_polearmStun1WeaponStatus
+		BIC_polearmStun1WeaponStatus,
+		BIC_queueUnarmedBlind1,
+		BIC_unarmedBlind1WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 213;
+	LRESULT const cms_backgroundInputProtocolVersion = 214;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -4038,6 +4040,17 @@ namespace ClientMainNamespace
 			case BIC_polearmStun1WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus(
 					"polearmStun1");
+
+			case BIC_queueUnarmedBlind1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"unarmedBlind1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_unarmedBlind1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"unarmedBlind1");
 
 			default:
 				return 0;

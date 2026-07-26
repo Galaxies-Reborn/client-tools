@@ -366,6 +366,12 @@ bounded production queue remains server-authoritative for the retained
 Brawler polearm tier-three chain, exact polearm admission, random-pool damage,
 30-second STUN application, restart persistence, and reversible cleanup.
 
+Milestone 293 advances the bridge to protocol 214 and adds
+`QueueUnarmedBlind1` plus `UnarmedBlind1WeaponStatus` at commands 344-345. The
+bounded production queue remains server-authoritative for the retained
+Brawler unarmed tier-three chain, exact unarmed admission, health-pool damage,
+50-second BLIND application, restart persistence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
