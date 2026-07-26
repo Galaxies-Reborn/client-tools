@@ -922,3 +922,13 @@ client queues production `chargeShot2`. The server owns the Patch 12
 1.5-second queue, 30-degree cone, RANDOM-pool damage, exact HAM costs,
 `chargeblast` prose, the exact `charge` animation, native knockdown defense and
 recovery, persistence observation, and reversible cleanup.
+
+## Core3 Strafe Shot I
+
+Background-input protocol 195 adds `QueueStrafeShot1` and
+`StrafeShot1WeaponStatus` at fixed IDs 306-307. The identity-bound CDEF-rifle
+path proves retained Rifleman novice ownership before an authenticated client
+queues production `strafeShot1`. The server owns the Patch 12 1.5-second
+queue, RANDOM-pool rifle damage, exact HAM costs, `strafeshot` prose,
+generated `fire_5_special_single` animation, cover removal, the ten-second
+next-attack delay, persistence observation, and reversible cleanup.
