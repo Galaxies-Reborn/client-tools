@@ -388,6 +388,13 @@ Brawler unarmed tier-two chain, exact unarmed admission, random-pool damage,
 generated-intensity animation, 60-second STUN application, restart
 persistence, and reversible cleanup.
 
+Milestone 295 advances the bridge to protocol 216 and adds
+`QueueIntimidate1` plus `Intimidate1WeaponStatus` at commands 348-349. The
+bounded production queue remains server-authoritative for the retained
+Brawler novice command, zero-damage `NO_ATTRIBUTE` delivery, the Core3
+`intimidate` accuracy skill, 30-second `STATE_INTIMIDATED` application,
+restart persistence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
