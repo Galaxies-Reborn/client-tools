@@ -243,6 +243,13 @@ RANDOM-pool cone damage, exact costs, `chargeblast` prose, the `charge`
 animation, native knockdown defense/recovery, persistence evidence, and
 ownership-safe cleanup.
 
+Milestone 274 advances the bridge to protocol 195 and adds queue and
+weapon-status routes for Rifleman novice `strafeShot1` at commands 306-307.
+The server remains authoritative for Patch 12's 1.5-second queue,
+RANDOM-pool rifle damage, exact costs, `strafeshot` prose, generated
+`fire_5_special_single` animation, remove-cover resolution, the ten-second
+next-attack delay, persistence evidence, and ownership-safe cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
