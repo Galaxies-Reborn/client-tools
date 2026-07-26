@@ -1066,3 +1066,12 @@ one-handed path uses the standard bounded repeat count and production toolbar
 queue. The server owns retained Brawler novice admission, Patch 12 timing,
 Core3 random-pool damage, `lower_posture_1hmelee_1` animation, posture-down
 application and active recovery, restart persistence, and reversible cleanup.
+
+## Core3 Two-Handed Lunge One
+
+Background-input protocol 210 adds `QueueMelee2hLunge1` and
+`Melee2hLunge1WeaponStatus` at fixed IDs 336-337. The identity-bound
+two-handed path uses the standard bounded repeat count and production toolbar
+queue. The server owns retained Brawler novice admission, Patch 12 timing,
+Core3 random-pool damage, `lower_posture_2hmelee_1` animation, posture-down
+application and active recovery, restart persistence, and reversible cleanup.

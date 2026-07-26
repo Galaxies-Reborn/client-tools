@@ -349,6 +349,12 @@ The bounded production queue remains server-authoritative for Brawler novice
 ownership, exact one-handed admission, random-pool damage, posture-down
 application and recovery, restart persistence, and reversible cleanup.
 
+Milestone 289 advances the bridge to protocol 210 and adds
+`QueueMelee2hLunge1` plus `Melee2hLunge1WeaponStatus` at commands 336-337.
+The bounded production queue remains server-authoritative for Brawler novice
+ownership, exact two-handed admission, random-pool damage, posture-down
+application and recovery, restart persistence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
