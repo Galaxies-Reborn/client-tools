@@ -264,6 +264,13 @@ weapon-status routes for Rifleman Accuracy III `surpriseShot` at commands
 `fire_1_special_single` animation, persistence evidence, and ownership-safe
 cleanup.
 
+Milestone 277 advances the bridge to protocol 198 and adds queue and
+weapon-status routes for Rifleman Accuracy IV `sniperShot` at commands
+312-313. The server remains authoritative for Patch 12's 1.5-second queue,
+fixed 135 RANDOM-pool rifle damage, exact costs, incapacitated-target
+admission, death-blow semantics, persistence evidence, and ownership-safe
+cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

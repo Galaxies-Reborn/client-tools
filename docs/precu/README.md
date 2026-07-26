@@ -952,3 +952,13 @@ client queues production `surpriseShot`. The server owns the Patch 12
 1.5-second queue, RANDOM-pool rifle damage, exact HAM costs, `surpriseshot`
 prose, generated `fire_1_special_single` animation, persistence observation,
 and reversible cleanup.
+
+## Core3 Sniper Shot
+
+Background-input protocol 198 adds `QueueSniperShot` and
+`SniperShotWeaponStatus` at fixed IDs 312-313. The identity-bound CDEF-rifle
+path proves retained Rifleman Accuracy IV ownership before an authenticated
+client queues production `sniperShot`. The server owns the Patch 12 1.5-second
+queue, fixed 135 random-attribute rifle damage, exact HAM costs, incapacitated
+target admission, the death-blow transition, persistence observation, and
+reversible cleanup.
