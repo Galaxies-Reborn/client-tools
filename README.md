@@ -346,6 +346,13 @@ The bounded production queue remains server-authoritative for Brawler novice
 ownership, exact two-handed admission, random-pool damage, posture-down
 application and recovery, restart persistence, and reversible cleanup.
 
+Milestone 290 advances the bridge to protocol 211 and adds
+`QueueMelee1hDizzyHit1` plus `Melee1hDizzyHit1WeaponStatus` at commands
+338-339. The bounded production queue remains server-authoritative for the
+retained Brawler one-hand tier-three chain, exact one-handed admission,
+random-pool damage, DIZZY application, restart persistence, and reversible
+cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
