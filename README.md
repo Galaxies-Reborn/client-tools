@@ -308,6 +308,13 @@ ownership, exact rifle admission, 60-degree cone selection, random-pool
 damage, posture-up transition and recovery behavior, persistence, and
 reversible cleanup.
 
+Milestone 284 advances the bridge to protocol 205 and adds
+`QueueFlushingShot1` plus `FlushingShot1WeaponStatus` at commands 326-327.
+The bounded production queue remains server-authoritative for Rifleman Ability
+I ownership, exact rifle admission, random-pool damage, ordered STUN and
+posture-up application, recovery behavior, persistence, and reversible
+cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

@@ -1019,3 +1019,13 @@ server owns retained Rifleman Ability IV admission, Patch 12 timing, Core3's
 64-meter/60-degree cone, random-pool damage, the
 `fire_defender_posture_change_up` animation, posture-up application and active
 recovery, restart persistence, and reversible cleanup.
+
+## Core3 Flushing Shot One
+
+Background-input protocol 205 adds `QueueFlushingShot1` and
+`FlushingShot1WeaponStatus` at fixed IDs 326-327. The identity-bound CDEF-rifle
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns retained Rifleman Ability I admission, Patch 12 timing, Core3
+random-pool damage, generated `fire_3_special_single` animation, ordered
+35-second STUN and posture-up effects, active posture recovery, restart
+persistence, and reversible cleanup.
