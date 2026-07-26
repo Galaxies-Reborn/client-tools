@@ -369,6 +369,12 @@ Brawler two-hand tier-three chain, exact two-handed admission, random-pool
 damage, posture-down application and active recovery, restart persistence,
 and reversible cleanup.
 
+Milestone 292 advances the bridge to protocol 213 and adds
+`QueuePolearmStun1` plus `PolearmStun1WeaponStatus` at commands 342-343. The
+bounded production queue remains server-authoritative for the retained
+Brawler polearm tier-three chain, exact polearm admission, random-pool damage,
+30-second STUN application, restart persistence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
