@@ -231,6 +231,13 @@ weapon-status routes for Carbineer Support I `fullAutoArea1` at commands
 `fire_area` intensity animation, three defended native state attempts,
 persistence evidence, and ownership-safe cleanup.
 
+Milestone 271 advances the bridge to protocol 192 and adds queue and
+weapon-status routes for Carbineer Support II `chargeShot1` at commands
+300-301. The server remains authoritative for Patch 12's 1.5-second queue,
+RANDOM-pool damage, exact costs, `chargeshot` prose, the `charge` animation,
+native knockdown defense/recovery, persistence evidence, and ownership-safe
+cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
