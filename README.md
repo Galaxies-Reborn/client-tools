@@ -353,6 +353,13 @@ retained Brawler one-hand tier-three chain, exact one-handed admission,
 random-pool damage, DIZZY application, restart persistence, and reversible
 cleanup.
 
+Milestone 291 advances the bridge to protocol 212 and adds
+`QueueMelee2hSweep1` plus `Melee2hSweep1WeaponStatus` at commands 340-341.
+The bounded production queue remains server-authoritative for the retained
+Brawler two-hand tier-three chain, exact two-handed admission, random-pool
+damage, posture-down application and active recovery, restart persistence,
+and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
