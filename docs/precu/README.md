@@ -989,3 +989,13 @@ path uses the standard bounded repeat count and production toolbar queue. The
 server owns Patch 12 timing and rifle admission, Core3's 64-meter/15-degree
 cone, random-pool damage, generated `fire_area` intensity animation, the
 defended 100% native dizzy attempt, persistence, timed recovery, and cleanup.
+
+## Core3 Strafe Shot Two
+
+Background-input protocol 202 adds `QueueStrafeShot2` and
+`StrafeShot2WeaponStatus` at fixed IDs 320-321. The identity-bound CDEF-rifle
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns Rifleman-master admission, Patch 12 timing, Core3's
+64-meter/60-degree cone, random-pool damage, generated `fire_area` intensity
+animation, the defended 75% native cover removal and ten-second attack delay,
+persistence, expiry, and reversible cleanup.
