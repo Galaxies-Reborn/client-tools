@@ -210,6 +210,13 @@ costs, `sup_fire` prose, exact posture-down animation, defended native
 posture-down/recovery behavior, persistence evidence, and ownership-safe
 cleanup.
 
+Milestone 268 advances the bridge to protocol 189 and adds queue and
+weapon-status routes for Carbineer Accuracy II `wildShot1` at commands
+294-295. The server remains authoritative for RANDOM-pool damage, exact
+costs, `wildshot` prose, generated `fire_7_single` animation, the defended
+50-percent native stun attempt, persistence evidence, and ownership-safe
+cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
