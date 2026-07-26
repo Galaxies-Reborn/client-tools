@@ -289,6 +289,12 @@ bounded production queue remains server-authoritative for exact rifle
 admission, 15-degree cone selection, random-pool damage, generated intensity
 animation, defended native dizzy application, persistence, and cleanup.
 
+Milestone 281 advances the bridge to protocol 202 and adds
+`QueueStrafeShot2` plus `StrafeShot2WeaponStatus` at commands 320-321. The
+bounded production queue remains server-authoritative for Rifleman-master
+ownership, exact rifle admission, 60-degree cone selection, random-pool
+damage, generated intensity animation, cover removal, delay, and cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
