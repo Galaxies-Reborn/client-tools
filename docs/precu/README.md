@@ -971,3 +971,12 @@ supplies only a fixture-owned AI OID and enters the normal toolbar queue. The
 server owns Patch 12 admission and costs, Core3 damage and miss accounting,
 the 40-meter and attacker-posture thresholds, AI threat removal, persistence
 observation, and reversible cleanup.
+
+## Core3 Flurry Shot One
+
+Background-input protocol 200 adds `QueueFlurryShot1` and
+`FlurryShot1WeaponStatus` at fixed IDs 316-317. The identity-bound CDEF-rifle
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns Patch 12 timing and rifle admission, Core3 random-pool damage,
+generated `fire_5_special_single` animation, the defended 85% native dizzy
+attempt, persistence observation, timed recovery, and reversible cleanup.

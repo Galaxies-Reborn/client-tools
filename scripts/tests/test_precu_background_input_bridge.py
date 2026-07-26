@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 199", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 199", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 200", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 200", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1357,6 +1357,14 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "QueueConcealShot = 314",
             "ConcealShotWeaponStatus = 315",
             'QueueConcealShot requires -TargetOid.',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"flurryShot1"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"flurryShot1")',
+            "BIC_queueFlurryShot1",
+            "BIC_flurryShot1WeaponStatus",
+            '"QueueFlurryShot1"',
+            '"FlurryShot1WeaponStatus"',
+            "QueueFlurryShot1 = 316",
+            "FlurryShot1WeaponStatus = 317",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
