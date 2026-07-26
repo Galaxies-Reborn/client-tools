@@ -266,6 +266,13 @@ rifle damage, exact HAM costs, `mindbender` prose, generated
 `fire_1_special_single` animation, native bleeding resolution, persistence
 evidence, and ownership-safe cleanup.
 
+Milestone 276 advances the bridge to protocol 197 and adds queue and
+weapon-status routes for Rifleman Accuracy III `surpriseShot` at commands
+310-311. The server remains authoritative for Patch 12's 1.5-second queue,
+3x RANDOM-pool rifle damage, exact costs, `surpriseshot` prose, generated
+`fire_1_special_single` animation, persistence evidence, and ownership-safe
+cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

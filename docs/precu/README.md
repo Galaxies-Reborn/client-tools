@@ -942,3 +942,13 @@ client queues production `mindShot2`. The server owns the Patch 12 1.5-second
 queue, MIND-pool rifle damage, exact HAM costs, `mindbender` prose, generated
 `fire_1_special_single` animation, the native bleeding effect, persistence
 observation, and reversible cleanup.
+
+## Core3 Surprise Shot
+
+Background-input protocol 197 adds `QueueSurpriseShot` and
+`SurpriseShotWeaponStatus` at fixed IDs 310-311. The identity-bound CDEF-rifle
+path proves retained Rifleman Accuracy III ownership before an authenticated
+client queues production `surpriseShot`. The server owns the Patch 12
+1.5-second queue, RANDOM-pool rifle damage, exact HAM costs, `surpriseshot`
+prose, generated `fire_1_special_single` animation, persistence observation,
+and reversible cleanup.
