@@ -842,6 +842,17 @@ damage and HAM costs, `legshot`/`kneecapshot` prose, exact `test_homing`
 animation, pinned Core3 85/100-percent defended timed stun attempts,
 persistence observation, and reversible cleanup.
 
+## Core3 Suppression Fire II
+
+Background-input protocol 188 adds `QueueSuppressionFire2` and
+`SuppressionFire2WeaponStatus` at fixed IDs 292-293. The identity-bound CDEF
+carbine path proves retained Carbineer Ability IV ownership before an
+authenticated client queues production `suppressionFire2`. The server owns
+RANDOM-pool damage, exact HAM costs, `sup_fire` prose, exact
+`fire_defender_posture_change_down` playback, the defended native
+posture-down/recovery transaction, persistence observation, and reversible
+cleanup.
+
 ## Core3 Full Auto Single II
 
 Background-input protocol 187 adds `QueueFullAutoSingle2` and
