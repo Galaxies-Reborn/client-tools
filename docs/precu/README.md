@@ -932,3 +932,13 @@ queues production `strafeShot1`. The server owns the Patch 12 1.5-second
 queue, RANDOM-pool rifle damage, exact HAM costs, `strafeshot` prose,
 generated `fire_5_special_single` animation, cover removal, the ten-second
 next-attack delay, persistence observation, and reversible cleanup.
+
+## Core3 Mind Shot II
+
+Background-input protocol 196 adds `QueueMindShot2` and
+`MindShot2WeaponStatus` at fixed IDs 308-309. The identity-bound CDEF-rifle
+path proves retained Rifleman Accuracy I ownership before an authenticated
+client queues production `mindShot2`. The server owns the Patch 12 1.5-second
+queue, MIND-pool rifle damage, exact HAM costs, `mindbender` prose, generated
+`fire_1_special_single` animation, the native bleeding effect, persistence
+observation, and reversible cleanup.

@@ -250,6 +250,13 @@ RANDOM-pool rifle damage, exact costs, `strafeshot` prose, generated
 `fire_5_special_single` animation, remove-cover resolution, the ten-second
 next-attack delay, persistence evidence, and ownership-safe cleanup.
 
+Milestone 275 advances the bridge to protocol 196 and adds queue and
+weapon-status routes for Rifleman Accuracy I `mindShot2` at commands 308-309.
+The server remains authoritative for Patch 12's 1.5-second queue, MIND-pool
+rifle damage, exact HAM costs, `mindbender` prose, generated
+`fire_1_special_single` animation, native bleeding resolution, persistence
+evidence, and ownership-safe cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
