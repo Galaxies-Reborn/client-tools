@@ -1048,3 +1048,12 @@ path uses the standard bounded repeat count and production toolbar queue. The
 server owns retained Brawler novice admission, Patch 12 timing, Core3
 random-pool damage, `lower_posture_polearm_2` animation, posture-down
 application and active recovery, restart persistence, and reversible cleanup.
+
+## Core3 Unarmed Lunge One
+
+Background-input protocol 208 adds `QueueUnarmedLunge1` and
+`UnarmedLunge1WeaponStatus` at fixed IDs 332-333. The identity-bound unarmed
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns retained Brawler novice admission, Patch 12 timing, Core3
+random-pool damage, `lower_posture_unarmed_1` animation, posture-down
+application and active recovery, restart persistence, and reversible cleanup.
