@@ -194,6 +194,13 @@ exact costs, `s_auto` prose, generated `fire_7_single` animation, three
 independent defended timed-state attempts, persistence evidence, and
 ownership-safe cleanup.
 
+Milestone 267 advances the bridge to protocol 188 and adds queue and
+weapon-status routes for Carbineer Ability IV `suppressionFire2` at commands
+292-293. The server remains authoritative for RANDOM-pool damage, exact
+costs, `sup_fire` prose, exact posture-down animation, defended native
+posture-down/recovery behavior, persistence evidence, and ownership-safe
+cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
