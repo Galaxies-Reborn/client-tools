@@ -1114,3 +1114,12 @@ server owns the retained Brawler unarmed tier-three skill chain, Patch 12
 timing, Core3 random-pool damage, exact `attack_high_center_light_1`
 animation, 50-second BLIND application, restart persistence, and reversible
 cleanup.
+
+## Core3 Unarmed Stun One
+
+Background-input protocol 215 adds `QueueUnarmedStun1` and
+`UnarmedStun1WeaponStatus` at fixed IDs 346-347. The identity-bound unarmed
+path uses the standard bounded repeat count and production toolbar queue. The
+server owns the retained Brawler unarmed tier-two skill chain, Patch 12
+timing, Core3 random-pool damage, generated-intensity `combo_4c` animation,
+60-second STUN application, restart persistence, and reversible cleanup.

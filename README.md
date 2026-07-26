@@ -372,6 +372,13 @@ bounded production queue remains server-authoritative for the retained
 Brawler unarmed tier-three chain, exact unarmed admission, random-pool damage,
 50-second BLIND application, restart persistence, and reversible cleanup.
 
+Milestone 294 advances the bridge to protocol 215 and adds
+`QueueUnarmedStun1` plus `UnarmedStun1WeaponStatus` at commands 346-347. The
+bounded production queue remains server-authoritative for the retained
+Brawler unarmed tier-two chain, exact unarmed admission, random-pool damage,
+generated-intensity animation, 60-second STUN application, restart
+persistence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
