@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 229", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 229", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 230", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 230", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1566,7 +1566,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_healthShot2WeaponStatus",
             '"QueueHealthShot2"',
             '"HealthShot2WeaponStatus"',
-            '"QueuePistolMeleeDefense2", "QueueTumbleToProne", "QueueTumbleToKneeling", "QueueTumbleToStanding", "QueueMelee1hBlindHit1", "QueueMelee1hBlindHit2", "QueueMelee1hScatterHit1", "QueueMelee1hDizzyHit2", "QueueMelee1hScatterHit2", "QueueMelee1hHealthHit1", "QueueMelee1hSpinAttack2", "QueueMelee1hHealthHit2", "QueueMelee1hHit3", "QueuePolearmHit2") }',
+            '"QueuePistolMeleeDefense2", "QueueTumbleToProne", "QueueTumbleToKneeling", "QueueTumbleToStanding", "QueueMelee1hBlindHit1", "QueueMelee1hBlindHit2", "QueueMelee1hScatterHit1", "QueueMelee1hDizzyHit2", "QueueMelee1hScatterHit2", "QueueMelee1hHealthHit1", "QueueMelee1hSpinAttack2", "QueueMelee1hHealthHit2", "QueueMelee1hHit3", "QueuePolearmHit2", "QueuePolearmStun2", "QueuePolearmSpinAttack2") }',
             '"HealthShot2WeaponStatus", "PistolMeleeDefense1WeaponStatus", "PistolMeleeDefense2WeaponStatus") }',
             "QueueHealthShot2 = 366",
             "HealthShot2WeaponStatus = 367",
@@ -1646,6 +1646,22 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"PolearmHit2WeaponStatus"',
             "QueuePolearmHit2 = 385",
             "PolearmHit2WeaponStatus = 386",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"polearmStun2"',
+            'getBackgroundGeneratedCombatWeaponStatus("polearmStun2")',
+            "BIC_queuePolearmStun2",
+            "BIC_polearmStun2WeaponStatus",
+            '"QueuePolearmStun2"',
+            '"PolearmStun2WeaponStatus"',
+            "QueuePolearmStun2 = 387",
+            "PolearmStun2WeaponStatus = 388",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"polearmSpinAttack2"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"polearmSpinAttack2")',
+            "BIC_queuePolearmSpinAttack2",
+            "BIC_polearmSpinAttack2WeaponStatus",
+            '"QueuePolearmSpinAttack2"',
+            '"PolearmSpinAttack2WeaponStatus"',
+            "QueuePolearmSpinAttack2 = 389",
+            "PolearmSpinAttack2WeaponStatus = 390",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
