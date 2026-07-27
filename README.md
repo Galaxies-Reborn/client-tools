@@ -408,6 +408,12 @@ remains server-authoritative for the retained Brawler novice command, a
 24-meter/15-degree zero-damage cone, resisted ten-second next-attack delay,
 restart persistence, and reversible cleanup.
 
+Milestone 298 advances the bridge to protocol 219 and adds `QueueWarcry2`
+plus `Warcry2WeaponStatus` at commands 354-355. The bounded production queue
+remains server-authoritative for the retained Brawler master command, a
+24-meter/30-degree zero-damage cone, resisted twenty-second next-attack delay,
+restart persistence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
