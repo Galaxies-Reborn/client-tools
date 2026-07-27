@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 219", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 219", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 220", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 220", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1515,10 +1515,42 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_warcry2WeaponStatus",
             '"QueueWarcry2"',
             '"Warcry2WeaponStatus"',
-            '"QueueWarcry2") }',
-            '"Warcry2WeaponStatus") }',
             "QueueWarcry2 = 354",
             "Warcry2WeaponStatus = 355",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"polearmLunge2"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"polearmLunge2")',
+            "BIC_queuePolearmLunge2",
+            "BIC_polearmLunge2WeaponStatus",
+            '"QueuePolearmLunge2"',
+            '"PolearmLunge2WeaponStatus"',
+            "QueuePolearmLunge2 = 356",
+            "PolearmLunge2WeaponStatus = 357",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"unarmedLunge2"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"unarmedLunge2")',
+            "BIC_queueUnarmedLunge2",
+            "BIC_unarmedLunge2WeaponStatus",
+            '"QueueUnarmedLunge2"',
+            '"UnarmedLunge2WeaponStatus"',
+            "QueueUnarmedLunge2 = 358",
+            "UnarmedLunge2WeaponStatus = 359",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee1hLunge2"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"melee1hLunge2")',
+            "BIC_queueMelee1hLunge2",
+            "BIC_melee1hLunge2WeaponStatus",
+            '"QueueMelee1hLunge2"',
+            '"Melee1hLunge2WeaponStatus"',
+            "QueueMelee1hLunge2 = 360",
+            "Melee1hLunge2WeaponStatus = 361",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee2hLunge2"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"melee2hLunge2")',
+            "BIC_queueMelee2hLunge2",
+            "BIC_melee2hLunge2WeaponStatus",
+            '"QueueMelee2hLunge2"',
+            '"Melee2hLunge2WeaponStatus"',
+            '"QueueMelee2hLunge2") }',
+            '"Melee2hLunge2WeaponStatus") }',
+            "QueueMelee2hLunge2 = 362",
+            "Melee2hLunge2WeaponStatus = 363",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(

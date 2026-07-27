@@ -1161,3 +1161,16 @@ bounded repeat count and production toolbar queue. The server owns the
 retained Brawler master chain, Patch 12 timing, a Core3 24-meter/30-degree
 zero-damage cone, the master's `warcry=20` accuracy modifier, a resisted
 twenty-second next-attack delay, restart persistence, and reversible cleanup.
+
+## Core3 Brawler Lunge Two Family
+
+Background-input protocol 220 adds `QueuePolearmLunge2`,
+`PolearmLunge2WeaponStatus`, `QueueUnarmedLunge2`,
+`UnarmedLunge2WeaponStatus`, `QueueMelee1hLunge2`,
+`Melee1hLunge2WeaponStatus`, `QueueMelee2hLunge2`, and
+`Melee2hLunge2WeaponStatus` at fixed IDs 356-363. Each identity-bound path
+uses the standard bounded repeat count and production toolbar queue. The
+server owns the complete Brawler master boundary, exact Patch 12 timing and
+weapon restrictions, the four pinned Core3 cost/damage/animation/spam
+profiles, random-pool damage, fixed knockdown/recovery behavior, restart
+persistence, and reversible cleanup.
