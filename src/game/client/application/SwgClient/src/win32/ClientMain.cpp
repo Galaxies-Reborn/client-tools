@@ -492,11 +492,15 @@ namespace ClientMainNamespace
 		BIC_queueTaunt,
 		BIC_tauntWeaponStatus,
 		BIC_queueHealthShot2,
-		BIC_healthShot2WeaponStatus
+		BIC_healthShot2WeaponStatus,
+		BIC_queuePistolMeleeDefense1,
+		BIC_pistolMeleeDefense1WeaponStatus,
+		BIC_queuePistolMeleeDefense2,
+		BIC_pistolMeleeDefense2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 222;
+	LRESULT const cms_backgroundInputProtocolVersion = 223;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -4225,6 +4229,28 @@ namespace ClientMainNamespace
 			case BIC_healthShot2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus(
 					"healthShot2");
+
+			case BIC_queuePistolMeleeDefense1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"pistolMeleeDefense1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_pistolMeleeDefense1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"pistolMeleeDefense1");
+
+			case BIC_queuePistolMeleeDefense2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"pistolMeleeDefense2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_pistolMeleeDefense2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"pistolMeleeDefense2");
 
 			default:
 				return 0;
