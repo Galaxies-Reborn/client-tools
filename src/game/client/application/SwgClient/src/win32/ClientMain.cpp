@@ -504,11 +504,14 @@ namespace ClientMainNamespace
 		BIC_queueMelee1hBlindHit2,
 		BIC_queueMelee1hScatterHit1,
 		BIC_queueMelee1hDizzyHit2,
-		BIC_queueMelee1hScatterHit2
+		BIC_queueMelee1hScatterHit2,
+		BIC_queueMelee1hHealthHit1,
+		BIC_queueMelee1hSpinAttack2,
+		BIC_queueMelee1hHealthHit2
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 226;
+	LRESULT const cms_backgroundInputProtocolVersion = 227;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -4313,6 +4316,27 @@ namespace ClientMainNamespace
 				if (lParam < 1 || lParam > 16 ||
 					!performBackgroundQueueMarksmanTier1(
 						"melee1hScatterHit2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueMelee1hHealthHit1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee1hHealthHit1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueMelee1hSpinAttack2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee1hSpinAttack2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueMelee1hHealthHit2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee1hHealthHit2", static_cast<int>(lParam)))
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
