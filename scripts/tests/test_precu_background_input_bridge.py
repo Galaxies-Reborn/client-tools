@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 222", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 222", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 223", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 223", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1547,7 +1547,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_melee2hLunge2WeaponStatus",
             '"QueueMelee2hLunge2"',
             '"Melee2hLunge2WeaponStatus"',
-            '"QueueMelee2hLunge2", "QueueHealthShot2") }',
+            '"QueueMelee2hLunge2", "QueueHealthShot2", "QueuePistolMeleeDefense1"',
             "QueueMelee2hLunge2 = 362",
             "Melee2hLunge2WeaponStatus = 363",
             "performBackgroundQueueTaunt(lParam)",
@@ -1556,7 +1556,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_tauntWeaponStatus",
             '"QueueTaunt"',
             '"TauntWeaponStatus"',
-            '"TauntWeaponStatus", "HealthShot2WeaponStatus") }',
+            '"TauntWeaponStatus", "HealthShot2WeaponStatus", "PistolMeleeDefense1WeaponStatus"',
             "QueueTaunt = 364",
             "TauntWeaponStatus = 365",
             "QueueTaunt requires -TargetOid.",
@@ -1566,10 +1566,26 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_healthShot2WeaponStatus",
             '"QueueHealthShot2"',
             '"HealthShot2WeaponStatus"',
-            '"QueueHealthShot2") }',
-            '"HealthShot2WeaponStatus") }',
+            '"QueueHealthShot2", "QueuePistolMeleeDefense1", "QueuePistolMeleeDefense2") }',
+            '"HealthShot2WeaponStatus", "PistolMeleeDefense1WeaponStatus", "PistolMeleeDefense2WeaponStatus") }',
             "QueueHealthShot2 = 366",
             "HealthShot2WeaponStatus = 367",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"pistolMeleeDefense1"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"pistolMeleeDefense1")',
+            "BIC_queuePistolMeleeDefense1",
+            "BIC_pistolMeleeDefense1WeaponStatus",
+            '"QueuePistolMeleeDefense1"',
+            '"PistolMeleeDefense1WeaponStatus"',
+            "QueuePistolMeleeDefense1 = 368",
+            "PistolMeleeDefense1WeaponStatus = 369",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"pistolMeleeDefense2"',
+            'getBackgroundGeneratedCombatWeaponStatus(\n\t\t\t\t\t"pistolMeleeDefense2")',
+            "BIC_queuePistolMeleeDefense2",
+            "BIC_pistolMeleeDefense2WeaponStatus",
+            '"QueuePistolMeleeDefense2"',
+            '"PistolMeleeDefense2WeaponStatus"',
+            "QueuePistolMeleeDefense2 = 370",
+            "PistolMeleeDefense2WeaponStatus = 371",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
