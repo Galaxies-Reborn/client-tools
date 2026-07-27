@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 223", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 223", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 224", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 224", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1566,7 +1566,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_healthShot2WeaponStatus",
             '"QueueHealthShot2"',
             '"HealthShot2WeaponStatus"',
-            '"QueueHealthShot2", "QueuePistolMeleeDefense1", "QueuePistolMeleeDefense2") }',
+            '"QueuePistolMeleeDefense2", "QueueTumbleToProne", "QueueTumbleToKneeling", "QueueTumbleToStanding") }',
             '"HealthShot2WeaponStatus", "PistolMeleeDefense1WeaponStatus", "PistolMeleeDefense2WeaponStatus") }',
             "QueueHealthShot2 = 366",
             "HealthShot2WeaponStatus = 367",
@@ -1586,6 +1586,18 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"PistolMeleeDefense2WeaponStatus"',
             "QueuePistolMeleeDefense2 = 370",
             "PistolMeleeDefense2WeaponStatus = 371",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"tumbleToProne"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"tumbleToKneeling"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"tumbleToStanding"',
+            "BIC_queueTumbleToProne",
+            "BIC_queueTumbleToKneeling",
+            "BIC_queueTumbleToStanding",
+            '"QueueTumbleToProne"',
+            '"QueueTumbleToKneeling"',
+            '"QueueTumbleToStanding"',
+            "QueueTumbleToProne = 372",
+            "QueueTumbleToKneeling = 373",
+            "QueueTumbleToStanding = 374",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
