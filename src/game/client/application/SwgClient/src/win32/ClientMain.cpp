@@ -480,11 +480,19 @@ namespace ClientMainNamespace
 		BIC_queueWarcry1,
 		BIC_warcry1WeaponStatus,
 		BIC_queueWarcry2,
-		BIC_warcry2WeaponStatus
+		BIC_warcry2WeaponStatus,
+		BIC_queuePolearmLunge2,
+		BIC_polearmLunge2WeaponStatus,
+		BIC_queueUnarmedLunge2,
+		BIC_unarmedLunge2WeaponStatus,
+		BIC_queueMelee1hLunge2,
+		BIC_melee1hLunge2WeaponStatus,
+		BIC_queueMelee2hLunge2,
+		BIC_melee2hLunge2WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 219;
+	LRESULT const cms_backgroundInputProtocolVersion = 220;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -4116,6 +4124,50 @@ namespace ClientMainNamespace
 			case BIC_warcry2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus(
 					"warcry2");
+
+			case BIC_queuePolearmLunge2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"polearmLunge2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_polearmLunge2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"polearmLunge2");
+
+			case BIC_queueUnarmedLunge2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"unarmedLunge2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_unarmedLunge2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"unarmedLunge2");
+
+			case BIC_queueMelee1hLunge2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee1hLunge2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee1hLunge2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"melee1hLunge2");
+
+			case BIC_queueMelee2hLunge2:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"melee2hLunge2", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_melee2hLunge2WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"melee2hLunge2");
 
 			default:
 				return 0;

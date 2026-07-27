@@ -405,6 +405,13 @@ remains server-authoritative for the retained Brawler master command, a
 24-meter/30-degree zero-damage cone, resisted twenty-second next-attack delay,
 restart persistence, and reversible cleanup.
 
+Milestone 299 advances the bridge to protocol 220 and adds the four Brawler
+master Lunge II queue/status pairs at commands 356-363: polearm, unarmed,
+one-handed, and two-handed. The bounded production queue remains
+server-authoritative for exact weapon admission, per-command HAM and damage
+multipliers, random-pool damage, knockdown/recovery behavior, restart
+persistence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
