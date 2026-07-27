@@ -1152,3 +1152,12 @@ bounded repeat count and production toolbar queue. The server owns the
 retained Brawler novice chain, Patch 12 timing, a Core3 24-meter/15-degree
 zero-damage cone, the `warcry` accuracy skill, a resisted ten-second
 next-attack delay, restart persistence, and reversible cleanup.
+
+## Core3 Warcry Two
+
+Background-input protocol 219 adds `QueueWarcry2` and `Warcry2WeaponStatus`
+at fixed IDs 354-355. The identity-bound unarmed path uses the standard
+bounded repeat count and production toolbar queue. The server owns the
+retained Brawler master chain, Patch 12 timing, a Core3 24-meter/30-degree
+zero-damage cone, the master's `warcry=20` accuracy modifier, a resisted
+twenty-second next-attack delay, restart persistence, and reversible cleanup.
