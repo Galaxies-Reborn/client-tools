@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 232", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 232", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 233", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 233", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1566,7 +1566,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_healthShot2WeaponStatus",
             '"QueueHealthShot2"',
             '"HealthShot2WeaponStatus"',
-            '"QueuePistolMeleeDefense2", "QueueTumbleToProne", "QueueTumbleToKneeling", "QueueTumbleToStanding", "QueueMelee1hBlindHit1", "QueueMelee1hBlindHit2", "QueueMelee1hScatterHit1", "QueueMelee1hDizzyHit2", "QueueMelee1hScatterHit2", "QueueMelee1hHealthHit1", "QueueMelee1hSpinAttack2", "QueueMelee1hHealthHit2", "QueueMelee1hHit3", "QueuePolearmHit2", "QueuePolearmStun2", "QueuePolearmSpinAttack2", "QueuePolearmArea2", "QueuePolearmSweep1", "QueuePolearmSweep2") }',
+            '"QueuePistolMeleeDefense2", "QueueTumbleToProne", "QueueTumbleToKneeling", "QueueTumbleToStanding", "QueueMelee1hBlindHit1", "QueueMelee1hBlindHit2", "QueueMelee1hScatterHit1", "QueueMelee1hDizzyHit2", "QueueMelee1hScatterHit2", "QueueMelee1hHealthHit1", "QueueMelee1hSpinAttack2", "QueueMelee1hHealthHit2", "QueueMelee1hHit3", "QueuePolearmHit2", "QueuePolearmStun2", "QueuePolearmSpinAttack2", "QueuePolearmArea2", "QueuePolearmSweep1", "QueuePolearmSweep2", "QueuePolearmActionHit1", "QueuePolearmActionHit2") }',
             '"HealthShot2WeaponStatus", "PistolMeleeDefense1WeaponStatus", "PistolMeleeDefense2WeaponStatus") }',
             "QueueHealthShot2 = 366",
             "HealthShot2WeaponStatus = 367",
@@ -1686,6 +1686,22 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"PolearmSweep2WeaponStatus"',
             "QueuePolearmSweep2 = 395",
             "PolearmSweep2WeaponStatus = 396",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"polearmActionHit1"',
+            'getBackgroundGeneratedCombatWeaponStatus("polearmActionHit1")',
+            "BIC_queuePolearmActionHit1",
+            "BIC_polearmActionHit1WeaponStatus",
+            '"QueuePolearmActionHit1"',
+            '"PolearmActionHit1WeaponStatus"',
+            "QueuePolearmActionHit1 = 397",
+            "PolearmActionHit1WeaponStatus = 398",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"polearmActionHit2"',
+            'getBackgroundGeneratedCombatWeaponStatus("polearmActionHit2")',
+            "BIC_queuePolearmActionHit2",
+            "BIC_polearmActionHit2WeaponStatus",
+            '"QueuePolearmActionHit2"',
+            '"PolearmActionHit2WeaponStatus"',
+            "QueuePolearmActionHit2 = 399",
+            "PolearmActionHit2WeaponStatus = 400",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
