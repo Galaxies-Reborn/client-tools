@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 226", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 226", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 227", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 227", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1566,7 +1566,7 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "BIC_healthShot2WeaponStatus",
             '"QueueHealthShot2"',
             '"HealthShot2WeaponStatus"',
-            '"QueuePistolMeleeDefense2", "QueueTumbleToProne", "QueueTumbleToKneeling", "QueueTumbleToStanding", "QueueMelee1hBlindHit1", "QueueMelee1hBlindHit2", "QueueMelee1hScatterHit1", "QueueMelee1hDizzyHit2", "QueueMelee1hScatterHit2") }',
+            '"QueuePistolMeleeDefense2", "QueueTumbleToProne", "QueueTumbleToKneeling", "QueueTumbleToStanding", "QueueMelee1hBlindHit1", "QueueMelee1hBlindHit2", "QueueMelee1hScatterHit1", "QueueMelee1hDizzyHit2", "QueueMelee1hScatterHit2", "QueueMelee1hHealthHit1", "QueueMelee1hSpinAttack2", "QueueMelee1hHealthHit2") }',
             '"HealthShot2WeaponStatus", "PistolMeleeDefense1WeaponStatus", "PistolMeleeDefense2WeaponStatus") }',
             "QueueHealthShot2 = 366",
             "HealthShot2WeaponStatus = 367",
@@ -1618,6 +1618,18 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "QueueMelee1hScatterHit1 = 377",
             "QueueMelee1hDizzyHit2 = 378",
             "QueueMelee1hScatterHit2 = 379",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee1hHealthHit1"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee1hSpinAttack2"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee1hHealthHit2"',
+            "BIC_queueMelee1hHealthHit1",
+            "BIC_queueMelee1hSpinAttack2",
+            "BIC_queueMelee1hHealthHit2",
+            '"QueueMelee1hHealthHit1"',
+            '"QueueMelee1hSpinAttack2"',
+            '"QueueMelee1hHealthHit2"',
+            "QueueMelee1hHealthHit1 = 380",
+            "QueueMelee1hSpinAttack2 = 381",
+            "QueueMelee1hHealthHit2 = 382",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
