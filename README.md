@@ -402,6 +402,12 @@ Brawler master command, master `intimidate=20` accuracy, zero-damage
 `NO_ATTRIBUTE` delivery, 120-second `STATE_INTIMIDATED` application,
 restart persistence, and reversible cleanup.
 
+Milestone 297 advances the bridge to protocol 218 and adds `QueueWarcry1`
+plus `Warcry1WeaponStatus` at commands 352-353. The bounded production queue
+remains server-authoritative for the retained Brawler novice command, a
+24-meter/15-degree zero-damage cone, resisted ten-second next-attack delay,
+restart persistence, and reversible cleanup.
+
 ## Additional Dependencies
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 

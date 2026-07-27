@@ -1143,3 +1143,12 @@ server owns the retained Brawler master chain, Patch 12 timing, Core3
 zero-damage `NO_ATTRIBUTE` delivery, the master `intimidate=20` accuracy
 modifier, 120-second `STATE_INTIMIDATED` application, restart persistence,
 and reversible cleanup.
+
+## Core3 Warcry One
+
+Background-input protocol 218 adds `QueueWarcry1` and `Warcry1WeaponStatus`
+at fixed IDs 352-353. The identity-bound unarmed path uses the standard
+bounded repeat count and production toolbar queue. The server owns the
+retained Brawler novice chain, Patch 12 timing, a Core3 24-meter/15-degree
+zero-damage cone, the `warcry` accuracy skill, a resisted ten-second
+next-attack delay, restart persistence, and reversible cleanup.
