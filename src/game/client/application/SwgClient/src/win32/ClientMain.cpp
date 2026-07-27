@@ -476,11 +476,13 @@ namespace ClientMainNamespace
 		BIC_queueIntimidate1,
 		BIC_intimidate1WeaponStatus,
 		BIC_queueIntimidate2,
-		BIC_intimidate2WeaponStatus
+		BIC_intimidate2WeaponStatus,
+		BIC_queueWarcry1,
+		BIC_warcry1WeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 217;
+	LRESULT const cms_backgroundInputProtocolVersion = 218;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -4090,6 +4092,17 @@ namespace ClientMainNamespace
 			case BIC_intimidate2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus(
 					"intimidate2");
+
+			case BIC_queueWarcry1:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"warcry1", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_warcry1WeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus(
+					"warcry1");
 
 			default:
 				return 0;
