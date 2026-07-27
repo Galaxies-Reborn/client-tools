@@ -488,11 +488,13 @@ namespace ClientMainNamespace
 		BIC_queueMelee1hLunge2,
 		BIC_melee1hLunge2WeaponStatus,
 		BIC_queueMelee2hLunge2,
-		BIC_melee2hLunge2WeaponStatus
+		BIC_melee2hLunge2WeaponStatus,
+		BIC_queueTaunt,
+		BIC_tauntWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 220;
+	LRESULT const cms_backgroundInputProtocolVersion = 221;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -877,6 +879,40 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"concealShot",
+			targetId,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueTaunt(LPARAM const targetValue)
+	{
+		Object * const player = Game::getPlayer();
+		if (!player || targetValue <= 0 ||
+			Game::getPlayerNetworkId().getValueString() != "44003778")
+			return false;
+
+		char targetBuffer[32];
+		_snprintf(
+			targetBuffer,
+			sizeof(targetBuffer) - 1,
+			"%lld",
+			static_cast<long long>(targetValue));
+		targetBuffer[sizeof(targetBuffer) - 1] = '\0';
+		NetworkId const targetId(targetBuffer);
+		if (!targetId.isValid())
+			return false;
+
+		// The bridge supplies only the fixture-owned AI OID. The production
+		// command queue, taunt roll, AI hate map, and timed restoration retain
+		// authority over the complete transaction.
+		CuiCombatManager::setLookAtTarget(targetId);
+		CuiCombatManager::setCombatTarget(targetId);
+		clearBackgroundCombatTimerCapture();
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"taunt",
 			targetId,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -4168,6 +4204,14 @@ namespace ClientMainNamespace
 			case BIC_melee2hLunge2WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus(
 					"melee2hLunge2");
+
+			case BIC_queueTaunt:
+				if (!performBackgroundQueueTaunt(lParam))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_tauntWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("taunt");
 
 			default:
 				return 0;
