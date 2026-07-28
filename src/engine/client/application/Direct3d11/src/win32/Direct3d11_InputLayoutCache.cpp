@@ -35,6 +35,12 @@ namespace Direct3d11_InputLayoutCacheNamespace
 		int8    textureCoordinateSetMapping[Direct3d11_InputLayoutCache::MAX_TEXTURE_COORDINATE_SETS];
 		int     mappingCount;
 
+		// The bone stream slot, or -1. Part of the key because the same vertex format drawn skinned
+		// and unskinned needs two different layouts -- the skinned one carries BLENDINDICES0 and
+		// BLENDWEIGHT0 and the other does not -- and without this they would alias to whichever was
+		// built first.
+		int     boneStream;
+
 		bool operator<(Key const &rhs) const
 		{
 			return memcmp(this, &rhs, sizeof(Key)) < 0;
@@ -54,7 +60,7 @@ namespace Direct3d11_InputLayoutCacheNamespace
 
 	uint32     hashBytes(void const *data, unsigned int size);
 	int        locateTextureCoordinateSets(uint32 const *formatFlags, int streamCount, SetLocation *locations, int maxLocations);
-	int        buildElements(uint32 const *formatFlags, int streamCount, int const *mapping, int mappingCount, D3D11_INPUT_ELEMENT_DESC *elements, int maxElements);
+	int        buildElements(uint32 const *formatFlags, int streamCount, int const *mapping, int mappingCount, D3D11_INPUT_ELEMENT_DESC *elements, int maxElements, int boneStream);
 }
 using namespace Direct3d11_InputLayoutCacheNamespace;
 
@@ -110,7 +116,7 @@ uint32 Direct3d11_InputLayoutCacheNamespace::hashBytes(void const *data, unsigne
  * builds one flat table over every bound stream.
  */
 
-int Direct3d11_InputLayoutCacheNamespace::buildElements(uint32 const *formatFlags, int streamCount, int const *mapping, int mappingCount, D3D11_INPUT_ELEMENT_DESC *elements, int maxElements)
+int Direct3d11_InputLayoutCacheNamespace::buildElements(uint32 const *formatFlags, int streamCount, int const *mapping, int mappingCount, D3D11_INPUT_ELEMENT_DESC *elements, int maxElements, int boneStream)
 {
 	int elementCount = 0;
 
@@ -187,6 +193,41 @@ int Direct3d11_InputLayoutCacheNamespace::buildElements(uint32 const *formatFlag
 			element.InputSlotClass    = D3D11_INPUT_PER_VERTEX_DATA;
 		}
 
+	}
+
+	// ------------------------------------------------------------------
+	// GPU skinning, when the draw supplies a bone stream.
+	//
+	// This stream is not one the engine describes through a vertex buffer format -- it is built by
+	// the skinning primitive to a layout this backend fixes, so the offsets are constants rather
+	// than descriptor lookups. The skinned vertex program variant declares exactly these two
+	// semantics and the unskinned variant declares neither, which is why boneStream is what decides.
+
+	if (boneStream >= 0)
+	{
+		FATAL(elementCount + 2 > maxElements, ("Direct3d11: too many input elements to add the bone stream"));
+
+		{
+			D3D11_INPUT_ELEMENT_DESC &element = elements[elementCount++];
+			Zero(element);
+			element.SemanticName      = "BLENDINDICES";
+			element.SemanticIndex     = 0;
+			element.Format            = DXGI_FORMAT_R8G8B8A8_UINT;
+			element.InputSlot         = static_cast<UINT>(boneStream);
+			element.AlignedByteOffset = static_cast<UINT>(Direct3d11_InputLayoutCache::BONE_INDICES_OFFSET);
+			element.InputSlotClass    = D3D11_INPUT_PER_VERTEX_DATA;
+		}
+
+		{
+			D3D11_INPUT_ELEMENT_DESC &element = elements[elementCount++];
+			Zero(element);
+			element.SemanticName      = "BLENDWEIGHT";
+			element.SemanticIndex     = 0;
+			element.Format            = DXGI_FORMAT_R8G8B8A8_UNORM;
+			element.InputSlot         = static_cast<UINT>(boneStream);
+			element.AlignedByteOffset = static_cast<UINT>(Direct3d11_InputLayoutCache::BONE_WEIGHTS_OFFSET);
+			element.InputSlotClass    = D3D11_INPUT_PER_VERTEX_DATA;
+		}
 	}
 
 	// ------------------------------------------------------------------
@@ -352,7 +393,7 @@ uint32 Direct3d11_InputLayoutCache::hashVertexShaderSignature(void const *vertex
 
 // ----------------------------------------------------------------------
 
-ID3D11InputLayout *Direct3d11_InputLayoutCache::getInputLayout(uint32 const *formatFlags, int streamCount, void const *vertexShaderBytecode, unsigned int vertexShaderBytecodeSize, uint32 signatureHash, int const *textureCoordinateSetMapping, int mappingCount)
+ID3D11InputLayout *Direct3d11_InputLayoutCache::getInputLayout(uint32 const *formatFlags, int streamCount, void const *vertexShaderBytecode, unsigned int vertexShaderBytecodeSize, uint32 signatureHash, int const *textureCoordinateSetMapping, int mappingCount, int boneStream)
 {
 	NOT_NULL(ms_layouts);
 	NOT_NULL(formatFlags);
@@ -373,6 +414,7 @@ ID3D11InputLayout *Direct3d11_InputLayoutCache::getInputLayout(uint32 const *for
 	DEBUG_FATAL(mappingCount < 0 || mappingCount > MAX_TEXTURE_COORDINATE_SETS, ("Direct3d11: a shader declares %d texture coordinate set tags; the engine supports %d.", mappingCount, static_cast<int>(MAX_TEXTURE_COORDINATE_SETS)));
 
 	key.mappingCount = mappingCount;
+	key.boneStream = boneStream;
 	for (int i = 0; i < mappingCount && i < MAX_TEXTURE_COORDINATE_SETS; ++i)
 		key.textureCoordinateSetMapping[i] = static_cast<int8>(textureCoordinateSetMapping[i]);
 
@@ -383,7 +425,7 @@ ID3D11InputLayout *Direct3d11_InputLayoutCache::getInputLayout(uint32 const *for
 		return existing->second;
 
 	D3D11_INPUT_ELEMENT_DESC elements[32];
-	int const elementCount = buildElements(formatFlags, streamCount, textureCoordinateSetMapping, mappingCount, elements, 32);
+	int const elementCount = buildElements(formatFlags, streamCount, textureCoordinateSetMapping, mappingCount, elements, 32, boneStream);
 
 	ID3D11InputLayout *layout = NULL;
 

@@ -100,6 +100,22 @@ namespace SkinningCostReport
 	int  ms_maximumInfluences;
 	int  ms_maximumSkeletonTransforms;
 
+	// How much of the skinning cost GPU skinning can actually recover.
+	//
+	// Skeletal shadow volumes are fed m_systemStream, which is the CPU-skinned buffer, so a
+	// character that casts a volumetric shadow needs its skinned positions in CPU memory whatever
+	// the GPU does. For those, GPU skinning removes only the copy to the dynamic buffer. Only
+	// primitives that skip the shadow path can drop the transform entirely.
+	int  ms_shadowCastingPrimitives;
+	int  ms_totalPrimitives;
+
+	void noteShadowPath(bool castsShadow)
+	{
+		++ms_totalPrimitives;
+		if (castsShadow)
+			++ms_shadowCastingPrimitives;
+	}
+
 	void noteVertexFormat(int influences, int skeletonTransforms)
 	{
 		if (influences > ms_maximumInfluences)
@@ -141,6 +157,13 @@ namespace SkinningCostReport
 			perSecond, perSecond / 10.0,
 			static_cast<double>(ms_vertices) / seconds,
 			static_cast<double>(ms_calls) / seconds));
+
+		WARNING(true, ("SkinningRecoverable: %d of %d skinned primitive(s) cast a volumetric shadow and so still need CPU-skinned positions; %.0f%% could drop the CPU transform entirely.",
+			ms_shadowCastingPrimitives, ms_totalPrimitives,
+			ms_totalPrimitives ? (100.0 * static_cast<double>(ms_totalPrimitives - ms_shadowCastingPrimitives) / static_cast<double>(ms_totalPrimitives)) : 0.0));
+
+		ms_shadowCastingPrimitives = 0;
+		ms_totalPrimitives = 0;
 
 		WARNING(true, ("SkinningFormat: at most %d influence(s) on a vertex and %d transform(s) in a skeleton. Influence histogram 1..8+: %d %d %d %d %d %d %d %d.",
 			ms_maximumInfluences, ms_maximumSkeletonTransforms,
@@ -687,6 +710,8 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 		&& !m_appearance.getIsHolonet()
 		)
 	{
+		SkinningCostReport::noteShadowPath(true);
+
 		//-- Create shadow volume.
 		if (!m_shadowVolume)
 			m_shadowVolume = new ShadowVolume(m_shader->usesVertexShader () ? ShadowVolume::ST_vertexShader : ShadowVolume::ST_fixedFunction, ShadowVolume::PT_animating, m_appearance.getAppearanceTemplate()->getName());
@@ -696,6 +721,8 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 	}
 	else
 	{
+		SkinningCostReport::noteShadowPath(false);
+
 		if (m_shadowVolume)
 		{
 			delete m_shadowVolume;

@@ -34,6 +34,57 @@ namespace Direct3d11_ShaderSignatureNamespace
 		"\tfloat4 swgTexCoord7 : TEXCOORD7;\n"
 		"};\n";
 
+	// The skinning prologue, injected ahead of the shipped program in a skinned variant.
+	//
+	// b4 matches Direct3d11_ConstantBuffers::SKINNING_BONES_SLOT. Rows are 3x4 -- the fourth row of
+	// an affine transform is constant, so it is reconstructed here rather than stored.
+	//
+	// Weights are renormalised rather than trusted. The engine allows up to six influences per
+	// vertex and this format carries four; measurement put five or six on 0.44% of vertices, so the
+	// dropped weight is small but not always zero, and renormalising keeps those vertices on the
+	// surface instead of shrinking them toward the origin.
+	char const cms_skinningPrologue[] =
+		"cbuffer SwgSkinning : register(b4)\n"
+		"{\n"
+		"\tfloat4 swgBoneRows[192];\n"
+		"};\n"
+		"\n"
+		"float4x3 swgBoneMatrix(uint index)\n"
+		"{\n"
+		"\tuint const row = index * 3u;\n"
+		"\treturn float4x3(\n"
+		"\t\tfloat3(swgBoneRows[row + 0u].x, swgBoneRows[row + 1u].x, swgBoneRows[row + 2u].x),\n"
+		"\t\tfloat3(swgBoneRows[row + 0u].y, swgBoneRows[row + 1u].y, swgBoneRows[row + 2u].y),\n"
+		"\t\tfloat3(swgBoneRows[row + 0u].z, swgBoneRows[row + 1u].z, swgBoneRows[row + 2u].z),\n"
+		"\t\tfloat3(swgBoneRows[row + 0u].w, swgBoneRows[row + 1u].w, swgBoneRows[row + 2u].w));\n"
+		"}\n"
+		"\n"
+		"void swgSkin(inout float3 position, inout float3 normal, uint4 indices, float4 weights)\n"
+		"{\n"
+		"\tfloat const total = weights.x + weights.y + weights.z + weights.w;\n"
+		"\tweights = (total > 0.0f) ? (weights / total) : float4(1.0f, 0.0f, 0.0f, 0.0f);\n"
+		"\n"
+		"\tfloat3 skinnedPosition = 0.0f;\n"
+		"\tfloat3 skinnedNormal = 0.0f;\n"
+		"\n"
+		"\t[unroll]\n"
+		"\tfor (uint i = 0u; i < 4u; ++i)\n"
+		"\t{\n"
+		"\t\tfloat const weight = weights[i];\n"
+		"\t\tfloat4x3 const bone = swgBoneMatrix(indices[i]);\n"
+		"\t\tskinnedPosition += mul(float4(position, 1.0f), bone) * weight;\n"
+		"\t\tskinnedNormal   += mul(float4(normal,   0.0f), bone) * weight;\n"
+		"\t}\n"
+		"\n"
+		"\tposition = skinnedPosition;\n"
+		"\tnormal = normalize(skinnedNormal);\n"
+		"}\n";
+
+	// The names the injected parameters carry. They are on the generated main rather than in the
+	// shipped input struct, so the shipped declaration is never rewritten.
+	char const cms_boneIndicesName[] = "swgBoneIndices";
+	char const cms_boneWeightsName[] = "swgBoneWeights";
+
 	struct Slot
 	{
 		char const *semantic;
@@ -478,7 +529,7 @@ char *Direct3d11_ShaderSignatureNamespace::duplicate(std::string const &text, in
  * member it declared into the matching canonical slot.
  */
 
-char *Direct3d11_ShaderSignature::wrapVertexProgram(char const *name, char const *source, int length, int &resultLength)
+char *Direct3d11_ShaderSignature::wrapVertexProgram(char const *name, char const *source, int length, int &resultLength, bool skinned)
 {
 	// Everything past the first NUL is invisible to the compiler, so it is invisible here too --
 	// otherwise the wrapper appended below lands after it. See compilableLength.
@@ -562,9 +613,43 @@ char *Direct3d11_ShaderSignature::wrapVertexProgram(char const *name, char const
 
 	result.append("\n\n");
 	result.append(cms_interpolants);
+
+	if (skinned)
+		result.append(cms_skinningPrologue);
+
 	result.append("\nSwgInterpolants main(");
 	result.append(parameters);
-	result.append(")\n{\n\t");
+
+	// Bone data as extra parameters on the generated entry point. The shipped input struct is left
+	// exactly as the asset declares it; only this wrapper knows about skinning.
+	if (skinned)
+	{
+		result.append(", uint4 ");
+		result.append(cms_boneIndicesName);
+		result.append(" : BLENDINDICES0, float4 ");
+		result.append(cms_boneWeightsName);
+		result.append(" : BLENDWEIGHT0");
+	}
+
+	result.append(")\n{\n");
+
+	// Skin before the shipped program runs, so it sees an already-skinned position and normal and
+	// needs no knowledge of any of this. The input struct is a by-value parameter, so modifying it
+	// here is local to this call.
+	if (skinned)
+	{
+		result.append("\tswgSkin(");
+		result.append(argument);
+		result.append(".position.xyz, ");
+		result.append(argument);
+		result.append(".normal.xyz, ");
+		result.append(cms_boneIndicesName);
+		result.append(", ");
+		result.append(cms_boneWeightsName);
+		result.append(");\n\n");
+	}
+
+	result.append("\t");
 	result.append(returnType);
 	result.append(" swgOriginal = swgVertexMain(");
 	result.append(argument);
