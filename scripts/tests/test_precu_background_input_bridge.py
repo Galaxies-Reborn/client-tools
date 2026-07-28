@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 245", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 245", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 246", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 246", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1860,6 +1860,30 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "SprayShotWeaponStatus = 439",
             "QueueFastBlast = 440",
             "FastBlastWeaponStatus = 441",
+            "BIC_queuePanicShot",
+            "BIC_panicShotWeaponStatus",
+            "BIC_queueLowBlow",
+            "BIC_lowBlowWeaponStatus",
+            "BIC_queueLastDitch",
+            "BIC_lastDitchWeaponStatus",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"panicShot"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"lowBlow"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"lastDitch"',
+            'getBackgroundGeneratedCombatWeaponStatus("panicShot")',
+            'getBackgroundGeneratedCombatWeaponStatus("lowBlow")',
+            'getBackgroundGeneratedCombatWeaponStatus("lastDitch")',
+            '"QueuePanicShot"',
+            '"PanicShotWeaponStatus"',
+            '"QueueLowBlow"',
+            '"LowBlowWeaponStatus"',
+            '"QueueLastDitch"',
+            '"LastDitchWeaponStatus"',
+            "QueuePanicShot = 442",
+            "PanicShotWeaponStatus = 443",
+            "QueueLowBlow = 444",
+            "LowBlowWeaponStatus = 445",
+            "QueueLastDitch = 446",
+            "LastDitchWeaponStatus = 447",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
