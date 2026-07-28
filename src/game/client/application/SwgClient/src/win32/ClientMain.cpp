@@ -545,11 +545,12 @@ namespace ClientMainNamespace
 		BIC_queueUnarmedKnockdown1,
 		BIC_unarmedKnockdown1WeaponStatus,
 		BIC_queueUnarmedKnockdown2,
-		BIC_unarmedKnockdown2WeaponStatus
+		BIC_unarmedKnockdown2WeaponStatus,
+		BIC_queueMeditate
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 239;
+	LRESULT const cms_backgroundInputProtocolVersion = 240;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1190,6 +1191,23 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"berserk1",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueMeditate()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Meditate is the Teras Kasi novice's nonqueued self-state command.
+		// The server owns sitting/combat admission and the recurring heal task.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"meditate",
 			NetworkId::cms_invalid,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -3051,6 +3069,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueBerserk1:
 				if (!performBackgroundQueueBerserk1())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueMeditate:
+				if (!performBackgroundQueueMeditate())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
