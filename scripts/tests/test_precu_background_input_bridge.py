@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 236", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 236", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 237", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 237", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1742,6 +1742,22 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"Melee2hSweep2WeaponStatus"',
             "QueueMelee2hSweep2 = 409",
             "Melee2hSweep2WeaponStatus = 410",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee2hMindHit1"',
+            'getBackgroundGeneratedCombatWeaponStatus("melee2hMindHit1")',
+            "BIC_queueMelee2hMindHit1",
+            "BIC_melee2hMindHit1WeaponStatus",
+            '"QueueMelee2hMindHit1"',
+            '"Melee2hMindHit1WeaponStatus"',
+            "QueueMelee2hMindHit1 = 411",
+            "Melee2hMindHit1WeaponStatus = 412",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"melee2hMindHit2"',
+            'getBackgroundGeneratedCombatWeaponStatus("melee2hMindHit2")',
+            "BIC_queueMelee2hMindHit2",
+            "BIC_melee2hMindHit2WeaponStatus",
+            '"QueueMelee2hMindHit2"',
+            '"Melee2hMindHit2WeaponStatus"',
+            "QueueMelee2hMindHit2 = 413",
+            "Melee2hMindHit2WeaponStatus = 414",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
