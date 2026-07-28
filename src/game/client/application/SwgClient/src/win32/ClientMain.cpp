@@ -566,11 +566,17 @@ namespace ClientMainNamespace
 		BIC_queueSprayShot,
 		BIC_sprayShotWeaponStatus,
 		BIC_queueFastBlast,
-		BIC_fastBlastWeaponStatus
+		BIC_fastBlastWeaponStatus,
+		BIC_queuePanicShot,
+		BIC_panicShotWeaponStatus,
+		BIC_queueLowBlow,
+		BIC_lowBlowWeaponStatus,
+		BIC_queueLastDitch,
+		BIC_lastDitchWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 245;
+	LRESULT const cms_backgroundInputProtocolVersion = 246;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -3689,6 +3695,36 @@ namespace ClientMainNamespace
 
 			case BIC_fastBlastWeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("fastBlast");
+
+			case BIC_queuePanicShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"panicShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_panicShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("panicShot");
+
+			case BIC_queueLowBlow:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"lowBlow", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_lowBlowWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("lowBlow");
+
+			case BIC_queueLastDitch:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"lastDitch", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_lastDitchWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("lastDitch");
 
 			case BIC_queuePolearmArea1:
 				if (lParam < 1 || lParam > 16 ||
