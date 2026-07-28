@@ -139,6 +139,14 @@ namespace SkinningCostReport
 			++ms_shadowCastingPrimitives;
 	}
 
+	int ms_gpuSkinnedPrimitives;
+
+	void noteGpuPath(bool gpuSkinned)
+	{
+		if (gpuSkinned)
+			++ms_gpuSkinnedPrimitives;
+	}
+
 	void noteVertexFormat(int influences, int skeletonTransforms)
 	{
 		if (influences > ms_maximumInfluences)
@@ -185,8 +193,15 @@ namespace SkinningCostReport
 			ms_shadowCastingPrimitives, ms_totalPrimitives,
 			ms_totalPrimitives ? (100.0 * static_cast<double>(ms_totalPrimitives - ms_shadowCastingPrimitives) / static_cast<double>(ms_totalPrimitives)) : 0.0));
 
+		// Without this the ms/s above cannot be attributed: a small improvement looks identical
+		// whether the GPU path ran on most primitives or hardly engaged.
+		WARNING(true, ("SkinningGpu: %d of %d skinned primitive(s) blended on the GPU (%.0f%%). The rest fell back: shadowed, dot3, single-stream, or too many bones.",
+			ms_gpuSkinnedPrimitives, ms_totalPrimitives,
+			ms_totalPrimitives ? (100.0 * static_cast<double>(ms_gpuSkinnedPrimitives) / static_cast<double>(ms_totalPrimitives)) : 0.0));
+
 		ms_shadowCastingPrimitives = 0;
 		ms_totalPrimitives = 0;
+		ms_gpuSkinnedPrimitives = 0;
 
 		WARNING(true, ("SkinningFormat: at most %d influence(s) on a vertex and %d transform(s) in a skeleton. Influence histogram 1..8+: %d %d %d %d %d %d %d %d.",
 			ms_maximumInfluences, ms_maximumSkeletonTransforms,
@@ -853,6 +868,8 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 		&& !m_appearance.getIsHolonet();
 
 	const bool gpuSkinned = !castsVolumetricShadow && tryGpuSkin(transformCount, transformArray);
+
+	SkinningCostReport::noteGpuPath(gpuSkinned);
 
 	//-- Setup which vertex buffers will be used for rendering and compute vertex buffer data.
 	if (gpuSkinned)

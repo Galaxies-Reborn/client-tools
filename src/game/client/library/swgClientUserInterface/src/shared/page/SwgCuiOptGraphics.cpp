@@ -176,10 +176,17 @@ m_sliderGamma      (0)
 	registerSlider (*slider, GroundScene::setCameraFarPlane, GroundScene::getCameraFarPlane, ConfigClientGame::getCameraFarPlane, 1024.0f, 4096.0f);
 
 	getCodeDataObject (TUISliderbar, slider, "sliderStaticLodBias");
-	registerSlider (*slider, DetailAppearance::setDetailLevelBias, DetailAppearance::getDetailLevelBias, ConfigClientObject::getDetailLevelBias, 0.5f, 2.0f);
+	// Up to 16x rather than 2x. This multiplies each asset's own near and far LOD distances, so
+	// the top of the slider is a genuine 16x switch distance -- which is what it takes to keep a
+	// building or a crate at its highest detail level past 100m.
+	registerSlider (*slider, DetailAppearance::setDetailLevelBias, DetailAppearance::getDetailLevelBias, ConfigClientObject::getDetailLevelBias, 0.5f, 16.0f);
 
 	getCodeDataObject (TUISliderbar, slider, "sliderCharacterLodBias");
-	registerSlider (*slider, SkeletalAppearance2::setDetailLevelBias, SkeletalAppearance2::getDetailLevelBias, ConfigClientObject::getDetailLevelBias, 0.5f, 2.0f);
+	// Up to 16x rather than 2x. Character LOD is chosen by screen fraction and LOD 0 ends at 20%
+	// of screen height, which is 8.7m for a 2m human and about 4m for a womprat. A bias of 2 only
+	// reached 17m; holding LOD 0 at 100m needs about 11.5, so the range has to clear that with
+	// room rather than end exactly on it.
+	registerSlider (*slider, SkeletalAppearance2::setDetailLevelBias, SkeletalAppearance2::getDetailLevelBias, ConfigClientObject::getDetailLevelBias, 0.5f, 16.0f);
 
 	getCodeDataObject (TUISliderbar, slider, "sliderParticleLodBias");
 	registerSlider (*slider, setParticleLodBias, getParticleLodBias, ConfigClientObject::getDetailLevelBias, 0.25f, 1.0f);

@@ -75,6 +75,10 @@ public:
 	static void install();
 
 	static void   setDetailLevelBias(float lodBias);
+
+	// Scale a raw screen fraction by the character detail slider. Used for the apparent-size
+	// thresholds that are not the LOD choice itself, which biases its own copy.
+	static float  applyDetailLevelBias(float screenFraction);
 	static float  getDetailLevelBias();
 
 	static bool   getShowSkeleton();
