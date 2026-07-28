@@ -1512,6 +1512,16 @@ void Graphics::setProjectionMatrix(const GlMatrix4x4 &projectionMatrix)
  * and it is why the return value matters.
  */
 
+bool Graphics::setBoneVertexData(void const *data, int vertexCount)
+{
+	if (!ms_api->setBoneVertexData)
+		return false;
+
+	return ms_api->setBoneVertexData(data, vertexCount);
+}
+
+// ----------------------------------------------------------------------
+
 bool Graphics::setBoneMatrices(float const *rows, int boneCount)
 {
 	if (!ms_api->setBoneMatrices || !rows || boneCount <= 0)

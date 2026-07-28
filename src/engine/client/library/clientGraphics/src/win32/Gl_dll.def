@@ -168,6 +168,7 @@ struct Gl_api
 	// A backend that does not implement GPU skinning leaves this null and the caller skins on the
 	// CPU exactly as before, which is what makes this additive rather than a switch-over.
 	void (*setBoneMatrices)(const float *rows, int boneCount);
+	bool (*setBoneVertexData)(const void *data, int vertexCount);
 	void (*setObjectToWorldTransformAndScale)(const Transform &objectToWorld, const Vector &scale);
 	void (*setGlobalTexture)(Tag tag, const Texture &texture);
 	void (*releaseAllGlobalTextures)();

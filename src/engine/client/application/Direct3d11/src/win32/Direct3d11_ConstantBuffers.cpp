@@ -9,6 +9,7 @@
 #include "Direct3d11_ConstantBuffers.h"
 
 #include "Direct3d11_Device.h"
+#include "Direct3d11_InputLayoutCache.h"
 #include "Direct3d11_Metrics.h"
 #include "PaddedVector.h"
 
@@ -65,6 +66,12 @@ namespace Direct3d11_ConstantBuffersNamespace
 	// 3x4 rather than 4x4: the fourth row of an affine transform is constant, and carrying it
 	// would waste a quarter of the buffer for nothing.
 	ID3D11Buffer   *ms_skinningBones;
+
+	// The per-vertex bone stream. Grown on demand rather than sized up front: the largest skinned
+	// primitive is a property of the assets, and guessing it wrong either wastes memory or fails
+	// the draw.
+	ID3D11Buffer   *ms_skinningStream;
+	int             ms_skinningStreamVertices;
 	int const       cms_maximumBones = 64;
 	int const       cms_rowsPerBone = 3;
 	float           ms_epilogueShadow[4];
@@ -238,6 +245,7 @@ void Direct3d11_ConstantBuffersNamespace::releaseBuffers()
 
 	if (ms_perObjectRing) { ms_perObjectRing->Release(); ms_perObjectRing = NULL; }
 	if (ms_pixelGlobals)  { ms_pixelGlobals->Release();  ms_pixelGlobals = NULL; }
+	if (ms_skinningStream) { ms_skinningStream->Release(); ms_skinningStream = NULL; ms_skinningStreamVertices = 0; }
 	if (ms_skinningBones) { ms_skinningBones->Release(); ms_skinningBones = NULL; }
 	if (ms_pixelEpilogue) { ms_pixelEpilogue->Release(); ms_pixelEpilogue = NULL; }
 	if (ms_vertexGlobals) { ms_vertexGlobals->Release(); ms_vertexGlobals = NULL; }
@@ -823,6 +831,74 @@ void Direct3d11_ConstantBuffers::setBoneMatrices(float const *rows, int boneCoun
 		UINT const slot = Direct3d11_ConstantBuffers::SKINNING_BONES_SLOT;
 		context->VSSetConstantBuffers(slot, 1, &ms_skinningBones);
 	}
+}
+
+// ----------------------------------------------------------------------
+
+/**
+ * Upload and bind the per-vertex bone stream for the next skinned draw.
+ *
+ * Grown on demand. The buffer is DYNAMIC and written with DISCARD, which is what a once-per-draw
+ * write wants, and the vertex count is remembered so a smaller primitive reuses the same buffer.
+ *
+ * Returns the input slot, or -1 if it could not be provided -- in which case the caller must fall
+ * back to the CPU path rather than draw with a layout that expects bone data.
+ */
+
+int Direct3d11_ConstantBuffers::setBoneStream(void const *data, int vertexCount)
+{
+	if (!data || vertexCount <= 0)
+		return -1;
+
+	ID3D11Device1 * const device = Direct3d11_Device::getDevice();
+	ID3D11DeviceContext1 * const context = Direct3d11_Device::getContext();
+	if (!device || !context)
+		return -1;
+
+	int const stride = Direct3d11_InputLayoutCache::BONE_STREAM_STRIDE;
+
+	if (!ms_skinningStream || ms_skinningStreamVertices < vertexCount)
+	{
+		if (ms_skinningStream)
+		{
+			ms_skinningStream->Release();
+			ms_skinningStream = NULL;
+		}
+
+		D3D11_BUFFER_DESC description;
+		Zero(description);
+		description.ByteWidth      = static_cast<UINT>(vertexCount * stride);
+		description.Usage          = D3D11_USAGE_DYNAMIC;
+		description.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
+		description.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		HRESULT const hresult = device->CreateBuffer(&description, NULL, &ms_skinningStream);
+		if (FAILED(hresult) || !ms_skinningStream)
+		{
+			WARNING(true, ("Direct3d11: the %d-vertex bone stream could not be created (%s). That primitive will skin on the CPU.", vertexCount, Direct3d11_Device::describeHresult(hresult)));
+			ms_skinningStream = NULL;
+			ms_skinningStreamVertices = 0;
+			return -1;
+		}
+
+		ms_skinningStreamVertices = vertexCount;
+		++Direct3d11_Metrics::vertexBufferCreations;
+	}
+
+	D3D11_MAPPED_SUBRESOURCE mapped;
+	Zero(mapped);
+	if (FAILED(context->Map(ms_skinningStream, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)))
+		return -1;
+
+	memcpy(mapped.pData, data, static_cast<size_t>(vertexCount * stride));
+	context->Unmap(ms_skinningStream, 0);
+
+	UINT const slot = static_cast<UINT>(Direct3d11_InputLayoutCache::MAX_STREAMS - 1);
+	UINT const strides = static_cast<UINT>(stride);
+	UINT const offsets = 0;
+	context->IASetVertexBuffers(slot, 1, &ms_skinningStream, &strides, &offsets);
+
+	return static_cast<int>(slot);
 }
 
 // ----------------------------------------------------------------------

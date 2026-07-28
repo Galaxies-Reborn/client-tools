@@ -156,10 +156,15 @@ private:
 	// largest and renormalises. 59 bones is the measured worst case, which fits a byte with room.
 	//
 	// Null until built, and only built when GPU skinning is asked for.
-	uint8                  *m_gpuBoneData;
+	mutable uint8          *m_gpuBoneData;
 
 	// Built once, on first use, when GPU skinning is enabled.
-	void                    buildGpuBoneData();
+	void                    buildGpuBoneData() const;
+
+	// Push the bones and fill the dynamic stream with the bind pose, so the vertex program blends
+	// rather than the CPU. False means this primitive is not eligible or the backend would not take
+	// it, and the caller must skin on the CPU.
+	bool                    tryGpuSkin(int transformCount, const PoseModelTransform *transformArray) const;
 	//-----------------------------------------------
 
 	mutable ShadowVolume   *m_shadowVolume;

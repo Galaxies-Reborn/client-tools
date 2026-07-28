@@ -86,6 +86,12 @@ public:
 	// to the material that uses it rather than to startup.
 	ID3D11VertexShader       *getVertexShader() const;
 
+	// The GPU skinning variant. Null when there is none, which means the CPU path.
+	ID3D11VertexShader *getSkinnedVertexShader() const;
+	uint32              getSkinnedSignatureHash() const;
+	void const         *getSkinnedBytecode() const;
+	unsigned int        getSkinnedBytecodeSize() const;
+
 	// The tags this program declares, in declaration order. Tag i is TEXCOORD i, which is
 	// what lets the input layout route the vertex buffer's sets. Null when the program
 	// declares none.
@@ -108,11 +114,6 @@ private:
 	void parseHeader();
 	void compile();
 
-	// The GPU skinning variant. Null when there is none, which means the CPU path.
-	ID3D11VertexShader *getSkinnedVertexShader() const;
-	uint32              getSkinnedSignatureHash() const;
-	void const         *getSkinnedBytecode() const;
-	unsigned int        getSkinnedBytecodeSize() const;
 
 private:
 

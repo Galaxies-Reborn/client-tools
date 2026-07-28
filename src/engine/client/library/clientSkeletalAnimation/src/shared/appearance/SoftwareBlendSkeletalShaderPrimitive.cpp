@@ -77,6 +77,7 @@ namespace GpuSkinning
 		return ms_enabled;
 	}
 
+	int const cms_maximumBones = 64;    // matches the backend's bone constant buffer
 	int const cms_influencesPerVertex = 4;
 	int const cms_bytesPerVertex = 8;   // four indices then four weights, a byte each
 }
@@ -649,7 +650,7 @@ const StaticShader &SoftwareBlendSkeletalShaderPrimitive::prepareToView() const
  * byte with room, and 1/255 on a weight is far finer than skinning needs.
  */
 
-void SoftwareBlendSkeletalShaderPrimitive::buildGpuBoneData()
+void SoftwareBlendSkeletalShaderPrimitive::buildGpuBoneData() const
 {
 	if (m_gpuBoneData || !m_sourceVectors || m_vertexCount <= 0)
 		return;
@@ -724,6 +725,88 @@ void SoftwareBlendSkeletalShaderPrimitive::buildGpuBoneData()
 
 // ----------------------------------------------------------------------
 
+/**
+ * Skin on the GPU if this primitive can be, leaving the dynamic stream holding the bind pose.
+ *
+ * Bone rows are 3x4 and row-major. PoseModelTransform stores column-major, so writing them out is a
+ * transpose; the fourth row of an affine transform is constant and the shader supplies it rather
+ * than the buffer carrying it.
+ *
+ * Every rejection here is a fallback to the CPU path, not a failure. Whether that path still runs is
+ * the caller's decision, so this must not leave the stream half written -- which is why the backend
+ * is asked for the bones before the stream is touched.
+ */
+
+bool SoftwareBlendSkeletalShaderPrimitive::tryGpuSkin(int transformCount, const PoseModelTransform *transformArray) const
+{
+	if (!GpuSkinning::enabled())
+		return false;
+
+	// Multi-stream only. Otherwise the dynamic stream also carries the colour and texture coordinates
+	// that the system stream holds, and rewriting it with bind pose alone would drop them.
+	if (!ms_useMultiStreamVertexBuffers)
+		return false;
+
+	// A dot3 tangent frame is skinned alongside position and normal, and the injected prologue does
+	// not carry a tangent yet.
+	if (m_hasDot3Vector || (m_skinningMode != SM_softSkinning))
+		return false;
+
+	if (!m_sourceVectors || (m_vertexCount <= 0) || !transformArray || (transformCount <= 0) || (transformCount > GpuSkinning::cms_maximumBones))
+		return false;
+
+	buildGpuBoneData();
+	if (!m_gpuBoneData)
+		return false;
+
+	float rows[GpuSkinning::cms_maximumBones * 3 * 4];
+	{
+		float *destination = rows;
+
+		for (int bone = 0; bone < transformCount; ++bone)
+		{
+			const PoseModelTransform &transform = transformArray[bone];
+
+			for (int row = 0; row < 3; ++row)
+			{
+				*destination++ = transform.matrix[0][row];
+				*destination++ = transform.matrix[1][row];
+				*destination++ = transform.matrix[2][row];
+				*destination++ = transform.matrix[3][row];
+			}
+		}
+	}
+
+	//-- Ask the backend before writing anything, so a refusal leaves the stream untouched for the
+	//   CPU path to fill.
+	if (!Graphics::setBoneMatrices(rows, transformCount))
+		return false;
+
+	if (!Graphics::setBoneVertexData(m_gpuBoneData, m_vertexCount))
+		return false;
+
+	//-- The bind pose, not a skinned copy: the vertex program does the blending now.
+	m_dynamicStream->lock(m_vertexCount);
+	{
+		VertexBufferWriteIterator iterator = m_dynamicStream->begin();
+
+		for (int i = 0; i < m_vertexCount; ++i, ++iterator)
+		{
+			const SourceVertex &sourceVertex = m_sourceVectors[i];
+
+			iterator.setPosition(sourceVertex.m_position);
+			iterator.setNormal(sourceVertex.m_normal);
+		}
+	}
+	m_dynamicStream->unlock();
+
+	m_hasBeenSkinned = true;
+
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
 void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 {
 	NOT_NULL(m_dynamicStream);
@@ -755,9 +838,32 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 	const int                 transformCount = skeleton.getTransformCount();
 	const PoseModelTransform *transformArray = skeleton.getBindPoseModelToRootTransforms();
 
+	//-- Does this primitive cast a volumetric shadow this frame? Decided before skinning rather than
+	//   after, because the shadow volume is handed m_systemStream and only the CPU path fills it: a
+	//   shadowed character has to skin on the CPU whatever the GPU could do.
+	const bool castsVolumetricShadow =
+		   ShadowManager::getEnabled()
+		&& ShadowManager::getAllowed()
+		&& ShadowManager::getSkeletalShadowsVolumetric()
+		&& ShadowVolume::getEnabled()
+		&& m_shader->getShaderTemplate().castsShadows()
+		&& (m_appearance.getFadeState() == SkeletalAppearance2::FS_notFading)
+		&& (m_appearance.getHologramType() == SkeletalAppearance2::HT_none)
+		&& !m_appearance.getIsBlueGlowie()
+		&& !m_appearance.getIsHolonet();
+
+	const bool gpuSkinned = !castsVolumetricShadow && tryGpuSkin(transformCount, transformArray);
+
 	//-- Setup which vertex buffers will be used for rendering and compute vertex buffer data.
-	if (ms_useMultiStreamVertexBuffers)
+	if (gpuSkinned)
 	{
+		// Nothing to do: tryGpuSkin filled the dynamic stream and armed the bone data.
+	}
+	else if (ms_useMultiStreamVertexBuffers)
+	{
+		//-- Disarm, so this draw cannot pick up whatever the last skinned primitive left behind.
+		IGNORE_RETURN(Graphics::setBoneVertexData(NULL, 0));
+
 		// STATE: Using multi streaming.
 
 		// Perform skinning on the system vertex buffer.  Collision and shadows require CPU
@@ -775,6 +881,8 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 	else
 	{
 		// STATE: Not using multi streaming.
+		IGNORE_RETURN(Graphics::setBoneVertexData(NULL, 0));
+
 		// @todo -TRF- look at this: the following code path should not be legal.
 		if (!m_systemStream)
 		{
@@ -814,16 +922,7 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 	}
 
 	//-- set the vb and ib to the shadow system
-	if (ShadowManager::getEnabled() 
-		&& ShadowManager::getAllowed() 
-		&& ShadowManager::getSkeletalShadowsVolumetric() 
-		&& ShadowVolume::getEnabled() 
-		&& m_shader->getShaderTemplate().castsShadows() 
-		&& (m_appearance.getFadeState() == SkeletalAppearance2::FS_notFading)
-		&& (m_appearance.getHologramType() == SkeletalAppearance2::HT_none)
-		&& !m_appearance.getIsBlueGlowie()
-		&& !m_appearance.getIsHolonet()
-		)
+	if (castsVolumetricShadow)
 	{
 		SkinningCostReport::noteShadowPath(true);
 

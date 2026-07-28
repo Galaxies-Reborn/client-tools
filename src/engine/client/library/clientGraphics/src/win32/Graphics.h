@@ -207,6 +207,12 @@ public:
 	// affine transform is constant and the shader reconstructs it. Returns false when the backend
 	// has no GPU skinning, in which case the caller skins on the CPU exactly as before.
 	static bool                          setBoneMatrices(const float *rows, int boneCount);
+
+	// Per-vertex bone indices and weights for the coming skinned draw, four of each as bytes.
+	// Passing null disarms, which is how a primitive that is not GPU skinned makes sure the last
+	// one's data cannot be picked up. False means the backend cannot take it and the caller must
+	// skin on the CPU instead.
+	static bool                          setBoneVertexData(const void *data, int vertexCount);
 	static void                          getFog(bool & enabled, float & density, PackedArgb & color);
 	static void                          setObjectToWorldTransformAndScale(const Transform &objectToWorld, const Vector &scale);
 	static void                          setGlobalTexture(Tag tag, const Texture &texture);

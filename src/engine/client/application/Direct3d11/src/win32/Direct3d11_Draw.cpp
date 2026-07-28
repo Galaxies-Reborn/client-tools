@@ -82,6 +82,13 @@ namespace Direct3d11_DrawNamespace
 	unsigned int    ms_currentVertexShaderBytecodeSize;
 	uint32          ms_currentVertexShaderSignatureHash;
 
+	// GPU skinning. ms_boneStream is the input slot a bone stream was uploaded to for this draw,
+	// or -1; ms_currentDrawSkinned says the material actually bound a skinned variant. Both are
+	// needed: an armed stream with no skinned program, or the reverse, is a mismatch and the draw
+	// must use neither.
+	int             ms_boneStream = -1;
+	bool            ms_currentDrawSkinned;
+
 	// Which vertex buffer texture coordinate set each of the bound program's tags reads, in
 	// declaration order. This is what DX9 compiled into the shader as a texture coordinate
 	// key; here the program is compiled once and the input layout does the routing, so the
@@ -346,6 +353,27 @@ void Direct3d11::setIndexBuffer(HardwareIndexBuffer const &indexBuffer)
 
 // ----------------------------------------------------------------------
 
+void Direct3d11::armBoneStream(int stream)
+{
+	ms_boneStream = stream;
+}
+
+// ----------------------------------------------------------------------
+
+bool Direct3d11::isBoneStreamArmed()
+{
+	return ms_boneStream >= 0;
+}
+
+// ----------------------------------------------------------------------
+
+void Direct3d11::setCurrentDrawSkinned(bool skinned)
+{
+	ms_currentDrawSkinned = skinned;
+}
+
+// ----------------------------------------------------------------------
+
 void Direct3d11::forgetIndexBuffer(void *buffer)
 {
 	if (!buffer || ms_boundIndexBuffer == buffer)
@@ -432,7 +460,8 @@ bool Direct3d11::prepareToDraw()
 		return false;
 	}
 
-	ID3D11InputLayout * const layout = Direct3d11_InputLayoutCache::getInputLayout(ms_streamFormatFlags, ms_streamCount, ms_currentVertexShaderBytecode, ms_currentVertexShaderBytecodeSize, ms_currentVertexShaderSignatureHash, ms_currentTextureCoordinateSetMapping, ms_currentTextureCoordinateSetMappingCount);
+	ID3D11InputLayout * const layout = Direct3d11_InputLayoutCache::getInputLayout(ms_streamFormatFlags, ms_streamCount, ms_currentVertexShaderBytecode, ms_currentVertexShaderBytecodeSize, ms_currentVertexShaderSignatureHash, ms_currentTextureCoordinateSetMapping, ms_currentTextureCoordinateSetMappingCount,
+		ms_currentDrawSkinned ? ms_boneStream : -1);
 	if (!layout)
 	{
 		// The cache has already explained which format and shader combination could

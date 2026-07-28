@@ -308,6 +308,24 @@ namespace Direct3d11Namespace
 
 	// GPU skinning: the bone matrices for the next skinned draw. Rows are 3x4 -- the fourth row of an
 	// affine transform is constant, so the shader reconstructs it rather than the buffer carrying it.
+	// Null disarms. Uploading and arming together means the armed slot always refers to data that
+	// was just written, so a draw can never pick up the previous primitive's bones.
+	bool setBoneVertexData(void const *data, int vertexCount)
+	{
+		if (!data || vertexCount <= 0)
+		{
+			Direct3d11::armBoneStream(-1);
+			return true;
+		}
+
+		int const slot = Direct3d11_ConstantBuffers::setBoneStream(data, vertexCount);
+		Direct3d11::armBoneStream(slot);
+
+		return slot >= 0;
+	}
+
+	// ----------------------------------------------------------------------
+
 	void setBoneMatrices(float const *rows, int boneCount)
 	{
 		Direct3d11_ConstantBuffers::setBoneMatrices(rows, boneCount);
@@ -742,6 +760,7 @@ void Direct3d11Namespace::fillApiTable()
 	ms_glApi.setProjectionMatrix               = setProjectionMatrix;
 	ms_glApi.setFog                            = setFog;
 	ms_glApi.setBoneMatrices                   = setBoneMatrices;
+	ms_glApi.setBoneVertexData                 = setBoneVertexData;
 	ms_glApi.setObjectToWorldTransformAndScale = setObjectToWorldTransformAndScale;
 	ms_glApi.setGlobalTexture                  = setGlobalTexture;
 	ms_glApi.releaseAllGlobalTextures          = releaseAllGlobalTextures;
