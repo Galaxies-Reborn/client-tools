@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 243", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 243", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 244", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 244", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1820,6 +1820,30 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             "KnockdownFireWeaponStatus = 429",
             "QueueConfusionShot = 430",
             "ConfusionShotWeaponStatus = 431",
+            "BIC_queueBleedingShot",
+            "BIC_bleedingShotWeaponStatus",
+            "BIC_queueEyeShot",
+            "BIC_eyeShotWeaponStatus",
+            "BIC_queueTorsoShot",
+            "BIC_torsoShotWeaponStatus",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"bleedingShot"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"eyeShot"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"torsoShot"',
+            'getBackgroundGeneratedCombatWeaponStatus("bleedingShot")',
+            'getBackgroundGeneratedCombatWeaponStatus("eyeShot")',
+            'getBackgroundGeneratedCombatWeaponStatus("torsoShot")',
+            '"QueueBleedingShot"',
+            '"BleedingShotWeaponStatus"',
+            '"QueueEyeShot"',
+            '"EyeShotWeaponStatus"',
+            '"QueueTorsoShot"',
+            '"TorsoShotWeaponStatus"',
+            "QueueBleedingShot = 432",
+            "BleedingShotWeaponStatus = 433",
+            "QueueEyeShot = 434",
+            "EyeShotWeaponStatus = 435",
+            "QueueTorsoShot = 436",
+            "TorsoShotWeaponStatus = 437",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
