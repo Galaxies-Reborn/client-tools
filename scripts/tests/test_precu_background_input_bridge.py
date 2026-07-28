@@ -359,8 +359,8 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 242", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 242", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 243", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 243", self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1802,6 +1802,24 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"UnarmedHit3WeaponStatus"',
             "QueueUnarmedHit3 = 424",
             "UnarmedHit3WeaponStatus = 425",
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"underHandShot"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"knockdownFire"',
+            'performBackgroundQueueMarksmanTier1(\n\t\t\t\t\t\t"confusionShot"',
+            'getBackgroundGeneratedCombatWeaponStatus("underHandShot")',
+            'getBackgroundGeneratedCombatWeaponStatus("knockdownFire")',
+            'getBackgroundGeneratedCombatWeaponStatus("confusionShot")',
+            '"QueueUnderHandShot"',
+            '"UnderHandShotWeaponStatus"',
+            '"QueueKnockdownFire"',
+            '"KnockdownFireWeaponStatus"',
+            '"QueueConfusionShot"',
+            '"ConfusionShotWeaponStatus"',
+            "QueueUnderHandShot = 426",
+            "UnderHandShotWeaponStatus = 427",
+            "QueueKnockdownFire = 428",
+            "KnockdownFireWeaponStatus = 429",
+            "QueueConfusionShot = 430",
+            "ConfusionShotWeaponStatus = 431",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
