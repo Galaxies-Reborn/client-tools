@@ -33,6 +33,8 @@
 #include "sharedFoundation/PointerDeleter.h"
 #include "sharedObject/CellProperty.h"
 #include "sharedObject/ContainedByProperty.h"
+
+#include <map>
 #include "sharedObject/Appearance.h"
 #include "sharedMath/Sphere.h"
 
@@ -173,6 +175,14 @@ public:
 	int                 compactEdgeCount;
 	bool                computedEdgeConnectivity;
 
+	//-- Triangle adjacency, six indices a face, for a geometry shader silhouette pass:
+	//   corner 0, the opposite corner of the neighbour across edge 0-1, corner 1, the neighbour
+	//   across 1-2, corner 2, the neighbour across 2-0. Built once alongside the edge list.
+	//
+	//   Nothing reads it yet.
+	Index*              adjacencyIndexArray;
+	int                 adjacencyIndexCount;
+
 	SystemVertexBuffer* shadowVertexBuffer;
 	SystemIndexBuffer*  shadowFrontIndexBuffer;
 	int                 shadowFrontIndexCount;
@@ -193,6 +203,8 @@ public:
 		compactEdgeArray (0),
 		compactEdgeCount (0),
 		computedEdgeConnectivity (false),
+		adjacencyIndexArray (0),
+		adjacencyIndexCount (0),
 		shadowVertexBuffer (0),
 		shadowFrontIndexBuffer (0),
 		shadowFrontIndexCount (0),
@@ -1075,6 +1087,73 @@ void ShadowVolume::clearProxyLocalShaderPrimitiveList ()
 
 //-------------------------------------------------------------------
 
+//-------------------------------------------------------------------
+
+/**
+ * An edge key that does not care which way the edge is walked.
+ *
+ * Adjacent faces traverse a shared edge in opposite directions, so the pair is ordered before it is
+ * packed. Vertex indices here are Index, which is 16 bit, so both fit a uint32 with nothing lost.
+ */
+
+uint32 ShadowVolume::makeEdgeKey (const int v0, const int v1)
+{
+	const uint32 low  = static_cast<uint32> ((v0 < v1) ? v0 : v1);
+	const uint32 high = static_cast<uint32> ((v0 < v1) ? v1 : v0);
+
+	return (low << 16) | high;
+}
+
+//-------------------------------------------------------------------
+
+/**
+ * addEdge without the linear scan.
+ *
+ * The original walked every edge found so far looking for a match, which makes building the edge
+ * list quadratic in face count. The map does the same lookup in log time and produces the same
+ * array: the same edges carrying the same face links, differing only in the order they appear,
+ * which nothing downstream depends on.
+ */
+
+void ShadowVolume::addEdgeFast (std::map<uint32, int>& edgeMap, ShadowVolume::Edge* const edgeList, int& numberOfEdges, const int v0, const int v1, const int face)
+{
+	NOT_NULL (edgeList);
+
+	const uint32 key = makeEdgeKey (v0, v1);
+
+	const std::map<uint32, int>::const_iterator it = edgeMap.find (key);
+
+	int index;
+	if (it != edgeMap.end ())
+	{
+		index = it->second;
+	}
+	else
+	{
+		index = numberOfEdges++;
+
+		edgeList [index].v0 = v0;
+		edgeList [index].v1 = v1;
+		edgeList [index].numberOfFaces = 0;
+#ifdef _DEBUG
+		edgeList [index].isNonManifold = false;
+#endif
+
+		edgeMap [key] = index;
+	}
+
+	if (edgeList [index].numberOfFaces < 2)
+	{
+		edgeList [index].face [edgeList [index].numberOfFaces++] = face;
+	}
+#ifdef _DEBUG
+	else
+	{
+		edgeList [index].isNonManifold = true;
+	}
+#endif
+}
+
 void ShadowVolume::addEdge (ShadowVolume::Edge* const edgeList, int& numberOfEdges, const int v0, const int v1, const int face)
 {
 	NOT_NULL (edgeList);
@@ -1257,6 +1336,11 @@ ShadowVolume::~ShadowVolume ()
 
 		shadowPrimitive.compactEdgeCount = 0;
 
+		delete [] shadowPrimitive.adjacencyIndexArray;
+		shadowPrimitive.adjacencyIndexArray = 0;
+
+		shadowPrimitive.adjacencyIndexCount = 0;
+
 		delete shadowPrimitive.shadowVertexBuffer;
 		shadowPrimitive.shadowVertexBuffer = 0;
 
@@ -1397,6 +1481,10 @@ void ShadowVolume::addPrimitive (const VertexBufferReadIterator& vi, const int n
 		shadowPrimitive.compactEdgeArray = 0;
 		shadowPrimitive.compactEdgeCount = 0;
 
+		delete [] shadowPrimitive.adjacencyIndexArray;
+		shadowPrimitive.adjacencyIndexArray = 0;
+		shadowPrimitive.adjacencyIndexCount = 0;
+
 		delete [] shadowPrimitive.compactIndexArrayToIndexArrayMap;
 		shadowPrimitive.compactIndexArrayToIndexArrayMap = 0;
 	}
@@ -1452,6 +1540,14 @@ void ShadowVolume::addPrimitive (const VertexBufferReadIterator& vi, const int n
 		//-- compute edge connectivity
 		if (!shadowPrimitive.computedEdgeConnectivity)
 		{
+			//-- Keyed on the vertex pair, smaller index first so an edge is found whichever way round
+			//   it is walked. This replaces a linear scan of every edge found so far, which made the
+			//   build quadratic in face count -- about 50 million comparisons for a 5000 triangle
+			//   character. It runs once per shadow primitive, but that is once per character coming
+			//   into shadow range, and shadow range just went from roughly 6m to past 100m.
+			typedef std::map<uint32, int> EdgeMap;
+			EdgeMap edgeMap;
+
 			int i;
 			for (i = 0; i < shadowPrimitive.compactFaceCount; ++i)
 			{
@@ -1479,9 +1575,67 @@ void ShadowVolume::addPrimitive (const VertexBufferReadIterator& vi, const int n
 #endif
 
 				//-- compute edge array (only needs to be done once)
-				addEdge (shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i0, i1, i);
-				addEdge (shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i1, i2, i);
-				addEdge (shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i2, i0, i);
+				addEdgeFast (edgeMap, shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i0, i1, i);
+				addEdgeFast (edgeMap, shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i1, i2, i);
+				addEdgeFast (edgeMap, shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i2, i0, i);
+			}
+
+			//-- Triangle adjacency for a geometry shader silhouette pass. Six indices a face: each
+			//   corner followed by the opposite corner of the face sharing the edge that leaves it.
+			//   An edge with one face has no neighbour, and repeating this face's own opposite corner
+			//   makes the GS see a degenerate neighbour and treat the edge as a silhouette -- which
+			//   for an open mesh is the answer that closes the volume rather than leaving a hole.
+			{
+				shadowPrimitive.adjacencyIndexCount = shadowPrimitive.compactFaceCount * 6;
+				shadowPrimitive.adjacencyIndexArray = new Index [static_cast<size_t> (shadowPrimitive.adjacencyIndexCount)];
+
+				for (i = 0; i < shadowPrimitive.compactFaceCount; ++i)
+				{
+					const Index corner [3] =
+					{
+						shadowPrimitive.compactIndexArray [3 * i + 0],
+						shadowPrimitive.compactIndexArray [3 * i + 1],
+						shadowPrimitive.compactIndexArray [3 * i + 2]
+					};
+
+					Index * const destination = shadowPrimitive.adjacencyIndexArray + (6 * i);
+
+					int corn;
+					for (corn = 0; corn < 3; ++corn)
+					{
+						const Index v0 = corner [corn];
+						const Index v1 = corner [(corn + 1) % 3];
+
+						//-- This face's own corner opposite the edge, which is also the fallback.
+						Index opposite = corner [(corn + 2) % 3];
+
+						const EdgeMap::const_iterator it = edgeMap.find (makeEdgeKey (v0, v1));
+						if (it != edgeMap.end ())
+						{
+							const Edge& edge = shadowPrimitive.compactEdgeArray [it->second];
+
+							if (edge.numberOfFaces == 2)
+							{
+								const int neighbourFace = (edge.face [0] == i) ? edge.face [1] : edge.face [0];
+
+								//-- The neighbour's corner that is not on this edge.
+								int k;
+								for (k = 0; k < 3; ++k)
+								{
+									const Index candidate = shadowPrimitive.compactIndexArray [3 * neighbourFace + k];
+									if (candidate != v0 && candidate != v1)
+									{
+										opposite = candidate;
+										break;
+									}
+								}
+							}
+						}
+
+						destination [2 * corn + 0] = v0;
+						destination [2 * corn + 1] = opposite;
+					}
+				}
 			}
 
 			shadowPrimitive.computedEdgeConnectivity = true;

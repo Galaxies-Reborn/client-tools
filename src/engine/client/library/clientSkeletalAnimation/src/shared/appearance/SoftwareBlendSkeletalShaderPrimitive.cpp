@@ -141,6 +141,45 @@ namespace SkinningCostReport
 
 	int ms_gpuSkinnedPrimitives;
 
+	// Why the GPU path declined. An aggregate "0%" cannot be acted on: it reads the same whether the
+	// switch is off, the vertex buffers are single-stream, or the backend refused.
+	enum GpuReject
+	{
+		GR_switchOff,
+		GR_shadowed,
+		GR_singleStream,
+		GR_dot3,
+		GR_notSoftSkinning,
+		GR_tooManyBones,
+		GR_noSourceData,
+		GR_backendRefused,
+		GR_count
+	};
+
+	int ms_gpuRejects[GR_count];
+
+	char const *rejectName(int reason)
+	{
+		switch (reason)
+		{
+			case GR_switchOff:       return "switch off";
+			case GR_shadowed:        return "casts a shadow";
+			case GR_singleStream:    return "single-stream";
+			case GR_dot3:            return "dot3";
+			case GR_notSoftSkinning: return "hard/no skinning";
+			case GR_tooManyBones:    return "too many bones";
+			case GR_noSourceData:    return "no source data";
+			case GR_backendRefused:  return "backend refused";
+			default:                 return "?";
+		}
+	}
+
+	void noteGpuReject(int reason)
+	{
+		if (reason >= 0 && reason < GR_count)
+			++ms_gpuRejects[reason];
+	}
+
 	void noteGpuPath(bool gpuSkinned)
 	{
 		if (gpuSkinned)
@@ -195,9 +234,29 @@ namespace SkinningCostReport
 
 		// Without this the ms/s above cannot be attributed: a small improvement looks identical
 		// whether the GPU path ran on most primitives or hardly engaged.
-		WARNING(true, ("SkinningGpu: %d of %d skinned primitive(s) blended on the GPU (%.0f%%). The rest fell back: shadowed, dot3, single-stream, or too many bones.",
+		WARNING(true, ("SkinningGpu: %d of %d skinned primitive(s) blended on the GPU (%.0f%%).",
 			ms_gpuSkinnedPrimitives, ms_totalPrimitives,
 			ms_totalPrimitives ? (100.0 * static_cast<double>(ms_gpuSkinnedPrimitives) / static_cast<double>(ms_totalPrimitives)) : 0.0));
+
+		//-- Which test did the rejecting. Without this a zero share names no suspect.
+		{
+			char reasons[512];
+			reasons[0] = '\0';
+
+			for (int r = 0; r < GR_count; ++r)
+			{
+				if (!ms_gpuRejects[r])
+					continue;
+
+				char one[96];
+				snprintf(one, sizeof(one), "%s%s %d", reasons[0] ? ", " : "", rejectName(r), ms_gpuRejects[r]);
+				strncat(reasons, one, sizeof(reasons) - strlen(reasons) - 1);
+
+				ms_gpuRejects[r] = 0;
+			}
+
+			WARNING(true, ("SkinningGpuRejects: %s.", reasons[0] ? reasons : "none"));
+		}
 
 		ms_shadowCastingPrimitives = 0;
 		ms_totalPrimitives = 0;
@@ -804,27 +863,57 @@ bool SoftwareBlendSkeletalShaderPrimitive::buildBindPoseStream() const
 bool SoftwareBlendSkeletalShaderPrimitive::tryGpuSkin(int transformCount, const PoseModelTransform *transformArray) const
 {
 	if (!GpuSkinning::enabled())
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_switchOff);
 		return false;
+	}
 
 	// Multi-stream only. Otherwise the dynamic stream also carries the colour and texture coordinates
 	// that the system stream holds, and rewriting it with bind pose alone would drop them.
 	if (!ms_useMultiStreamVertexBuffers)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_singleStream);
 		return false;
+	}
 
 	// A dot3 tangent frame is skinned alongside position and normal, and the injected prologue does
 	// not carry a tangent yet.
-	if (m_hasDot3Vector || (m_skinningMode != SM_softSkinning))
+	if (m_hasDot3Vector)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_dot3);
 		return false;
+	}
 
-	if (!m_sourceVectors || (m_vertexCount <= 0) || !transformArray || (transformCount <= 0) || (transformCount > GpuSkinning::cms_maximumBones))
+	if (m_skinningMode != SM_softSkinning)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_notSoftSkinning);
 		return false;
+	}
+
+	if (transformCount > GpuSkinning::cms_maximumBones)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_tooManyBones);
+		return false;
+	}
+
+	if (!m_sourceVectors || (m_vertexCount <= 0) || !transformArray || (transformCount <= 0))
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_noSourceData);
+		return false;
+	}
 
 	buildGpuBoneData();
 	if (!m_gpuBoneData)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_noSourceData);
 		return false;
+	}
 
 	if (!buildBindPoseStream())
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_noSourceData);
 		return false;
+	}
 
 	float rows[GpuSkinning::cms_maximumBones * 3 * 4];
 	{
@@ -847,10 +936,16 @@ bool SoftwareBlendSkeletalShaderPrimitive::tryGpuSkin(int transformCount, const 
 	//-- Ask the backend before writing anything, so a refusal leaves the stream untouched for the
 	//   CPU path to fill.
 	if (!Graphics::setBoneMatrices(rows, transformCount))
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_backendRefused);
 		return false;
+	}
 
 	if (!Graphics::setBoneVertexData(m_gpuBoneData, m_vertexCount))
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_backendRefused);
 		return false;
+	}
 
 	//-- Nothing else to write. The bind pose is already on the card and the vertex program blends
 	//   it, so this path touches no per-frame geometry at all.
@@ -906,7 +1001,11 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 		&& !m_appearance.getIsBlueGlowie()
 		&& !m_appearance.getIsHolonet();
 
-	const bool gpuSkinned = !castsVolumetricShadow && tryGpuSkin(transformCount, transformArray);
+	bool gpuSkinned = false;
+	if (castsVolumetricShadow)
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_shadowed);
+	else
+		gpuSkinned = tryGpuSkin(transformCount, transformArray);
 
 	SkinningCostReport::noteGpuPath(gpuSkinned);
 
