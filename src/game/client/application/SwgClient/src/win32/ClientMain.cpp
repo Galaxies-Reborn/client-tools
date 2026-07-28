@@ -546,11 +546,13 @@ namespace ClientMainNamespace
 		BIC_unarmedKnockdown1WeaponStatus,
 		BIC_queueUnarmedKnockdown2,
 		BIC_unarmedKnockdown2WeaponStatus,
-		BIC_queueMeditate
+		BIC_queueMeditate,
+		BIC_queuePowerBoost,
+		BIC_queueForceOfWill
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 240;
+	LRESULT const cms_backgroundInputProtocolVersion = 241;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1208,6 +1210,40 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"meditate",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueuePowerBoost()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// The server owns meditation admission, Mind capacity, ramp, duration,
+		// and cooldown for this no-target Teras Kasi command.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"powerBoost",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueForceOfWill()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// The server owns incapacitation admission, roll, penalty tier,
+		// recovery, and the one-hour successful-use cooldown.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"forceOfWill",
 			NetworkId::cms_invalid,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -3074,6 +3110,16 @@ namespace ClientMainNamespace
 
 			case BIC_queueMeditate:
 				if (!performBackgroundQueueMeditate())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queuePowerBoost:
+				if (!performBackgroundQueuePowerBoost())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueForceOfWill:
+				if (!performBackgroundQueueForceOfWill())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 
