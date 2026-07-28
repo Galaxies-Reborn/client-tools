@@ -86,17 +86,40 @@ namespace ShadowManagerNamespace
 
 	inline bool shouldRender (Camera const & camera, Vector const & position_w, float const radius, float const maximumDistance)
 	{
+		//-- check maximum distance first: a subtraction and a compare against a squared distance,
+		//   and it rejects far more than the size test does.
+		const float distanceSquared = camera.getPosition_w ().magnitudeBetweenSquared (position_w);
+		if (distanceSquared > sqr (maximumDistance))
+			return false;
+
 		const float ignoreRatio = linearInterpolate (cms_maximumIgnoreRatio, cms_minimumIgnoreRatio, ms_shadowDetailLevel);
 		const int ignoreSize = static_cast<int> (ignoreRatio * Graphics::getCurrentRenderTargetWidth ());
 
 		//-- check minimum screen size
-		float screenRadius = 0.f;
-		if (camera.computeRadiusInScreenSpace (camera.rotateTranslate_w2o (position_w), radius, screenRadius) && screenRadius < ignoreSize)
-			return false;
+		//
+		//   Estimated from distance and field of view rather than by projecting the object. This used
+		//   to call computeRadiusInScreenSpace and test its result with &&, which meant a projection
+		//   that FAILED skipped the cull entirely -- and projectInCameraSpace fails for anything
+		//   outside the near or far plane. An object behind the camera therefore kept its shadow while
+		//   the same object in front of the camera, small on screen, lost it. Turning the camera moved
+		//   objects across that boundary, so shadows came and went with camera angle and the cost of
+		//   building volumes for things the viewer could not see arrived during rotation.
+		//
+		//   This estimate is continuous and frustum independent: the same object at the same distance
+		//   gets the same answer whichever way the camera faces, so there is no boundary to cross.
+		{
+			const float distance = sqrt (distanceSquared);
+			const float tanHalfFov = tan (0.5f * camera.getHorizontalFieldOfView ());
 
-		//-- check maximum distance
-		if (camera.getPosition_w ().magnitudeBetweenSquared (position_w) > sqr (maximumDistance))
-			return false;
+			if (distance > 0.01f && tanHalfFov > 0.f)
+			{
+				const float halfWidth = 0.5f * static_cast<float> (Graphics::getCurrentRenderTargetWidth ());
+				const float screenRadius = (radius * halfWidth) / (distance * tanHalfFov);
+
+				if (screenRadius < static_cast<float> (ignoreSize))
+					return false;
+			}
+		}
 		
 		bool fogEnabled;
 		float fogDensity;
