@@ -562,11 +562,15 @@ namespace ClientMainNamespace
 		BIC_queueEyeShot,
 		BIC_eyeShotWeaponStatus,
 		BIC_queueTorsoShot,
-		BIC_torsoShotWeaponStatus
+		BIC_torsoShotWeaponStatus,
+		BIC_queueSprayShot,
+		BIC_sprayShotWeaponStatus,
+		BIC_queueFastBlast,
+		BIC_fastBlastWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 244;
+	LRESULT const cms_backgroundInputProtocolVersion = 245;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -3665,6 +3669,26 @@ namespace ClientMainNamespace
 
 			case BIC_torsoShotWeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("torsoShot");
+
+			case BIC_queueSprayShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"sprayShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_sprayShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("sprayShot");
+
+			case BIC_queueFastBlast:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"fastBlast", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_fastBlastWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("fastBlast");
 
 			case BIC_queuePolearmArea1:
 				if (lParam < 1 || lParam > 16 ||
