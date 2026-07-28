@@ -57,6 +57,16 @@ namespace Direct3d11_ConstantBuffersNamespace
 	// ABI every shader in the corpus depends on, and there is no reason to move that
 	// contract for something the backend owns outright.
 	ID3D11Buffer   *ms_pixelEpilogue;
+
+	// Bone matrices for GPU skinning, in their own buffer because the shared register file is
+	// 96 rows and shared with DX9 while the measured worst case is 59 bones -- 177 rows as 3x4
+	// matrices. Capacity is 64 against that 59.
+	//
+	// 3x4 rather than 4x4: the fourth row of an affine transform is constant, and carrying it
+	// would waste a quarter of the buffer for nothing.
+	ID3D11Buffer   *ms_skinningBones;
+	int const       cms_maximumBones = 64;
+	int const       cms_rowsPerBone = 3;
 	float           ms_epilogueShadow[4];
 
 	// The second row of b1: fog colour in rgb, the enable in alpha. Starts fully unfogged so a
@@ -168,6 +178,15 @@ bool Direct3d11_ConstantBuffersNamespace::createBuffers()
 	}
 	++Direct3d11_Metrics::constantBufferCreations;
 
+	description.ByteWidth = static_cast<UINT>(cms_maximumBones * cms_rowsPerBone * cms_bytesPerRow);
+	hresult = device->CreateBuffer(&description, NULL, &ms_skinningBones);
+	if (FAILED(hresult) || !ms_skinningBones)
+	{
+		WARNING(true, ("Direct3d11: the skinning bone constant buffer could not be created (%s).", Direct3d11_Device::describeHresult(hresult)));
+		return false;
+	}
+	++Direct3d11_Metrics::constantBufferCreations;
+
 	// A ring needs both capabilities. Without either, a per-draw slice cannot be
 	// appended and bound by offset, and the fallback is renaming a small buffer
 	// per draw -- which works, costs more, and is reported rather than assumed.
@@ -219,6 +238,7 @@ void Direct3d11_ConstantBuffersNamespace::releaseBuffers()
 
 	if (ms_perObjectRing) { ms_perObjectRing->Release(); ms_perObjectRing = NULL; }
 	if (ms_pixelGlobals)  { ms_pixelGlobals->Release();  ms_pixelGlobals = NULL; }
+	if (ms_skinningBones) { ms_skinningBones->Release(); ms_skinningBones = NULL; }
 	if (ms_pixelEpilogue) { ms_pixelEpilogue->Release(); ms_pixelEpilogue = NULL; }
 	if (ms_vertexGlobals) { ms_vertexGlobals->Release(); ms_vertexGlobals = NULL; }
 }
@@ -748,6 +768,61 @@ void Direct3d11_ConstantBuffersNamespace::applyFogColor()
 	ms_fogShadow[2] = blue;
 	ms_fogShadow[3] = alpha;
 	ms_epilogueDirty = true;
+}
+
+// ----------------------------------------------------------------------
+
+/**
+ * Upload a skinned primitive's bone matrices.
+ *
+ * Rows are 3x4: the fourth row of an affine transform is constant, so the shader reconstructs it.
+ * DISCARD rather than an offset ring, because this is written once per skinned primitive and a
+ * fresh buffer each time is what DISCARD is for. If the per-primitive count ever makes that the
+ * bottleneck, the ring machinery the per-object buffer already uses applies here too.
+ *
+ * A count above the capacity is clamped and reported rather than overrunning: the measured worst
+ * case is 59 against a capacity of 64, so exceeding it means the data changed and that is worth
+ * hearing about.
+ */
+
+void Direct3d11_ConstantBuffers::setBoneMatrices(float const *rows, int boneCount)
+{
+	if (!rows || boneCount <= 0)
+		return;
+
+	ID3D11DeviceContext1 * const context = Direct3d11_Device::getContext();
+	if (!context || !ms_skinningBones)
+		return;
+
+	if (boneCount > cms_maximumBones)
+	{
+		static bool reported = false;
+		if (!reported)
+		{
+			reported = true;
+			WARNING(true, ("Direct3d11: a skinned primitive asked for %d bones and the constant buffer holds %d. Clamped. The measured worst case when this was sized was 59, so the data has changed. Reported once.", boneCount, cms_maximumBones));
+		}
+
+		boneCount = cms_maximumBones;
+	}
+
+	D3D11_MAPPED_SUBRESOURCE mapped;
+	Zero(mapped);
+
+	if (SUCCEEDED(context->Map(ms_skinningBones, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)))
+	{
+		size_t const bytes = static_cast<size_t>(boneCount * cms_rowsPerBone * cms_bytesPerRow);
+		memcpy(mapped.pData, rows, bytes);
+		context->Unmap(ms_skinningBones, 0);
+
+		Direct3d11_Metrics::constantBufferBytes += static_cast<int>(bytes);
+		++Direct3d11_Metrics::constantBufferUpdates;
+
+		// Bound here rather than once at install: the buffer is only meaningful for the draw whose
+		// matrices were just written, and binding it alongside the write keeps the two together.
+		UINT const slot = Direct3d11_ConstantBuffers::SKINNING_BONES_SLOT;
+		context->VSSetConstantBuffers(slot, 1, &ms_skinningBones);
+	}
 }
 
 // ----------------------------------------------------------------------
