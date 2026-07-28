@@ -566,6 +566,8 @@ SoftwareBlendSkeletalShaderPrimitive::SoftwareBlendSkeletalShaderPrimitive(class
 	m_sourceDot3Vectors(0),
 	m_transformData(0),
 	m_gpuBoneData(0),
+	m_bindPoseStream(0),
+	m_gpuVertexBufferVector(0),
 	m_shadowVolume(0),
 	m_skinningMode(SM_softSkinning),
 	m_hasBeenSkinned(false),
@@ -609,6 +611,13 @@ SoftwareBlendSkeletalShaderPrimitive::~SoftwareBlendSkeletalShaderPrimitive()
 
 	delete [] m_gpuBoneData;
 	m_gpuBoneData = 0;
+
+	//-- The vector first: it refers to the buffer.
+	delete m_gpuVertexBufferVector;
+	m_gpuVertexBufferVector = 0;
+
+	delete m_bindPoseStream;
+	m_bindPoseStream = 0;
 
 	delete m_shadowVolume;
 	m_shadowVolume = 0;
@@ -752,6 +761,46 @@ void SoftwareBlendSkeletalShaderPrimitive::buildGpuBoneData() const
  * is asked for the bones before the stream is touched.
  */
 
+/**
+ * Upload the bind pose once, and build the vertex buffer vector that draws it.
+ *
+ * The pose does not change for the life of the primitive, so writing it into the dynamic ring every
+ * frame was 24 bytes a vertex of pointless memcpy. Lazy because most primitives fall back to the CPU
+ * path and never need this at all.
+ */
+
+bool SoftwareBlendSkeletalShaderPrimitive::buildBindPoseStream() const
+{
+	if (m_gpuVertexBufferVector)
+		return true;
+
+	if (!m_staticStream || !m_dynamicStream || !m_sourceVectors || (m_vertexCount <= 0))
+		return false;
+
+	//-- Same format as the dynamic stream it replaces, so the input layout is unchanged.
+	m_bindPoseStream = new StaticVertexBuffer(m_dynamicStream->getFormat(), m_vertexCount);
+
+	m_bindPoseStream->lock();
+	{
+		VertexBufferWriteIterator iterator = m_bindPoseStream->begin();
+
+		for (int i = 0; i < m_vertexCount; ++i, ++iterator)
+		{
+			const SourceVertex &sourceVertex = m_sourceVectors[i];
+
+			iterator.setPosition(sourceVertex.m_position);
+			iterator.setNormal(sourceVertex.m_normal);
+		}
+	}
+	m_bindPoseStream->unlock();
+
+	m_gpuVertexBufferVector = new VertexBufferVector(*m_staticStream, *m_bindPoseStream);
+
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
 bool SoftwareBlendSkeletalShaderPrimitive::tryGpuSkin(int transformCount, const PoseModelTransform *transformArray) const
 {
 	if (!GpuSkinning::enabled())
@@ -772,6 +821,9 @@ bool SoftwareBlendSkeletalShaderPrimitive::tryGpuSkin(int transformCount, const 
 
 	buildGpuBoneData();
 	if (!m_gpuBoneData)
+		return false;
+
+	if (!buildBindPoseStream())
 		return false;
 
 	float rows[GpuSkinning::cms_maximumBones * 3 * 4];
@@ -800,21 +852,8 @@ bool SoftwareBlendSkeletalShaderPrimitive::tryGpuSkin(int transformCount, const 
 	if (!Graphics::setBoneVertexData(m_gpuBoneData, m_vertexCount))
 		return false;
 
-	//-- The bind pose, not a skinned copy: the vertex program does the blending now.
-	m_dynamicStream->lock(m_vertexCount);
-	{
-		VertexBufferWriteIterator iterator = m_dynamicStream->begin();
-
-		for (int i = 0; i < m_vertexCount; ++i, ++iterator)
-		{
-			const SourceVertex &sourceVertex = m_sourceVectors[i];
-
-			iterator.setPosition(sourceVertex.m_position);
-			iterator.setNormal(sourceVertex.m_normal);
-		}
-	}
-	m_dynamicStream->unlock();
-
+	//-- Nothing else to write. The bind pose is already on the card and the vertex program blends
+	//   it, so this path touches no per-frame geometry at all.
 	m_hasBeenSkinned = true;
 
 	return true;
@@ -961,8 +1000,9 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 		}
 	}
 
-	// Set the vertex buffer(s).
-	Graphics::setVertexBuffer(*m_vertexBufferVector);
+	// Set the vertex buffer(s). The GPU path draws the static bind pose; the CPU path draws the
+	// dynamic stream it just filled.
+	Graphics::setVertexBuffer(gpuSkinned ? *m_gpuVertexBufferVector : *m_vertexBufferVector);
 
 	// Set the index buffer.
 	NOT_NULL(m_indexBuffer);

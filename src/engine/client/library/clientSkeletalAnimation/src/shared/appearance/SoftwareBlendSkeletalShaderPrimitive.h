@@ -161,10 +161,22 @@ private:
 	// Built once, on first use, when GPU skinning is enabled.
 	void                    buildGpuBoneData() const;
 
-	// Push the bones and fill the dynamic stream with the bind pose, so the vertex program blends
-	// rather than the CPU. False means this primitive is not eligible or the backend would not take
-	// it, and the caller must skin on the CPU.
+	// Push the bones and bind the bind-pose geometry, so the vertex program blends rather than the
+	// CPU. False means this primitive is not eligible or the backend would not take it, and the
+	// caller must skin on the CPU.
 	bool                    tryGpuSkin(int transformCount, const PoseModelTransform *transformArray) const;
+
+	// The bind pose, uploaded once rather than rewritten every frame. Built on the first draw that
+	// takes the GPU path, because most primitives never take it and this would otherwise cost VRAM
+	// on every character in the world.
+	//
+	// Kept alongside the CPU path's buffers rather than replacing them: whether a primitive is GPU
+	// skinned is decided per frame, so a character that starts casting a shadow returns to the CPU
+	// path mid-flight and both have to stay valid.
+	mutable StaticVertexBuffer *m_bindPoseStream;
+	mutable VertexBufferVector *m_gpuVertexBufferVector;
+
+	bool                    buildBindPoseStream() const;
 	//-----------------------------------------------
 
 	mutable ShadowVolume   *m_shadowVolume;
