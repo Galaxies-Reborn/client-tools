@@ -550,11 +550,17 @@ namespace ClientMainNamespace
 		BIC_queuePowerBoost,
 		BIC_queueForceOfWill,
 		BIC_queueUnarmedHit3,
-		BIC_unarmedHit3WeaponStatus
+		BIC_unarmedHit3WeaponStatus,
+		BIC_queueUnderHandShot,
+		BIC_underHandShotWeaponStatus,
+		BIC_queueKnockdownFire,
+		BIC_knockdownFireWeaponStatus,
+		BIC_queueConfusionShot,
+		BIC_confusionShotWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 242;
+	LRESULT const cms_backgroundInputProtocolVersion = 243;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -3593,6 +3599,36 @@ namespace ClientMainNamespace
 
 			case BIC_unarmedHit3WeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("unarmedHit3");
+
+			case BIC_queueUnderHandShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"underHandShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_underHandShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("underHandShot");
+
+			case BIC_queueKnockdownFire:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"knockdownFire", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_knockdownFireWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("knockdownFire");
+
+			case BIC_queueConfusionShot:
+				if (lParam < 1 || lParam > 16 ||
+					!performBackgroundQueueMarksmanTier1(
+						"confusionShot", static_cast<int>(lParam)))
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_confusionShotWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("confusionShot");
 
 			case BIC_queuePolearmArea1:
 				if (lParam < 1 || lParam > 16 ||
