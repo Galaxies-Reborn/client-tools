@@ -308,6 +308,44 @@ namespace Direct3d11Namespace
 
 	// GPU skinning: the bone matrices for the next skinned draw. Rows are 3x4 -- the fourth row of an
 	// affine transform is constant, so the shader reconstructs it rather than the buffer carrying it.
+	// QueryVideoMemoryInfo is on IDXGIAdapter3, which is Windows 10 and later. An adapter that does
+	// not offer it gets false rather than a fabricated number: the overlay omits the field, which is
+	// honest, where a zero would read as "no video memory in use".
+	//
+	// The local segment is the one that matters on a discrete card. CurrentUsage is this process's
+	// attribution and Budget is what the OS is presently willing to grant, and it is the gap between
+	// them that predicts eviction stalls.
+	bool getVideoMemory(int *usedMB, int *budgetMB)
+	{
+		if (!usedMB || !budgetMB)
+			return false;
+
+		IDXGIAdapter1 * const adapter = Direct3d11_Device::getAdapter();
+		if (!adapter)
+			return false;
+
+		IDXGIAdapter3 *adapter3 = NULL;
+		if (FAILED(adapter->QueryInterface(__uuidof(IDXGIAdapter3), reinterpret_cast<void **>(&adapter3))) || !adapter3)
+			return false;
+
+		DXGI_QUERY_VIDEO_MEMORY_INFO info;
+		Zero(info);
+
+		HRESULT const hresult = adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info);
+
+		adapter3->Release();
+
+		if (FAILED(hresult))
+			return false;
+
+		*usedMB   = static_cast<int>(info.CurrentUsage / (1024 * 1024));
+		*budgetMB = static_cast<int>(info.Budget / (1024 * 1024));
+
+		return true;
+	}
+
+	// ----------------------------------------------------------------------
+
 	// Null disarms. Uploading and arming together means the armed slot always refers to data that
 	// was just written, so a draw can never pick up the previous primitive's bones.
 	bool setBoneVertexData(void const *data, int vertexCount)
@@ -657,6 +695,10 @@ namespace Direct3d11Namespace
 		ms_badVertexBufferAppearanceName = appearanceName;
 	}
 
+#endif
+
+	// Outside the _DEBUG block above: this is a measurement rather than a debugging toggle, and
+	// Release is the only configuration that links a client.
 	void getRenderedVerticesPointsLinesTrianglesCalls(int &vertices, int &points, int &lines, int &triangles, int &calls)
 	{
 		// Points and lines are not counted separately yet -- the draw paths that
@@ -669,7 +711,6 @@ namespace Direct3d11Namespace
 		triangles = Direct3d11_Metrics::triangles;
 		calls     = Direct3d11_Metrics::drawCalls + Direct3d11_Metrics::drawIndexedCalls;
 	}
-#endif
 
 #if PRODUCTION == 0
 	bool createVideoBuffers(int, int)                                      { DX11_NOT_IMPLEMENTED("createVideoBuffers"); return false; }
@@ -705,8 +746,9 @@ void Direct3d11Namespace::fillApiTable()
 	ms_glApi.showMipmapLevels                  = showMipmapLevels;
 	ms_glApi.getShowMipmapLevels               = getShowMipmapLevels;
 	ms_glApi.setBadVertexBufferVertexShaderCombination = setBadVertexBufferVertexShaderCombination;
-	ms_glApi.getRenderedVerticesPointsLinesTrianglesCalls = getRenderedVerticesPointsLinesTrianglesCalls;
 #endif
+
+	ms_glApi.getRenderedVerticesPointsLinesTrianglesCalls = getRenderedVerticesPointsLinesTrianglesCalls;
 
 	ms_glApi.setBrightnessContrastGamma        = setBrightnessContrastGamma;
 
@@ -761,6 +803,7 @@ void Direct3d11Namespace::fillApiTable()
 	ms_glApi.setFog                            = setFog;
 	ms_glApi.setBoneMatrices                   = setBoneMatrices;
 	ms_glApi.setBoneVertexData                 = setBoneVertexData;
+	ms_glApi.getVideoMemory                    = getVideoMemory;
 	ms_glApi.setObjectToWorldTransformAndScale = setObjectToWorldTransformAndScale;
 	ms_glApi.setGlobalTexture                  = setGlobalTexture;
 	ms_glApi.releaseAllGlobalTextures          = releaseAllGlobalTextures;

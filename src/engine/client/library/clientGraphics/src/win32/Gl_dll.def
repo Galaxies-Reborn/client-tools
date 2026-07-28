@@ -105,9 +105,11 @@ struct Gl_api
 	bool (*getShowMipmapLevels)();
 
 	void (*setBadVertexBufferVertexShaderCombination)(bool *flag, const char *debugAppearanceName);
-
-	void (*getRenderedVerticesPointsLinesTrianglesCalls)(int &vertices, int &points, int &lines, int &triangles, int &calls);
 #endif
+
+	// Not under _DEBUG. Unlike the toggles above this is a measurement, and Release is the only
+	// configuration that links a client, so behind _DEBUG it could never be read where it counts.
+	void (*getRenderedVerticesPointsLinesTrianglesCalls)(int &vertices, int &points, int &lines, int &triangles, int &calls);
 
 	bool (*supportsMipmappedCubeMaps)();
 	bool (*supportsScissorRect)();
@@ -169,6 +171,7 @@ struct Gl_api
 	// CPU exactly as before, which is what makes this additive rather than a switch-over.
 	void (*setBoneMatrices)(const float *rows, int boneCount);
 	bool (*setBoneVertexData)(const void *data, int vertexCount);
+	bool (*getVideoMemory)(int *usedMB, int *budgetMB);
 	void (*setObjectToWorldTransformAndScale)(const Transform &objectToWorld, const Vector &scale);
 	void (*setGlobalTexture)(Tag tag, const Texture &texture);
 	void (*releaseAllGlobalTextures)();

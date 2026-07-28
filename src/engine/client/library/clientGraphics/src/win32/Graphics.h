@@ -95,8 +95,11 @@ public:
 	static bool                          getShowMipmapLevels();
 	static void                          setBadVertexBufferVertexShaderCombination(bool *badDrawFlag, const char *debugAppearanceName);
 	static void                          clearStaticShader();
-	static void                          getRenderedVerticesPointsLinesTrianglesCalls(int &vertices, int &points, int &lines, int &triangles, int &calls);
 #endif
+
+	// Not under _DEBUG: this is a measurement, not a debugging toggle, and Release is the only
+	// configuration that links a client.
+	static void                          getRenderedVerticesPointsLinesTrianglesCalls(int &vertices, int &points, int &lines, int &triangles, int &calls);
 
 	static int                           getFrameBufferMaxWidth();
 	static int                           getFrameBufferMaxHeight();
@@ -213,6 +216,12 @@ public:
 	// one's data cannot be picked up. False means the backend cannot take it and the caller must
 	// skin on the CPU instead.
 	static bool                          setBoneVertexData(const void *data, int vertexCount);
+
+	// This process's video memory use and the budget the OS is currently willing to give it, in
+	// megabytes. False when the backend cannot answer -- an older adapter, or a backend that does
+	// not implement it -- in which case the outputs are untouched and the caller should show
+	// nothing rather than a zero.
+	static bool                          getVideoMemory(int &usedMB, int &budgetMB);
 	static void                          getFog(bool & enabled, float & density, PackedArgb & color);
 	static void                          setObjectToWorldTransformAndScale(const Transform &objectToWorld, const Vector &scale);
 	static void                          setGlobalTexture(Tag tag, const Texture &texture);

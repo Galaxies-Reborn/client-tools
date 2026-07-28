@@ -1271,13 +1271,15 @@ void Graphics::clearStaticShader()
 
 // ----------------------------------------------------------------------
 
-#ifdef _DEBUG
 void Graphics::getRenderedVerticesPointsLinesTrianglesCalls(int &vertices, int &points, int &lines, int &triangles, int &calls)
 {
-	NOT_NULL(ms_api->getRenderedVerticesPointsLinesTrianglesCalls);
+	//-- A backend that does not supply it leaves the counters alone rather than faulting. The
+	//   caller can then show nothing, which is what it should show when there is nothing to say.
+	if (!ms_api->getRenderedVerticesPointsLinesTrianglesCalls)
+		return;
+
 	ms_api->getRenderedVerticesPointsLinesTrianglesCalls(vertices, points, lines, triangles, calls);
 }
-#endif
 
 // ----------------------------------------------------------------------
 
@@ -1511,6 +1513,16 @@ void Graphics::setProjectionMatrix(const GlMatrix4x4 &projectionMatrix)
  * on the CPU exactly as before. That is what keeps GPU skinning additive rather than a switch-over,
  * and it is why the return value matters.
  */
+
+bool Graphics::getVideoMemory(int &usedMB, int &budgetMB)
+{
+	if (!ms_api->getVideoMemory)
+		return false;
+
+	return ms_api->getVideoMemory(&usedMB, &budgetMB);
+}
+
+// ----------------------------------------------------------------------
 
 bool Graphics::setBoneVertexData(void const *data, int vertexCount)
 {
