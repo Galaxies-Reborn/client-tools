@@ -1121,10 +1121,19 @@ void ShadowVolume::addEdgeFast (std::map<uint32, int>& edgeMap, ShadowVolume::Ed
 
 	const uint32 key = makeEdgeKey (v0, v1);
 
-	const std::map<uint32, int>::const_iterator it = edgeMap.find (key);
+	const std::map<uint32, int>::iterator it = edgeMap.find (key);
 
+	//-- The original scan SKIPPED entries that already held two faces rather than matching them, so
+	//   a third face sharing an edge produced a second entry for the same edge instead of being
+	//   dropped. That is not incidental: an entry holding one face is treated as a boundary and
+	//   always silhouettes, and discarding the extra faces instead changes which edges extrude --
+	//   which shows up as streamers and spikes coming off objects.
+	//
+	//   The map therefore holds the most recent entry for a key, and a full one is passed over in
+	//   favour of a new entry, exactly as the scan did: the scan matched the first non-full entry,
+	//   and entries for a key fill in creation order, so the first non-full one is the newest.
 	int index;
-	if (it != edgeMap.end ())
+	if (it != edgeMap.end () && edgeList [it->second].numberOfFaces < 2)
 	{
 		index = it->second;
 	}
@@ -1136,22 +1145,13 @@ void ShadowVolume::addEdgeFast (std::map<uint32, int>& edgeMap, ShadowVolume::Ed
 		edgeList [index].v1 = v1;
 		edgeList [index].numberOfFaces = 0;
 #ifdef _DEBUG
-		edgeList [index].isNonManifold = false;
+		edgeList [index].isNonManifold = (it != edgeMap.end ());
 #endif
 
 		edgeMap [key] = index;
 	}
 
-	if (edgeList [index].numberOfFaces < 2)
-	{
-		edgeList [index].face [edgeList [index].numberOfFaces++] = face;
-	}
-#ifdef _DEBUG
-	else
-	{
-		edgeList [index].isNonManifold = true;
-	}
-#endif
+	edgeList [index].face [edgeList [index].numberOfFaces++] = face;
 }
 
 void ShadowVolume::addEdge (ShadowVolume::Edge* const edgeList, int& numberOfEdges, const int v0, const int v1, const int face)
