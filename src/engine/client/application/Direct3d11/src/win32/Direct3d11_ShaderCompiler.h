@@ -70,7 +70,10 @@ public:
 
 	// Returns a bytecode blob the caller owns, or null. The name is only for
 	// diagnostics; make it the asset path so a failure names something findable.
-	static ID3DBlob *compileVertexShader(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros);
+	// skinned compiles the GPU skinning variant, which carries a skinning prologue and takes
+	// BLENDINDICES0 and BLENDWEIGHT0. A program is compiled both ways because injecting
+	// unconditionally would oblige every vertex buffer in the game to carry bone data.
+	static ID3DBlob *compileVertexShader(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, bool skinned = false);
 	static ID3DBlob *compilePixelShader(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros);
 
 	// For shaders this backend writes itself rather than loads. No source patching and no

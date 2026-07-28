@@ -60,7 +60,7 @@ namespace Direct3d11_ShaderCompilerNamespace
 
 	ID3DBlob       *compile(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target);
 	bool            refuseIfNotHlsl(char const *source, int sourceLength, char const *name);
-	ID3DBlob       *compilePatched(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool isVertexProgram);
+	ID3DBlob       *compilePatched(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool isVertexProgram, bool skinned = false);
 	void            reportCompilerVersion();
 }
 using namespace Direct3d11_ShaderCompilerNamespace;
@@ -463,7 +463,7 @@ bool Direct3d11_ShaderCompilerNamespace::refuseIfNotHlsl(char const *source, int
 
 // ----------------------------------------------------------------------
 
-ID3DBlob *Direct3d11_ShaderCompilerNamespace::compilePatched(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool isVertexProgram)
+ID3DBlob *Direct3d11_ShaderCompilerNamespace::compilePatched(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool isVertexProgram, bool skinned)
 {
 	NOT_NULL(source);
 
@@ -486,7 +486,7 @@ ID3DBlob *Direct3d11_ShaderCompilerNamespace::compilePatched(char const *source,
 	// validates below on the untouched PSRC chunk.
 
 	int patchedLength = 0;
-	char * const patched = Direct3d11_ShaderSource::patchProgramSource(name, source, sourceLength, isVertexProgram, patchedLength);
+	char * const patched = Direct3d11_ShaderSource::patchProgramSource(name, source, sourceLength, isVertexProgram, patchedLength, skinned);
 
 	ID3DBlob * const bytecode = patched
 		? compile(patched, patchedLength, name, macros, target)
@@ -498,11 +498,11 @@ ID3DBlob *Direct3d11_ShaderCompilerNamespace::compilePatched(char const *source,
 
 // ----------------------------------------------------------------------
 
-ID3DBlob *Direct3d11_ShaderCompiler::compileVertexShader(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros)
+ID3DBlob *Direct3d11_ShaderCompiler::compileVertexShader(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, bool skinned)
 {
 	// No language check: the text has already had its marker stripped by parseHeader, which is
 	// also what validated it. Testing here would reject every vertex program. See compilePatched.
-	return compilePatched(source, sourceLength, name, macros, cms_vertexShaderTarget, true);
+	return compilePatched(source, sourceLength, name, macros, cms_vertexShaderTarget, true, skinned);
 }
 
 // ----------------------------------------------------------------------

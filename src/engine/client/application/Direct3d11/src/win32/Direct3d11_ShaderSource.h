@@ -146,7 +146,9 @@ public:
 	// Patches 3 and 6, applied to a program's source. Returns a newly allocated buffer
 	// the caller owns, or null when nothing changed. isVertexProgram gates patch 6,
 	// which has no meaning for a pixel program.
-	static char        *patchProgramSource(char const *name, char const *source, int length, bool isVertexProgram, int &patchedLength);
+	// skinned asks the vertex wrapper for the GPU skinning variant. The compiler's cache key is a
+	// hash of the patched text, so the two variants key apart with no extra plumbing.
+	static char        *patchProgramSource(char const *name, char const *source, int length, bool isVertexProgram, int &patchedLength, bool skinned = false);
 
 	// Patch 1, as a macro the caller appends to its define list.
 	static D3D_SHADER_MACRO const &getPointRenameMacro();

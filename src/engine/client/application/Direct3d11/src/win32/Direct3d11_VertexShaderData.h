@@ -108,6 +108,12 @@ private:
 	void parseHeader();
 	void compile();
 
+	// The GPU skinning variant. Null when there is none, which means the CPU path.
+	ID3D11VertexShader *getSkinnedVertexShader() const;
+	uint32              getSkinnedSignatureHash() const;
+	void const         *getSkinnedBytecode() const;
+	unsigned int        getSkinnedBytecodeSize() const;
+
 private:
 
 	ShaderImplementationPassVertexShader const &m_vertexShader;
@@ -126,6 +132,14 @@ private:
 	ID3DBlob                                   *m_bytecode;
 	uint32                                      m_signatureHash;
 	ID3D11VertexShader                         *m_shader;
+
+	// The GPU skinning variant of the same program: the same source with a skinning prologue
+	// injected ahead of it, taking BLENDINDICES0 and BLENDWEIGHT0. Null when the program has no
+	// skinned variant or its compile failed, in which case that material draws through the CPU path
+	// rather than not at all.
+	ID3DBlob                                   *m_skinnedBytecode;
+	uint32                                      m_skinnedSignatureHash;
+	ID3D11VertexShader                         *m_skinnedShader;
 };
 
 // ======================================================================
@@ -133,6 +147,34 @@ private:
 inline ID3D11VertexShader *Direct3d11_VertexShaderData::getVertexShader() const
 {
 	return m_shader;
+}
+
+// ----------------------------------------------------------------------
+
+inline ID3D11VertexShader *Direct3d11_VertexShaderData::getSkinnedVertexShader() const
+{
+	return m_skinnedShader;
+}
+
+// ----------------------------------------------------------------------
+
+inline uint32 Direct3d11_VertexShaderData::getSkinnedSignatureHash() const
+{
+	return m_skinnedSignatureHash;
+}
+
+// ----------------------------------------------------------------------
+
+inline void const *Direct3d11_VertexShaderData::getSkinnedBytecode() const
+{
+	return m_skinnedBytecode ? m_skinnedBytecode->GetBufferPointer() : NULL;
+}
+
+// ----------------------------------------------------------------------
+
+inline unsigned int Direct3d11_VertexShaderData::getSkinnedBytecodeSize() const
+{
+	return m_skinnedBytecode ? static_cast<unsigned int>(m_skinnedBytecode->GetBufferSize()) : 0;
 }
 
 // ----------------------------------------------------------------------
