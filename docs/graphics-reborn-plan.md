@@ -63,6 +63,63 @@ one is verified in game.
 4. **Particles and effects.** Whatever else is still coming through the dynamic ring once skinning
    is gone.
 
+## Step 1 results
+
+Measured standing among NPCs, both candidates sampled in the same scene.
+
+| candidate | CPU | per frame at ~200 fps |
+| --- | --- | --- |
+| software skinning (`SoftwareBlendSkeletalShaderPrimitive::prepareToDraw`) | 185 ms/s, **18.5% of one core** | ~0.92 ms |
+| CPU shadow volumes (`ShadowVolume::extrudeShadowVolume`) | 29 ms/s, 2.9% of one core | ~0.15 ms |
+
+Skinning costs 6.4x what the shadow volumes do, so it is the first target. Worth noting that is the
+opposite of what the reported shadow problem suggested, which is the reason for measuring rather
+than starting where the symptom pointed.
+
+Per-vertex cost is 56 ns, and it extrapolates: twice the characters, twice the time.
+
+`prepareToDraw` also covers transform setup and buffer locks, so 0.92 ms is the upper bound of what
+GPU skinning removes, not the exact prize.
+
+## The vertex format, decided by measurement
+
+SWG stores influences as one plus a variable count, so a fixed four was an assumption. Sampling
+~218 million vertices:
+
+| influences | share |
+| --- | --- |
+| 1 | 59.5% |
+| 2 | 24.0% |
+| 3 | 14.1% |
+| 4 | 1.16% |
+| 5 to 6 | 0.44% |
+| 7 or more | none |
+
+Largest skeleton seen: **59 transforms**.
+
+So:
+
+- **Four influences per vertex**, weights renormalised. This touches 0.44% of vertices and only
+  their two smallest weights. Standard practice, and now a measured claim rather than a habit.
+- **No matrix palette splitting.** 59 bones is 177 float4 constants against a 4096 limit.
+- Vertex format carries position, normal, four bone indices and four weights.
+
+## How the skinning gets into the shaders
+
+Not by authoring a shader per material. `Direct3d11_ShaderSource` already rewrites the shipped
+programs -- it injects a pixel epilogue for the alpha test and fog, and
+`Direct3d11_ShaderSignature::wrapVertexProgram` already wraps every vertex program in one canonical
+signature. Skinning goes in the same way: a prologue injected ahead of the shipped code that
+replaces position and normal with their skinned values from the bone constants.
+
+That keeps all 192 shipped vertex programs working untouched, and it makes the fallback switch
+nearly free -- skip the injection and the CPU path stands exactly as it is.
+
+## Target for DX11 only
+
+Backward compatibility with the DX9 client is explicitly out of scope from this point. The vertex
+formats are free to change.
+
 ## Constraints
 
 - New shaders are now in scope. They were not on the parity branch: that branch is stock DX9 assets

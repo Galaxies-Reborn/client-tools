@@ -91,6 +91,27 @@ namespace SkinningCostReport
 		return ms_enabled;
 	}
 
+	// The two numbers that decide a GPU skinning vertex format: how many bones influence a single
+	// vertex, and how many bones a skeleton has. SWG stores influences as one plus a variable
+	// count, so a fixed four is an assumption until the shipped data is checked. Weights beyond the
+	// fourth are usually negligible and clamping is standard practice -- but "usually" is not a
+	// measurement, and the histogram says whether clamping to four would touch anything real.
+	int  ms_influenceHistogram[9];   // 1..8 influences, index 0 unused, last bucket is "8 or more"
+	int  ms_maximumInfluences;
+	int  ms_maximumSkeletonTransforms;
+
+	void noteVertexFormat(int influences, int skeletonTransforms)
+	{
+		if (influences > ms_maximumInfluences)
+			ms_maximumInfluences = influences;
+
+		if (skeletonTransforms > ms_maximumSkeletonTransforms)
+			ms_maximumSkeletonTransforms = skeletonTransforms;
+
+		int const bucket = (influences < 1) ? 1 : ((influences > 8) ? 8 : influences);
+		++ms_influenceHistogram[bucket];
+	}
+
 	void report(long long ticks, int vertices)
 	{
 		ms_ticks += ticks;
@@ -120,6 +141,11 @@ namespace SkinningCostReport
 			perSecond, perSecond / 10.0,
 			static_cast<double>(ms_vertices) / seconds,
 			static_cast<double>(ms_calls) / seconds));
+
+		WARNING(true, ("SkinningFormat: at most %d influence(s) on a vertex and %d transform(s) in a skeleton. Influence histogram 1..8+: %d %d %d %d %d %d %d %d.",
+			ms_maximumInfluences, ms_maximumSkeletonTransforms,
+			ms_influenceHistogram[1], ms_influenceHistogram[2], ms_influenceHistogram[3], ms_influenceHistogram[4],
+			ms_influenceHistogram[5], ms_influenceHistogram[6], ms_influenceHistogram[7], ms_influenceHistogram[8]));
 
 		ms_ticks = 0;
 		ms_vertices = 0;
@@ -565,6 +591,18 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 	NOT_NULL(m_dynamicStream);
 
 	SkinningCostReport::Scope const skinningCost(m_vertexCount);
+
+	// Sample the vertex influence counts once per call rather than per vertex: this walks the source
+	// vertices only to characterise the data for a GPU vertex format, and doing it per vertex on
+	// every primitive every frame would cost more than the thing being measured.
+	if (SkinningCostReport::enabled() && m_sourceVectors && m_vertexCount > 0)
+	{
+		int const skeletonTransforms = m_appearance.getSkeleton(m_lodIndex).getTransformCount();
+		int const sampleStride = (m_vertexCount > 64) ? (m_vertexCount / 64) : 1;
+
+		for (int i = 0; i < m_vertexCount; i += sampleStride)
+			SkinningCostReport::noteVertexFormat(1 + m_sourceVectors[i].m_extraTransformDataCount, skeletonTransforms);
+	}
 
 	NP_PROFILER_AUTO_BLOCK_DEFINE("SoftwareBlendSkeletalShaderPrimitive::prepareToDraw");
 
