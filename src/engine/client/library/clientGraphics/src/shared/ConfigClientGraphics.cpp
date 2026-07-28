@@ -96,20 +96,21 @@ void ConfigClientGraphics::install (const Defaults &defaults)
 
 	KEY_BOOL(validateShaderImplementations,       true);
 	KEY_BOOL(screenShotBackBuffer,                false);
-	// Multi-stream skinned vertex buffers, on by default now.
+	// Multi-stream skinned vertex buffers. Off, as shipped.
 	//
-	// This shipped disabled, and measurement showed what that cost: every skinned primitive was
-	// rejected from the GPU skinning path for being single-stream, so the path could never run at
-	// all -- the switch alone held it at zero regardless of anything else.
+	// Turning this on is what unblocks GPU skinning -- every primitive is otherwise rejected as
+	// single-stream, which held that path at exactly zero -- and it would also stop the whole vertex
+	// being copied into the dynamic ring every frame when only position and normal change.
 	//
-	// It costs more than that path, though. Single-stream puts colour and texture coordinates in the
-	// same buffer as position and normal, so the whole vertex is copied into the dynamic ring every
-	// frame even though only position and normal change. Multi-stream keeps the constant data in a
-	// static buffer and writes only what is animated.
+	// But enabling it produced severe geometry corruption: distorted objects, bouncing terrain,
+	// wobbling buildings. That is scene-wide, and skeletal meshes are the only thing this flag is
+	// supposed to reach, so switching it on disturbs something shared rather than only the skinned
+	// path. Whatever that is has to be found before the flag is worth anything.
 	//
-	// DX11 is the only target and it supports multiple streams and stream offsets natively; the
-	// backend reports both. Set true to put every skeletal primitive back on the single-stream path.
-	KEY_BOOL(disableMultiStreamVertexBuffers,     false);
+	// Not a regression of a working feature: multi-stream has never run in this client. The DX11
+	// backend reports stream offsets supported and more than one stream, so the capability is
+	// claimed -- and the corruption says the claim is not matched by the code behind it somewhere.
+	KEY_BOOL(disableMultiStreamVertexBuffers,     true);
 	KEY_BOOL(nPatchTest,                          false);
 	KEY_BOOL(disableOcclusionCulling,             false);
 
