@@ -8,6 +8,7 @@
 //===================================================================
 
 #include "clientObject/FirstClientObject.h"
+#include "sharedFoundation/ConfigFile.h"
 #include "clientObject/ShadowVolume.h"
 
 #include "clientGraphics/Camera.h"
@@ -1678,8 +1679,97 @@ void ShadowVolume::render(Object const * const object, const Appearance *const a
 // PRIVATE ShadowVolume
 //===================================================================
 
+// ======================================================================
+// Graphics Reborn step 1: what do CPU shadow volumes cost?
+//
+// Measured against the same scene as the skinning figure so the two can be compared and the first
+// GPU target chosen by size rather than by assumption. extrudeShadowVolume is the per-object
+// silhouette and extrusion work: dot tests against the light for every face, then building the cap
+// and edge index buffers.
+//
+// Same shape as SkinningCostReport in SoftwareBlendSkeletalShaderPrimitive.cpp -- a rate over five
+// seconds, gated on ClientGame/reportGpuOffloadCandidates, default false.
+// ======================================================================
+
+namespace ShadowCostReport
+{
+	bool      ms_enabled;
+	bool      ms_checkedConfig;
+	long long ms_ticks;
+	int       ms_calls;
+	long long ms_lastReport;
+
+	long long nowTicks()
+	{
+		LARGE_INTEGER now;
+		return QueryPerformanceCounter(&now) ? now.QuadPart : 0;
+	}
+
+	long long frequency()
+	{
+		LARGE_INTEGER f;
+		return QueryPerformanceFrequency(&f) ? f.QuadPart : 0;
+	}
+
+	bool enabled()
+	{
+		if (!ms_checkedConfig)
+		{
+			ms_checkedConfig = true;
+			ms_enabled = ConfigFile::getKeyBool("ClientGame", "reportGpuOffloadCandidates", false);
+		}
+
+		return ms_enabled;
+	}
+
+	void report(long long ticks)
+	{
+		ms_ticks += ticks;
+		++ms_calls;
+
+		long long const f = frequency();
+		long long const now = nowTicks();
+		if (!f || !now)
+			return;
+
+		if (!ms_lastReport)
+		{
+			ms_lastReport = now;
+			return;
+		}
+
+		long long const sinceReport = now - ms_lastReport;
+		if (sinceReport < f * 5)
+			return;
+
+		double const seconds = static_cast<double>(sinceReport) / static_cast<double>(f);
+		double const milliseconds = static_cast<double>(ms_ticks) * 1000.0 / static_cast<double>(f);
+		double const perSecond = milliseconds / seconds;
+
+		WARNING(true, ("ShadowCost: %.1f ms/s in ShadowVolume::extrudeShadowVolume, %.1f%% of one core; %.0f calls/s.",
+			perSecond, perSecond / 10.0, static_cast<double>(ms_calls) / seconds));
+
+		ms_ticks = 0;
+		ms_calls = 0;
+		ms_lastReport = now;
+	}
+
+	class Scope
+	{
+	public:
+		Scope() : m_start(enabled() ? nowTicks() : 0) {}
+		~Scope() { if (m_start) report(nowTicks() - m_start); }
+	private:
+		Scope(Scope const &);
+		Scope &operator =(Scope const &);
+		long long m_start;
+	};
+}
+
 void ShadowVolume::extrudeShadowVolume (const Vector& directionToLight_o) const
 {
+	ShadowCostReport::Scope const shadowCost;
+
 	PROFILER_AUTO_BLOCK_DEFINE("ShadowVolume::extrudeShadowVolume");
 
 	//-- setup CrashReportInformation string.

@@ -38,6 +38,109 @@
 #include "sharedDebug/Profiler.h"
 #include "sharedFoundation/ExitChain.h"
 #include "sharedFoundation/MemoryBlockManager.h"
+#include "sharedFoundation/ConfigFile.h"
+
+// ======================================================================
+// Graphics Reborn step 1: what does software skinning actually cost?
+//
+// Measured around prepareToDraw, which runs per primitive per frame and builds the skinned
+// vertex data. Not calculateSkinnedGeometryNow: that is a virtual on ShaderPrimitive with no
+// caller on the normal path -- only TextureRendererShaderPrimitive forwards to it -- so timing
+// it reported nothing at all.
+//
+// 6.4 MB a frame through the dynamic vertex ring says a lot of geometry is CPU-built. It does not
+// say how many milliseconds that costs, and milliseconds decide whether GPU skinning is worth its
+// risk. So measure before moving anything.
+//
+// Reported as a rate rather than per frame: the scene that matters is a crowded one, and the
+// question is what share of a second's CPU budget this takes. Milliseconds per second and vertices
+// per second together give a per-vertex cost that extrapolates.
+//
+// Gated behind ClientGame/reportGpuOffloadCandidates, default false.
+// ======================================================================
+
+namespace SkinningCostReport
+{
+	bool      ms_enabled;
+	bool      ms_checkedConfig;
+	long long ms_ticks;
+	long long ms_vertices;
+	int       ms_calls;
+	long long ms_lastReport;
+
+	long long nowTicks()
+	{
+		LARGE_INTEGER now;
+		return QueryPerformanceCounter(&now) ? now.QuadPart : 0;
+	}
+
+	long long frequency()
+	{
+		LARGE_INTEGER f;
+		return QueryPerformanceFrequency(&f) ? f.QuadPart : 0;
+	}
+
+	bool enabled()
+	{
+		if (!ms_checkedConfig)
+		{
+			ms_checkedConfig = true;
+			ms_enabled = ConfigFile::getKeyBool("ClientGame", "reportGpuOffloadCandidates", false);
+		}
+
+		return ms_enabled;
+	}
+
+	void report(long long ticks, int vertices)
+	{
+		ms_ticks += ticks;
+		ms_vertices += vertices;
+		++ms_calls;
+
+		long long const f = frequency();
+		long long const now = nowTicks();
+		if (!f || !now)
+			return;
+
+		if (!ms_lastReport)
+		{
+			ms_lastReport = now;
+			return;
+		}
+
+		long long const sinceReport = now - ms_lastReport;
+		if (sinceReport < f * 5)
+			return;
+
+		double const seconds = static_cast<double>(sinceReport) / static_cast<double>(f);
+		double const milliseconds = static_cast<double>(ms_ticks) * 1000.0 / static_cast<double>(f);
+		double const perSecond = milliseconds / seconds;
+
+		WARNING(true, ("SkinningCost: %.1f ms/s in SoftwareBlendSkeletalShaderPrimitive::prepareToDraw, %.1f%% of one core; %.0f vertices/s over %.0f calls/s.",
+			perSecond, perSecond / 10.0,
+			static_cast<double>(ms_vertices) / seconds,
+			static_cast<double>(ms_calls) / seconds));
+
+		ms_ticks = 0;
+		ms_vertices = 0;
+		ms_calls = 0;
+		ms_lastReport = now;
+	}
+
+	// Scope guard, so the measurement cannot be left unclosed by an early return.
+	class Scope
+	{
+	public:
+		explicit Scope(int vertices) : m_vertices(vertices), m_start(enabled() ? nowTicks() : 0) {}
+		~Scope() { if (m_start) report(nowTicks() - m_start, m_vertices); }
+	private:
+		Scope(Scope const &);
+		Scope &operator =(Scope const &);
+		int       m_vertices;
+		long long m_start;
+	};
+}
+
 #include "sharedFoundation/Os.h"
 #include "sharedFoundation/PointerDeleter.h"
 #include "sharedFoundation/VoidMemberFunction.h"
@@ -460,6 +563,8 @@ const StaticShader &SoftwareBlendSkeletalShaderPrimitive::prepareToView() const
 void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 {
 	NOT_NULL(m_dynamicStream);
+
+	SkinningCostReport::Scope const skinningCost(m_vertexCount);
 
 	NP_PROFILER_AUTO_BLOCK_DEFINE("SoftwareBlendSkeletalShaderPrimitive::prepareToDraw");
 
