@@ -572,11 +572,13 @@ namespace ClientMainNamespace
 		BIC_queueLowBlow,
 		BIC_lowBlowWeaponStatus,
 		BIC_queueLastDitch,
-		BIC_lastDitchWeaponStatus
+		BIC_lastDitchWeaponStatus,
+		BIC_queueFeignDeath,
+		BIC_feignDeathWeaponStatus
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 246;
+	LRESULT const cms_backgroundInputProtocolVersion = 247;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1234,6 +1236,25 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"meditate",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueFeignDeath()
+	{
+		Object * const player = Game::getPlayer();
+		if (!player ||
+			Game::getPlayerNetworkId().getValueString() != "44003778")
+			return false;
+
+		// Feign death is a queued self-state command.  The server owns combat
+		// admission, the pending defense window, the roll, and later reveal.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"feignDeath",
 			NetworkId::cms_invalid,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -3725,6 +3746,14 @@ namespace ClientMainNamespace
 
 			case BIC_lastDitchWeaponStatus:
 				return getBackgroundGeneratedCombatWeaponStatus("lastDitch");
+
+			case BIC_queueFeignDeath:
+				if (!performBackgroundQueueFeignDeath())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_feignDeathWeaponStatus:
+				return getBackgroundGeneratedCombatWeaponStatus("feignDeath");
 
 			case BIC_queuePolearmArea1:
 				if (lParam < 1 || lParam > 16 ||
