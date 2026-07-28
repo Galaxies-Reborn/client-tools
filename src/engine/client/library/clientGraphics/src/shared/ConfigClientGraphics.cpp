@@ -96,7 +96,20 @@ void ConfigClientGraphics::install (const Defaults &defaults)
 
 	KEY_BOOL(validateShaderImplementations,       true);
 	KEY_BOOL(screenShotBackBuffer,                false);
-	KEY_BOOL(disableMultiStreamVertexBuffers,     true);
+	// Multi-stream skinned vertex buffers, on by default now.
+	//
+	// This shipped disabled, and measurement showed what that cost: every skinned primitive was
+	// rejected from the GPU skinning path for being single-stream, so the path could never run at
+	// all -- the switch alone held it at zero regardless of anything else.
+	//
+	// It costs more than that path, though. Single-stream puts colour and texture coordinates in the
+	// same buffer as position and normal, so the whole vertex is copied into the dynamic ring every
+	// frame even though only position and normal change. Multi-stream keeps the constant data in a
+	// static buffer and writes only what is animated.
+	//
+	// DX11 is the only target and it supports multiple streams and stream offsets natively; the
+	// backend reports both. Set true to put every skeletal primitive back on the single-stream path.
+	KEY_BOOL(disableMultiStreamVertexBuffers,     false);
 	KEY_BOOL(nPatchTest,                          false);
 	KEY_BOOL(disableOcclusionCulling,             false);
 
