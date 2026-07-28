@@ -51,7 +51,7 @@ namespace Direct3d11_ShaderSignatureNamespace
 		"\n"
 		"float4x3 swgBoneMatrix(uint index)\n"
 		"{\n"
-		"\tuint const row = index * 3u;\n"
+		"\tconst uint row = index * 3u;\n"
 		"\treturn float4x3(\n"
 		"\t\tfloat3(swgBoneRows[row + 0u].x, swgBoneRows[row + 1u].x, swgBoneRows[row + 2u].x),\n"
 		"\t\tfloat3(swgBoneRows[row + 0u].y, swgBoneRows[row + 1u].y, swgBoneRows[row + 2u].y),\n"
@@ -61,7 +61,7 @@ namespace Direct3d11_ShaderSignatureNamespace
 		"\n"
 		"void swgSkin(inout float3 position, inout float3 normal, uint4 indices, float4 weights)\n"
 		"{\n"
-		"\tfloat const total = weights.x + weights.y + weights.z + weights.w;\n"
+		"\tconst float total = weights.x + weights.y + weights.z + weights.w;\n"
 		"\tweights = (total > 0.0f) ? (weights / total) : float4(1.0f, 0.0f, 0.0f, 0.0f);\n"
 		"\n"
 		"\tfloat3 skinnedPosition = 0.0f;\n"
@@ -70,8 +70,8 @@ namespace Direct3d11_ShaderSignatureNamespace
 		"\t[unroll]\n"
 		"\tfor (uint i = 0u; i < 4u; ++i)\n"
 		"\t{\n"
-		"\t\tfloat const weight = weights[i];\n"
-		"\t\tfloat4x3 const bone = swgBoneMatrix(indices[i]);\n"
+		"\t\tconst float weight = weights[i];\n"
+		"\t\tconst float4x3 bone = swgBoneMatrix(indices[i]);\n"
 		"\t\tskinnedPosition += mul(float4(position, 1.0f), bone) * weight;\n"
 		"\t\tskinnedNormal   += mul(float4(normal,   0.0f), bone) * weight;\n"
 		"\t}\n"
@@ -119,6 +119,10 @@ namespace Direct3d11_ShaderSignatureNamespace
 	};
 
 	bool        isIdentifierCharacter(char c);
+
+	// Does the entry point's input struct declare both of the members the skinning prologue writes
+	// through? Programs that take only a position -- the 2D ones -- cannot be skinned.
+	bool        inputStructCanSkin(char const *source, int length, std::string const &parameters);
 	char const *memberForSemantic(char const *semantic);
 	int         widthOfType(char const *type);
 	int         compilableLength(char const *source, int length);
@@ -529,6 +533,46 @@ char *Direct3d11_ShaderSignatureNamespace::duplicate(std::string const &text, in
  * member it declared into the matching canonical slot.
  */
 
+bool Direct3d11_ShaderSignatureNamespace::inputStructCanSkin(char const *source, int length, std::string const &parameters)
+{
+	//-- The struct's type name is the first identifier in the parameter list.
+	size_t typeStart = parameters.find_first_not_of(" \t\n\r");
+	if (typeStart == std::string::npos)
+		return false;
+
+	size_t typeEnd = typeStart;
+	while ((typeEnd < parameters.size()) && isIdentifierCharacter(parameters[typeEnd]))
+		++typeEnd;
+
+	if (typeEnd <= typeStart)
+		return false;
+
+	std::string const typeName(parameters, typeStart, typeEnd - typeStart);
+
+	int structStart = 0;
+	int structEnd = 0;
+	if (!findStruct(source, length, typeName.c_str(), structStart, structEnd))
+		return false;
+
+	std::vector<Declaration> members;
+	parseDeclarations(source, structStart + 1, structEnd, members);
+
+	bool hasPosition = false;
+	bool hasNormal = false;
+
+	for (size_t i = 0; i < members.size(); ++i)
+	{
+		if (members[i].name == "position")
+			hasPosition = true;
+		else if (members[i].name == "normal")
+			hasNormal = true;
+	}
+
+	return hasPosition && hasNormal;
+}
+
+// ----------------------------------------------------------------------
+
 char *Direct3d11_ShaderSignature::wrapVertexProgram(char const *name, char const *source, int length, int &resultLength, bool skinned)
 {
 	// Everything past the first NUL is invisible to the compiler, so it is invisible here too --
@@ -589,6 +633,14 @@ char *Direct3d11_ShaderSignature::wrapVertexProgram(char const *name, char const
 	// single struct, but forwarding the text rather than the parsed form means an unusual one still
 	// works as long as it compiles.
 	std::string const parameters(source + parameterOpen + 1, static_cast<size_t>(parameterClose - parameterOpen - 1));
+
+	//-- A skinned variant is only meaningful if the shipped input struct has the members the
+	//   prologue writes through. 2d.vsh and its like have a position and no normal, so the injection
+	//   could never have worked for them and attempting it just spends an fxc compile to produce an
+	//   error. No skinned variant means that program's materials skin on the CPU, which for a 2D
+	//   program is not a loss of anything.
+	if (skinned && !inputStructCanSkin(source, length, parameters))
+		return NULL;
 
 	// The parameter's NAME, for the forwarded call. Last identifier in the list.
 	int argEnd = parameterClose;
