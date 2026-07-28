@@ -148,6 +148,18 @@ private:
 	SourceVertex           *m_sourceVectors;
 	Dot3Vector             *m_sourceDot3Vectors;
 	TransformData          *m_transformData;
+
+	// GPU skinning, built once per primitive rather than per frame.
+	//
+	// Four influences a vertex: indices then weights, one byte each, eight bytes a vertex. The
+	// engine allows six and measurement put five or six on 0.44% of vertices, so this keeps the four
+	// largest and renormalises. 59 bones is the measured worst case, which fits a byte with room.
+	//
+	// Null until built, and only built when GPU skinning is asked for.
+	uint8                  *m_gpuBoneData;
+
+	// Built once, on first use, when GPU skinning is enabled.
+	void                    buildGpuBoneData();
 	//-----------------------------------------------
 
 	mutable ShadowVolume   *m_shadowVolume;

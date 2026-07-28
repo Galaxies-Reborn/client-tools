@@ -59,6 +59,28 @@
 // Gated behind ClientGame/reportGpuOffloadCandidates, default false.
 // ======================================================================
 
+namespace GpuSkinning
+{
+	bool ms_enabled;
+	bool ms_checkedConfig;
+
+	// Off until asked for. Turning it off is also how a regression gets bisected in a running
+	// client rather than by rebuilding.
+	bool enabled()
+	{
+		if (!ms_checkedConfig)
+		{
+			ms_checkedConfig = true;
+			ms_enabled = ConfigFile::getKeyBool("ClientSkeletalAnimation", "gpuSkinning", false);
+		}
+
+		return ms_enabled;
+	}
+
+	int const cms_influencesPerVertex = 4;
+	int const cms_bytesPerVertex = 8;   // four indices then four weights, a byte each
+}
+
 namespace SkinningCostReport
 {
 	bool      ms_enabled;
@@ -527,6 +549,7 @@ SoftwareBlendSkeletalShaderPrimitive::SoftwareBlendSkeletalShaderPrimitive(class
 	m_sourceVectors(0),
 	m_sourceDot3Vectors(0),
 	m_transformData(0),
+	m_gpuBoneData(0),
 	m_shadowVolume(0),
 	m_skinningMode(SM_softSkinning),
 	m_hasBeenSkinned(false),
@@ -568,6 +591,9 @@ SoftwareBlendSkeletalShaderPrimitive::~SoftwareBlendSkeletalShaderPrimitive()
 	std::for_each(m_renderCommands->begin(), m_renderCommands->end(), PointerDeleter());
 	delete m_renderCommands;
 
+	delete [] m_gpuBoneData;
+	m_gpuBoneData = 0;
+
 	delete m_shadowVolume;
 	m_shadowVolume = 0;
 }
@@ -605,6 +631,95 @@ int SoftwareBlendSkeletalShaderPrimitive::getVertexBufferSortKey() const
 const StaticShader &SoftwareBlendSkeletalShaderPrimitive::prepareToView() const
 {
 	return m_shader->prepareToView();
+}
+
+// ----------------------------------------------------------------------
+
+// ======================================================================
+/**
+ * Build the per-vertex bone data GPU skinning needs, once.
+ *
+ * The engine stores influences as a first transform plus a variable number of extras, and the GPU
+ * format carries four. Measurement over about 218 million vertices put five or six influences on
+ * 0.44% of them and none above six, so this keeps the four largest and renormalises: the dropped
+ * weight is small but not always zero, and without renormalising those vertices would be pulled
+ * toward the origin instead of staying on the surface.
+ *
+ * Indices and weights are a byte each. The largest skeleton measured is 59 transforms, which fits a
+ * byte with room, and 1/255 on a weight is far finer than skinning needs.
+ */
+
+void SoftwareBlendSkeletalShaderPrimitive::buildGpuBoneData()
+{
+	if (m_gpuBoneData || !m_sourceVectors || m_vertexCount <= 0)
+		return;
+
+	m_gpuBoneData = new uint8[static_cast<size_t>(m_vertexCount) * GpuSkinning::cms_bytesPerVertex];
+
+	TransformData const *extra = m_transformData;
+
+	for (int i = 0; i < m_vertexCount; ++i)
+	{
+		SourceVertex const &sourceVertex = m_sourceVectors[i];
+
+		int indices[8];
+		float weights[8];
+		int count = 0;
+
+		indices[count] = sourceVertex.m_firstTransformData.m_transformIndex;
+		weights[count] = static_cast<float>(sourceVertex.m_firstTransformData.m_transformWeight);
+		++count;
+
+		for (int j = 0; j < sourceVertex.m_extraTransformDataCount && count < 8; ++j)
+		{
+			indices[count] = extra[j].m_transformIndex;
+			weights[count] = static_cast<float>(extra[j].m_transformWeight);
+			++count;
+		}
+
+		extra += sourceVertex.m_extraTransformDataCount;
+
+		// Keep the four largest by weight: a partial selection sort over at most eight entries,
+		// which runs once per vertex for the life of the primitive.
+		for (int slot = 0; slot < GpuSkinning::cms_influencesPerVertex && slot < count; ++slot)
+		{
+			int best = slot;
+			for (int j = slot + 1; j < count; ++j)
+				if (weights[j] > weights[best])
+					best = j;
+
+			if (best != slot)
+			{
+				float const weight = weights[slot];
+				int const index = indices[slot];
+				weights[slot] = weights[best];
+				indices[slot] = indices[best];
+				weights[best] = weight;
+				indices[best] = index;
+			}
+		}
+
+		int const kept = (count < GpuSkinning::cms_influencesPerVertex) ? count : GpuSkinning::cms_influencesPerVertex;
+
+		float total = 0.f;
+		for (int j = 0; j < kept; ++j)
+			total += weights[j];
+
+		uint8 * const destination = m_gpuBoneData + static_cast<size_t>(i) * GpuSkinning::cms_bytesPerVertex;
+
+		for (int j = 0; j < GpuSkinning::cms_influencesPerVertex; ++j)
+		{
+			bool const present = (j < kept) && (total > 0.f);
+
+			// An absent influence points at bone 0 with weight 0, so the shader's unrolled loop runs
+			// all four without a branch and the empty ones contribute nothing.
+			destination[j] = present ? static_cast<uint8>(indices[j]) : static_cast<uint8>(0);
+
+			float const normalised = present ? (weights[j] / total) : 0.f;
+			int const quantised = static_cast<int>((normalised * 255.f) + 0.5f);
+			destination[GpuSkinning::cms_influencesPerVertex + j] = static_cast<uint8>((quantised < 0) ? 0 : ((quantised > 255) ? 255 : quantised));
+		}
+	}
 }
 
 // ----------------------------------------------------------------------
