@@ -306,6 +306,13 @@ namespace Direct3d11Namespace
 			static_cast<float>(color.getB()) / 255.0f);
 	}
 
+	// GPU skinning: the bone matrices for the next skinned draw. Rows are 3x4 -- the fourth row of an
+	// affine transform is constant, so the shader reconstructs it rather than the buffer carrying it.
+	void setBoneMatrices(float const *rows, int boneCount)
+	{
+		Direct3d11_ConstantBuffers::setBoneMatrices(rows, boneCount);
+	}
+
 	void setVertexShaderUserConstants(int index, float c0, float c1, float c2, float c3)
 	{
 		FATAL(index < 0 || index > (VCSR_userConstant7 - VCSR_userConstant0), ("Direct3d11: vertex user constant index %d is outside the eight the register file reserves.", index));
@@ -734,6 +741,7 @@ void Direct3d11Namespace::fillApiTable()
 	ms_glApi.setWorldToCameraTransform         = setWorldToCameraTransform;
 	ms_glApi.setProjectionMatrix               = setProjectionMatrix;
 	ms_glApi.setFog                            = setFog;
+	ms_glApi.setBoneMatrices                   = setBoneMatrices;
 	ms_glApi.setObjectToWorldTransformAndScale = setObjectToWorldTransformAndScale;
 	ms_glApi.setGlobalTexture                  = setGlobalTexture;
 	ms_glApi.releaseAllGlobalTextures          = releaseAllGlobalTextures;

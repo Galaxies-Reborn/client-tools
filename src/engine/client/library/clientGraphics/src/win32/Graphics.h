@@ -202,6 +202,11 @@ public:
 	static void                          setWorldToCameraTransform(const Transform &transform, const Vector &cameraPosition);
 	static void                          setProjectionMatrix(const GlMatrix4x4 &projectionMatrix);
 	static void                          setFog(bool enabled, float density, const PackedArgb &color);
+
+	// GPU skinning: bone matrices for the next skinned draw, as 3x4 rows -- the fourth row of an
+	// affine transform is constant and the shader reconstructs it. Returns false when the backend
+	// has no GPU skinning, in which case the caller skins on the CPU exactly as before.
+	static bool                          setBoneMatrices(const float *rows, int boneCount);
 	static void                          getFog(bool & enabled, float & density, PackedArgb & color);
 	static void                          setObjectToWorldTransformAndScale(const Transform &objectToWorld, const Vector &scale);
 	static void                          setGlobalTexture(Tag tag, const Texture &texture);

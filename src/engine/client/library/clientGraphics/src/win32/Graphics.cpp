@@ -1502,6 +1502,27 @@ void Graphics::setProjectionMatrix(const GlMatrix4x4 &projectionMatrix)
 
 // ----------------------------------------------------------------------
 
+/**
+ * Upload the bone matrices for the next skinned draw.
+ *
+ * Rows are 3x4: the fourth row of an affine transform is constant and the shader reconstructs it.
+ *
+ * A backend without GPU skinning leaves the entry null, and this reports false so the caller skins
+ * on the CPU exactly as before. That is what keeps GPU skinning additive rather than a switch-over,
+ * and it is why the return value matters.
+ */
+
+bool Graphics::setBoneMatrices(float const *rows, int boneCount)
+{
+	if (!ms_api->setBoneMatrices || !rows || boneCount <= 0)
+		return false;
+
+	ms_api->setBoneMatrices(rows, boneCount);
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
 void Graphics::setFog(bool enabled, float density, const PackedArgb &color)
 {
 	NOT_NULL(ms_api);
