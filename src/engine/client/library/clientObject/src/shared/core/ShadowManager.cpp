@@ -111,7 +111,24 @@ namespace ShadowManagerNamespace
 			const float distance = sqrt (distanceSquared);
 			const float tanHalfFov = tan (0.5f * camera.getHorizontalFieldOfView ());
 
-			if (distance > 0.01f && tanHalfFov > 0.f)
+			//-- Only applied past a quarter of the shadow distance.
+			//
+			//   A caster's own apparent size is a poor proxy for whether its shadow is visible: the
+			//   volume extends up to ms_shadowVolumeExtrudeDistance from the caster, so something
+			//   behind the camera, or small on screen, can still throw a shadow across the view. The
+			//   shipped code got this right by accident -- it only size-culled objects it could
+			//   project, and projection fails outside the near and far planes, so anything behind the
+			//   camera escaped the cull. Making the test unconditional removed shadows that were
+			//   being drawn for good reason, which shows up as shadows vanishing when you turn away
+			//   from what casts them.
+			//
+			//   Near casters therefore keep their shadows whatever their screen size or direction.
+			//   The size test still bounds the distant tail, where a shadow genuinely cannot reach
+			//   back into view, and it is still computed from distance and field of view rather than
+			//   by projecting -- so it stays continuous and there is nothing to flicker.
+			const float sizeCullBeyond = 0.25f * maximumDistance;
+
+			if (distance > sizeCullBeyond && distance > 0.01f && tanHalfFov > 0.f)
 			{
 				const float halfWidth = 0.5f * static_cast<float> (Graphics::getCurrentRenderTargetWidth ());
 				const float screenRadius = (radius * halfWidth) / (distance * tanHalfFov);
