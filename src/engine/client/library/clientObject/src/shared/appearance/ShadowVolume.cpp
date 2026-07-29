@@ -1529,7 +1529,10 @@ void ShadowVolume::addPrimitive (const VertexBufferReadIterator& vi, const int n
 				VertexBufferFormat format;
 				format.setPosition ();
 
-				shadowPrimitive.shadowVertexBuffer = new SystemVertexBuffer (format, shadowPrimitive.compactVertexCount);
+				//-- Twice the vertices: the mesh, then an extruded copy for the far cap. Holding both
+				//   here is what lets the two cap draws become one -- the far cap no longer needs its
+				//   own transform because the offset is baked into the second half.
+				shadowPrimitive.shadowVertexBuffer = new SystemVertexBuffer (format, shadowPrimitive.compactVertexCount * 2);
 			}
 
 			//-- copy compact vertex array
@@ -1793,21 +1796,16 @@ void ShadowVolume::render(Object const * const object, const Appearance *const a
 		NOT_NULL (m_localShaderPrimitiveRenderFrontCapsTwoSided);
 		ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderFrontCapsTwoSided);
 
-		//-- Three draw calls: edges, front caps, back caps. The two extrude proxies submitted
-		//   alongside them set the transform and run the extrusion in prepareToDraw; their draw() is
-		//   empty, so counting them here would overstate the draw cost by two thirds.
-		ShadowCostReport::noteRendered (3);
+		//-- Two draw calls now: edges, and one cap pass carrying both front and back. The extrude
+		//   proxy submitted alongside them runs the extrusion in prepareToDraw and its draw() is
+		//   empty, so counting it here would overstate the draw cost.
+		ShadowCostReport::noteRendered (2);
 
 #if SHADOW_EXTRUDE_TO_POINT == 0
-		if (m_localShaderPrimitiveRenderBackCapsTwoSided)
-		{
-			proxyLocalShaderPrimitive = NON_NULL (new ProxyLocalShaderPrimitive (*ms_shadowVolumeTwoSidedShader, *this, *object, *appearance, isInWorldCell, ProxyLocalShaderPrimitive::M_prepareFarCap));
-			ms_proxyLocalShaderPrimitiveList->push_back (proxyLocalShaderPrimitive);
-			ShaderPrimitiveSorter::add (*proxyLocalShaderPrimitive);
-
-			NOT_NULL (m_localShaderPrimitiveRenderBackCapsTwoSided);
-			ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderBackCapsTwoSided);
-		}
+		//-- No separate back cap pass. Its geometry is now an extruded copy of the mesh living in the
+		//   second half of the same vertex buffer, with its indices appended to the front cap's, so
+		//   the front cap draw above delivers both. The far-cap transform proxy went with it: the
+		//   offset is baked into those vertices and no longer needs a transform to apply it.
 #endif
 	}
 	else
@@ -2041,6 +2039,36 @@ void ShadowVolume::extrudeShadowVolume (const Vector& directionToLight_o) const
 				}
 			}
 		}
+
+			//-- The far cap: the same vertices moved along the light, written into the second half of
+			//   the buffer, and the back cap indices appended after the front ones with that offset
+			//   applied. One draw covers both caps afterwards.
+			//
+			//   The counts always fit: a face is either front-facing or back-facing to the light and
+			//   never both, so the two index counts sum to compactIndexCount, which is what the front
+			//   index buffer is sized to.
+			if (shadowPrimitive.shadowVertexBuffer && shadowPrimitive.compactVertexCount)
+			{
+				const Vector extrusion = -directionToLight_o * ms_shadowVolumeExtrudeDistance;
+
+				VertexBufferWriteIterator farIterator = shadowPrimitive.shadowVertexBuffer->begin ();
+				farIterator += shadowPrimitive.compactVertexCount;
+
+				int v;
+				for (v = 0; v < shadowPrimitive.compactVertexCount; ++v, ++farIterator)
+					farIterator.setPosition (shadowPrimitive.compactVertexArray [v] + extrusion);
+
+				Index * const combined = shadowPrimitive.shadowFrontIndexBuffer->begin ();
+				const Index * const back = shadowPrimitive.shadowBackIndexBuffer->begin ();
+				const Index offset = static_cast<Index> (shadowPrimitive.compactVertexCount);
+
+				int b;
+				for (b = 0; b < shadowPrimitive.shadowBackIndexCount; ++b)
+					combined [shadowPrimitive.shadowFrontIndexCount + b] = static_cast<Index> (back [b] + offset);
+
+				shadowPrimitive.shadowFrontIndexCount += shadowPrimitive.shadowBackIndexCount;
+				shadowPrimitive.shadowBackIndexCount = 0;
+			}
 
 		{
 			if (ms_numberOfShadowEdgePrimitives >= ms_shadowEdgePrimitiveList.size ())
