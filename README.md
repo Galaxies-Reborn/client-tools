@@ -28,7 +28,7 @@ Installer URLs, pinned DirectX hashes, and the offline-cache workflow are docume
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-X64Client.ps1
 ```
 
-The script builds the gameplay client and its D3D9 raster DLLs, then verifies that every runtime artifact is x64. Pass `-StagePath` to deploy those artifacts into an existing client data directory with automatic backups.
+The script builds the DX11 gameplay client, then verifies that every deployed runtime artifact is x64. Pass `-StagePath` to deploy those artifacts into an existing client data directory with automatic backups. Gameplay staging is DX11-only, removes backed-up `gl00`, `gl05`, `gl06`, and `gl07` renderer DLLs from the target runtime, and installs the tracked HLSL overrides required to render legacy Publish 14 shader assets through D3D11.
 
 ## Shared Files
 Please note that certain projects and files are prepended with `shared` which means they are files that are used in both the game engine ([the `src` repository](https://github.com/swg-source/src)) and the client. There are many enums, for instance, that must match between the client and server or there may be crashes, errors, unintended functionality or some combination thereof. ***If you make changes to any of these shared files, you must make the changes both in the src and in client-tools.***

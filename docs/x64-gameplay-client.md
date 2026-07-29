@@ -42,10 +42,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-X64Clien
 ## Outputs
 
 - `src/build/win32/x64/Release/SwgClient_r.exe`
-- `src/compile/win32/Direct3d9/Release/gl05_r.dll`
-- `src/compile/win32/Direct3d9_ffp/Release/gl06_r.dll`
-- `src/compile/win32/Direct3d9_vsps/Release/gl07_r.dll`
-- `src/compile/win32/DllExport/Release/DllExport.dll`
+- `src/build/win32/x64/Release/gl11_r.dll`
+- `src/build/win32/x64/Release/DllExport.dll`
 
 ## Stage
 
@@ -61,24 +59,24 @@ profile with the x64 runtime:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Stage-X64Client.ps1 `
-  -ClientRoot "E:\SWG\SWGSource\PreCU-Client" `
+  -ClientRoot "E:\SWG\PRE-CU-Reborn\PreCU-Client" `
   -RuntimeProfile Precu
 ```
 
-The profile owns the canonical 51-TRE archive order, login/preload defaults,
-1024x768 windowed settings, the legacy-interior Bloom compatibility lock, and
-non-activating D3D9 window transitions for background automation. It preserves
-`user.cfg`.
+The profile owns the canonical tracked archive order, login/preload defaults,
+1024x768 windowed settings, the legacy-interior Bloom compatibility lock, the
+DX11 renderer selection, and the HLSL overrides that translate legacy D3D9
+shader assembly for D3D11. It preserves `user.cfg`.
 
 Or build and stage in one command:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-X64Client.ps1 `
-  -StagePath "E:\SWG\SWGSource\PreCU-Client" `
+  -StagePath "E:\SWG\PRE-CU-Reborn\PreCU-Client" `
   -RuntimeProfile Precu
 ```
 
-Staging validates every copied PE as x64, backs up only replaced runtime/profile files under `.x64-backups`, and writes `x64-runtime-manifest.json`. It also backs up and removes incompatible local x86 copies of system DLLs such as `dbghelp.dll`, allowing the x64 process to use `System32`. The default `None` profile does not change client configuration, login settings, TOCs, or TRE files; `-RuntimeProfile Precu` installs the tracked dedicated configuration but never changes TRE files or `user.cfg`.
+Staging validates every copied PE as x64, backs up replaced runtime/profile/shader files under `.x64-backups` while preserving their relative paths, and writes `x64-runtime-manifest.json`. It deploys only `gl11`, removes backed-up `gl00`, `gl05`, `gl06`, and `gl07` renderer DLLs, and installs the complete tracked `scripts/asm2hlsl/converted` tree as loose shader overrides for the Pre-CU profile. It also backs up and removes incompatible local x86 copies of system DLLs such as `dbghelp.dll`, allowing the x64 process to use `System32`. The default `None` profile does not change client configuration, login settings, TOCs, TRE files, or shader assets; `-RuntimeProfile Precu` installs the tracked dedicated configuration and DX11 shader overrides but never changes TRE files or `user.cfg`.
 
 SDL3 provides native input from as many as eight independent joysticks, throttles, rudder pedals, and gamepads. Existing keymaps continue to load; newly saved keymaps record stable device GUIDs so bindings can be restored after reconnecting or reordering controllers. See [the multi-controller input guide](inputreborn.md) for configuration and compatibility details.
 
@@ -87,4 +85,4 @@ SDL3 provides native input from as many as eight independent joysticks, throttle
 - x64 audio uses JUCE 8.0.14 with Windows Audio (WASAPI) and in-process WAV, MP3, and Ogg Vorbis decoding. The compatibility layer preserves sample callbacks, looping, seeking, playback-rate changes, 3D positioning, distance falloff, Doppler, obstruction/occlusion filtering, multichannel routing, and room reverb. No Miles DLL is required for x64.
 - JUCE 8 modules are dual-licensed under AGPLv3 or the commercial JUCE licence. Anyone distributing this client must select and comply with an applicable JUCE licensing path; see `src/external/3rd/library/JUCE-8.0.14/LICENSE.md`.
 - Vivox, Bink, and the retired TCG/browser components do not have usable x64 runtimes in this tree. Keep voice chat and intro video disabled.
-- The regular D3D9 gameplay client and x64 God client are validated. See [the God client guide](god-client.md) for its build and staging workflow.
+- The regular gameplay runtime is DX11-only. The separate x64 God client retains its own renderer workflow; see [the God client guide](god-client.md).
