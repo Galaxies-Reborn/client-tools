@@ -102,12 +102,20 @@ $runtimeFiles = @(
         Name   = "gl07_$suffix.dll"
     },
     [pscustomobject]@{
+        Source = Join-Path $repoRoot "src\build\win32\x64\$Configuration\gl11_$suffix.dll"
+        Name   = "gl11_$suffix.dll"
+    },
+    [pscustomobject]@{
+        Source = Join-Path $repoRoot "src\build\win32\x64\$Configuration\gl00_$suffix.dll"
+        Name   = "gl00_$suffix.dll"
+    },
+    [pscustomobject]@{
         Source = Join-Path $repoRoot "src\build\win32\x64\$Configuration\DllExport.dll"
         Name   = "DllExport.dll"
     },
     [pscustomobject]@{
-        Source = Join-Path $repoRoot "mss64-stub\mss64.dll"
-        Name   = "mss64.dll"
+        Source = Join-Path $repoRoot "deps\x64\bin\SDL3.dll"
+        Name   = "SDL3.dll"
     },
     [pscustomobject]@{
         Source = Join-Path $repoRoot "deps\x64\bin\libxml2.dll"
@@ -167,6 +175,10 @@ $incompatibleLocalPaths = @(
         }
     }
 )
+$obsoleteRuntimePaths = @(
+    Join-Path $clientRootPath "mss64.dll" |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+)
 
 if (-not $PSCmdlet.ShouldProcess($clientRootPath, "stage $Configuration x64 gameplay client")) {
     return
@@ -187,6 +199,7 @@ if (-not $NoBackup) {
         $existingTargets += $manifestPath
     }
     $existingTargets += $incompatibleLocalPaths
+    $existingTargets += $obsoleteRuntimePaths
     $existingTargets = @($existingTargets | Sort-Object -Unique)
 
     if ($existingTargets.Count -gt 0) {
@@ -202,7 +215,7 @@ if (-not $NoBackup) {
     }
 }
 
-foreach ($path in $incompatibleLocalPaths) {
+foreach ($path in @($incompatibleLocalPaths) + @($obsoleteRuntimePaths)) {
     Remove-Item -LiteralPath $path -Force
 }
 
@@ -241,9 +254,11 @@ $manifest = [ordered]@{
     workingTreeDirty = $workingTreeDirty
     clientRoot       = $clientRootPath
     rootTreCount     = $treFiles.Count
-    audioBackend     = "mss64 compatibility stub (silent)"
+    inputBackend     = "SDL 3.4.10 multi-device controller input"
+    audioBackend     = "JUCE 8.0.14 with WASAPI and WAV/MP3/Ogg decoders"
     backupDirectory  = $backupDirectory
     removedIncompatibleLocalFiles = @($incompatibleLocalPaths | ForEach-Object { [IO.Path]::GetFileName($_) })
+    removedObsoleteRuntimeFiles = @($obsoleteRuntimePaths | ForEach-Object { [IO.Path]::GetFileName($_) })
     files            = $stagedFiles
 }
 
@@ -255,4 +270,4 @@ Write-Host "Staged $($stagedSources.Count) x64 runtime/profile files to $clientR
 if ($backupDirectory) {
     Write-Host "Previous runtime files were backed up to $backupDirectory"
 }
-Write-Warning "The bundled mss64 compatibility DLL is silent; gameplay audio is not available in this x64 build."
+Write-Host "Audio backend: JUCE 8.0.14 with WASAPI and WAV, MP3, and Ogg Vorbis decoding."

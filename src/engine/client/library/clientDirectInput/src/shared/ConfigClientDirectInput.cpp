@@ -23,6 +23,7 @@ namespace ConfigClientDirectInputNamespace
 	bool         ms_useKeyboard;
 	bool         ms_useJoysticks;
 	int          ms_useJoystick;
+	bool         ms_useSdlInput;
 	bool         ms_useMouse;
 	bool         ms_windowsKeyEnabledWhenFullscreen;
 	bool         ms_windowsKeyEnabledWhenWindowed;
@@ -38,6 +39,7 @@ void ConfigClientDirectInput::install()
 	KEY_BOOL(useKeyboard,                     true);
 	KEY_BOOL(useJoysticks,                    true);
 	KEY_INT(useJoystick,                      0);
+	KEY_BOOL(useSdlInput,                     true);
 	KEY_BOOL(useMouse,                        true);
 	KEY_BOOL(windowsKeyEnabledWhenFullscreen, false);
 	KEY_BOOL(windowsKeyEnabledWhenWindowed,   true);
@@ -64,6 +66,13 @@ bool ConfigClientDirectInput::getUseJoysticks()
 int ConfigClientDirectInput::getUseJoystick()
 {
 	return ms_useJoystick;
+}
+
+// ----------------------------------------------------------------------
+
+bool ConfigClientDirectInput::getUseSdlInput()
+{
+	return ms_useSdlInput;
 }
 
 // ----------------------------------------------------------------------

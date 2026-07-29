@@ -4,9 +4,14 @@ The God client supports both its legacy Win32 build and a self-contained `Releas
 
 ## Requirements
 
-- Visual Studio or Build Tools with the C++ desktop workload and the `v145` toolset.
-- Microsoft DirectX SDK (June 2010), exposed through `DXSDK_DIR` or installed in its default location.
+- Visual Studio 2026 or Build Tools 2026 with MSBuild 18, the C++ desktop workload, and the `v145` x64 toolset.
+- Windows 10 SDK 10.0.19041 or newer.
+- Microsoft DirectX SDK (June 2010), exposed through `DXSDK_DIR` or installed in its default location. The DirectX end-user redist is not a substitute for the SDK.
 - An existing God client data package for staging and world editing.
+
+The x64 libjpeg-turbo and SDL 3.4.10 dependencies are included under `deps/x64`; do not install them separately.
+
+Run `.\scripts\Test-X64BuildPrerequisites.ps1` to check the environment. From elevated PowerShell, `.\scripts\Setup-X64BuildPrerequisites.ps1 -Install` downloads, verifies, and installs anything missing; direct links and offline-cache instructions are in [the prerequisite guide](../deps/build-prerequisites/README.md).
 
 ## x64 Build and Stage
 
@@ -22,7 +27,7 @@ The script builds local Qt 3, the God executable, and all three D3D9 renderer DL
 
 Launch `swg\exe\win32\SwgGodClient_r.exe` with `swg\exe\win32` as its working directory. The local test account is station ID `1001` with password `local`.
 
-The validated x64 editor loads the world, renders through `gl05_r.dll`, accepts editor/game focus input, and connects to the local Docker server. Legacy Perforce integration is disabled in x64, and the bundled `mss64.dll` compatibility runtime is silent.
+The validated x64 editor loads the world, renders through `gl05_r.dll`, accepts editor/game focus input, and connects to the local Docker server. It uses the same JUCE 8.0.14/WASAPI audio backend and SDL3 multi-controller input layer as the gameplay client. Legacy Perforce integration remains disabled in x64. JUCE distribution requires AGPLv3 compliance or an applicable commercial JUCE licence.
 
 ## Legacy Win32 Build
 
