@@ -75,6 +75,38 @@ long long Direct3d11_Metrics::textureConvertTicks;
 long long Direct3d11_Metrics::textureUpdateTicks;
 long long Direct3d11_Metrics::drawPrepareTicks;
 long long Direct3d11_Metrics::drawSubmitTicks;
+
+char const *Direct3d11_Metrics::drawAttributionName[Direct3d11_Metrics::DRAW_ATTRIBUTION_SLOTS];
+int         Direct3d11_Metrics::drawAttributionCount[Direct3d11_Metrics::DRAW_ATTRIBUTION_SLOTS];
+int         Direct3d11_Metrics::drawAttributionUsed;
+int         Direct3d11_Metrics::drawAttributionOverflow;
+char const *Direct3d11_Metrics::drawAttributionCurrent;
+
+void Direct3d11_Metrics::noteDrawAttribution()
+{
+	char const * const name = drawAttributionCurrent;
+	if (!name)
+		return;
+
+	for (int i = 0; i < drawAttributionUsed; ++i)
+	{
+		if (drawAttributionName[i] == name)
+		{
+			++drawAttributionCount[i];
+			return;
+		}
+	}
+
+	if (drawAttributionUsed >= DRAW_ATTRIBUTION_SLOTS)
+	{
+		++drawAttributionOverflow;
+		return;
+	}
+
+	drawAttributionName[drawAttributionUsed] = name;
+	drawAttributionCount[drawAttributionUsed] = 1;
+	++drawAttributionUsed;
+}
 long long Direct3d11_Metrics::shaderApplyTicks;
 long long Direct3d11_Metrics::ringMapTicks;
 int Direct3d11_Metrics::sceneMicroseconds;
@@ -361,6 +393,55 @@ void Direct3d11_Metrics::reportHitches()
 					static_cast<double>(Direct3d11_QueryPool::getGpuFrameTimeMilliseconds()),
 					drawCalls + drawIndexedCalls,
 					litBatches, static_cast<double>(maxAmbientMilli) / 1000.0));
+
+				//-- The frame's draw calls broken down by the material that issued them. One number
+				//   cannot be reduced; a ranked list of systems can.
+				{
+					int order[DRAW_ATTRIBUTION_SLOTS];
+					for (int i = 0; i < drawAttributionUsed; ++i)
+						order[i] = i;
+
+					//-- Selection sort over at most 64 entries, once every few hundred frames.
+					for (int i = 0; i < drawAttributionUsed; ++i)
+					{
+						int best = i;
+						for (int j = i + 1; j < drawAttributionUsed; ++j)
+							if (drawAttributionCount[order[j]] > drawAttributionCount[order[best]])
+								best = j;
+
+						int const swap = order[i];
+						order[i] = order[best];
+						order[best] = swap;
+					}
+
+					int total = 0;
+					for (int i = 0; i < drawAttributionUsed; ++i)
+						total += drawAttributionCount[i];
+
+					char line[1024];
+					line[0] = 0;
+
+					int const show = (drawAttributionUsed < 12) ? drawAttributionUsed : 12;
+					for (int i = 0; i < show; ++i)
+					{
+						char one[128];
+						snprintf(one, sizeof(one), "%s%s %d", i ? ", " : "",
+							drawAttributionName[order[i]] ? drawAttributionName[order[i]] : "<unnamed>",
+							drawAttributionCount[order[i]]);
+						strncat(line, one, sizeof(line) - strlen(line) - 1);
+					}
+
+					WARNING(true, ("Direct3d11 DRAWSBY: %d draw(s) over %d frame(s) across %d material(s)%s. Heaviest: %s.",
+						total, windowFrames, drawAttributionUsed,
+						drawAttributionOverflow ? " (table full, some uncounted)" : "",
+						line[0] ? line : "none"));
+
+					for (int i = 0; i < drawAttributionUsed; ++i)
+						drawAttributionCount[i] = 0;
+
+					drawAttributionUsed = 0;
+					drawAttributionOverflow = 0;
+				}
 
 				windowFrames = 0;
 				windowUnder17 = 0;

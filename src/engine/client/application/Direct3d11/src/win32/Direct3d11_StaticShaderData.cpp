@@ -223,6 +223,9 @@ void Direct3d11_StaticShaderData::update(StaticShader const &shader)
 
 void Direct3d11_StaticShaderData::construct(StaticShader const &shader)
 {
+	//-- Held for draw attribution. The template outlives this object, so the pointer is stable.
+	m_shaderTemplateName = shader.getShaderTemplate().getName().getString();
+
 	// StaticShader has no accessor for this; the engine names this class a friend of both
 	// StaticShaderTemplate and ShaderEffect so it can be reached, exactly as DX9 does.
 	ShaderEffect const * const effect = shader.getStaticShaderTemplate().m_effect;
@@ -538,6 +541,9 @@ int Direct3d11_StaticShaderData::getTextureSortKey() const
 
 bool Direct3d11_StaticShaderData::apply(int passNumber) const
 {
+	//-- Whatever draws next belongs to this material.
+	Direct3d11_Metrics::drawAttributionCurrent = m_shaderTemplateName;
+
 	// Every bind this backend performs is downstream of here: vertex and pixel shaders, the
 	// four state objects, samplers and shader resource views.
 	Direct3d11_Metrics::ScopedTimer timer(Direct3d11_Metrics::shaderApplyTicks);

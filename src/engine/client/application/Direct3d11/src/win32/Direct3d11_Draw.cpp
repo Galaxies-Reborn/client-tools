@@ -710,6 +710,7 @@ void Direct3d11::draw(int topology, int firstVertex, int vertexCount, int triang
 	}
 
 	++Direct3d11_Metrics::drawCalls;
+	Direct3d11_Metrics::noteDrawAttribution();
 	Direct3d11_Metrics::triangles += triangleCount;
 }
 
@@ -734,6 +735,7 @@ void Direct3d11::drawIndexed(int topology, int firstIndex, int indexCount, int b
 	}
 
 	++Direct3d11_Metrics::drawIndexedCalls;
+	Direct3d11_Metrics::noteDrawAttribution();
 	Direct3d11_Metrics::triangles += triangleCount;
 }
 
@@ -785,6 +787,7 @@ void Direct3d11::drawFan(int firstVertex, int vertexCount)
 	}
 
 	++Direct3d11_Metrics::drawIndexedCalls;
+	Direct3d11_Metrics::noteDrawAttribution();
 	Direct3d11_Metrics::triangles += triangles;
 }
 
@@ -831,6 +834,7 @@ void Direct3d11::drawQuads(int firstVertex, int quadCount)
 	}
 
 	++Direct3d11_Metrics::drawIndexedCalls;
+	Direct3d11_Metrics::noteDrawAttribution();
 	Direct3d11_Metrics::triangles += triangles;
 }
 
