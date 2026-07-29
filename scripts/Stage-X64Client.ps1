@@ -6,9 +6,6 @@ param(
     [ValidateSet("Release", "Optimized", "Debug")]
     [string]$Configuration = "Release",
 
-    [ValidateSet("None", "Precu")]
-    [string]$RuntimeProfile = "None",
-
     [switch]$NoBackup
 )
 
@@ -47,29 +44,7 @@ if (-not (Test-Path -LiteralPath $ClientRoot -PathType Container)) {
 $clientRootPath = (Resolve-Path -LiteralPath $ClientRoot).Path
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 
-$profileFiles = @()
-if ($RuntimeProfile -eq "Precu") {
-    $profileDirectory = Join-Path $repoRoot "config\precu"
-    $profileFiles = @(
-        "client.cfg",
-        "precu_login.cfg",
-        "precu_live.cfg",
-        "precu_preload.cfg",
-        "options.cfg"
-    ) | ForEach-Object {
-        [pscustomobject]@{
-            Source = Join-Path $profileDirectory $_
-            Name   = $_
-        }
-    }
-
-    foreach ($file in $profileFiles) {
-        if (-not (Test-Path -LiteralPath $file.Source -PathType Leaf)) {
-            throw "Pre-CU runtime profile file is missing: $($file.Source)"
-        }
-    }
-}
-elseif (-not (Test-Path -LiteralPath (Join-Path $clientRootPath "client.cfg") -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath (Join-Path $clientRootPath "client.cfg") -PathType Leaf)) {
     throw "ClientRoot does not contain client.cfg: $clientRootPath"
 }
 
@@ -102,12 +77,20 @@ $runtimeFiles = @(
         Name   = "gl07_$suffix.dll"
     },
     [pscustomobject]@{
+        Source = Join-Path $repoRoot "src\build\win32\x64\$Configuration\gl11_$suffix.dll"
+        Name   = "gl11_$suffix.dll"
+    },
+    [pscustomobject]@{
+        Source = Join-Path $repoRoot "src\build\win32\x64\$Configuration\gl00_$suffix.dll"
+        Name   = "gl00_$suffix.dll"
+    },
+    [pscustomobject]@{
         Source = Join-Path $repoRoot "src\build\win32\x64\$Configuration\DllExport.dll"
         Name   = "DllExport.dll"
     },
     [pscustomobject]@{
-        Source = Join-Path $repoRoot "mss64-stub\mss64.dll"
-        Name   = "mss64.dll"
+        Source = Join-Path $repoRoot "deps\x64\bin\SDL3.dll"
+        Name   = "SDL3.dll"
     },
     [pscustomobject]@{
         Source = Join-Path $repoRoot "deps\x64\bin\libxml2.dll"
@@ -167,17 +150,19 @@ $incompatibleLocalPaths = @(
         }
     }
 )
+$obsoleteRuntimePaths = @(
+    Join-Path $clientRootPath "mss64.dll" |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+)
 
 if (-not $PSCmdlet.ShouldProcess($clientRootPath, "stage $Configuration x64 gameplay client")) {
     return
 }
 
-$stagedSources = @($runtimeFiles) + @($profileFiles)
-
 $backupDirectory = $null
 if (-not $NoBackup) {
     $existingTargets = @(
-        $stagedSources |
+        $runtimeFiles |
             ForEach-Object { Join-Path $clientRootPath $_.Name } |
             Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
     )
@@ -187,6 +172,7 @@ if (-not $NoBackup) {
         $existingTargets += $manifestPath
     }
     $existingTargets += $incompatibleLocalPaths
+    $existingTargets += $obsoleteRuntimePaths
     $existingTargets = @($existingTargets | Sort-Object -Unique)
 
     if ($existingTargets.Count -gt 0) {
@@ -202,15 +188,11 @@ if (-not $NoBackup) {
     }
 }
 
-foreach ($path in $incompatibleLocalPaths) {
+foreach ($path in @($incompatibleLocalPaths) + @($obsoleteRuntimePaths)) {
     Remove-Item -LiteralPath $path -Force
 }
 
 foreach ($file in $runtimeFiles) {
-    Copy-Item -LiteralPath $file.Source -Destination (Join-Path $clientRootPath $file.Name) -Force
-}
-
-foreach ($file in $profileFiles) {
     Copy-Item -LiteralPath $file.Source -Destination (Join-Path $clientRootPath $file.Name) -Force
 }
 
@@ -219,7 +201,7 @@ $gitBranch = (& git -C $repoRoot branch --show-current).Trim()
 $workingTreeDirty = @(& git -C $repoRoot status --porcelain).Count -gt 0
 
 $stagedFiles = @(
-    $stagedSources | ForEach-Object {
+    $runtimeFiles | ForEach-Object {
         $destination = Join-Path $clientRootPath $_.Name
         [ordered]@{
             name   = $_.Name
@@ -234,16 +216,17 @@ $manifest = [ordered]@{
     generatedAtUtc   = [DateTime]::UtcNow.ToString("o")
     configuration    = $Configuration
     platform         = "x64"
-    runtimeProfile   = $RuntimeProfile
     sourceRepository = $repoRoot
     sourceCommit     = $gitCommit
     sourceBranch     = $gitBranch
     workingTreeDirty = $workingTreeDirty
     clientRoot       = $clientRootPath
     rootTreCount     = $treFiles.Count
-    audioBackend     = "mss64 compatibility stub (silent)"
+    inputBackend     = "SDL 3.4.10 multi-device controller input"
+    audioBackend     = "JUCE 8.0.14 with WASAPI and WAV/MP3/Ogg decoders"
     backupDirectory  = $backupDirectory
     removedIncompatibleLocalFiles = @($incompatibleLocalPaths | ForEach-Object { [IO.Path]::GetFileName($_) })
+    removedObsoleteRuntimeFiles = @($obsoleteRuntimePaths | ForEach-Object { [IO.Path]::GetFileName($_) })
     files            = $stagedFiles
 }
 
@@ -251,8 +234,8 @@ $json = $manifest | ConvertTo-Json -Depth 5
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
 [IO.File]::WriteAllText((Join-Path $clientRootPath "x64-runtime-manifest.json"), $json + [Environment]::NewLine, $utf8NoBom)
 
-Write-Host "Staged $($stagedSources.Count) x64 runtime/profile files to $clientRootPath"
+Write-Host "Staged $($runtimeFiles.Count) x64 runtime files to $clientRootPath"
 if ($backupDirectory) {
     Write-Host "Previous runtime files were backed up to $backupDirectory"
 }
-Write-Warning "The bundled mss64 compatibility DLL is silent; gameplay audio is not available in this x64 build."
+Write-Host "Audio backend: JUCE 8.0.14 with WASAPI and WAV, MP3, and Ogg Vorbis decoding."

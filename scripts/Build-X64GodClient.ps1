@@ -15,25 +15,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Get-VisualStudioRoot {
-    param([string]$RequestedRoot)
-
-    if ($RequestedRoot) {
-        return (Resolve-Path -LiteralPath $RequestedRoot).Path
-    }
-
-    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
-    if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
-        throw "vswhere.exe was not found. Pass -VisualStudioRoot explicitly."
-    }
-
-    $root = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
-    if (-not $root) {
-        throw "Visual Studio with the x64 C++ toolchain was not found."
-    }
-    return $root
-}
-
 function Get-PeMachine {
     param([Parameter(Mandatory)][string]$Path)
 
@@ -59,7 +40,12 @@ function Get-PeMachine {
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $solution = Join-Path $repoRoot "src\build\win32\swg.sln"
-$vsRoot = Get-VisualStudioRoot -RequestedRoot $VisualStudioRoot
+$prerequisites = & (Join-Path $PSScriptRoot "Test-X64BuildPrerequisites.ps1") `
+    -PlatformToolset $PlatformToolset `
+    -VisualStudioRoot $VisualStudioRoot `
+    -Quiet `
+    -PassThru
+$vsRoot = $prerequisites.VisualStudio.Root
 $devShell = Join-Path $vsRoot "Common7\Tools\Launch-VsDevShell.ps1"
 $msbuild = Join-Path $vsRoot "MSBuild\Current\Bin\MSBuild.exe"
 
@@ -72,27 +58,26 @@ if (-not $SkipQtBuild) {
 }
 
 & $devShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
-
-if (-not $env:DXSDK_DIR) {
-    $defaultDirectX = Join-Path ${env:ProgramFiles(x86)} "Microsoft DirectX SDK (June 2010)"
-    if (Test-Path -LiteralPath $defaultDirectX -PathType Container) {
-        $env:DXSDK_DIR = $defaultDirectX.TrimEnd("\") + "\"
-    }
-}
-if (-not $env:DXSDK_DIR -or -not (Test-Path -LiteralPath $env:DXSDK_DIR -PathType Container)) {
-    throw "Set DXSDK_DIR to the Microsoft DirectX SDK (June 2010) installation directory."
-}
+$env:DXSDK_DIR = $prerequisites.DirectXSdk.Root.TrimEnd("\") + "\"
 
 $requiredInputs = @(
+    "deps\x64\include\SDL3\SDL.h",
+    "deps\x64\lib\SDL3.lib",
+    "deps\x64\bin\SDL3.dll",
+    "deps\x64\include\libjpeg-turbo\jpeglib.h",
+    "deps\x64\lib\jpeg-static.lib",
     "deps\x64\lib\dpvs.lib",
     "deps\x64\lib\libxml2.lib",
     "deps\x64\lib\pcre.lib",
     "deps\x64\lib\libEverQuestTCG.lib",
     "deps\x64\lib\vivoxSharedWrapper.lib",
+    "deps\x64\lib\swg-stubs.lib",
+    "deps\x64\compat-source\misc_stubs.cpp",
     "deps\qt3-win64-src\lib\qt-mt3.lib",
     "deps\qt3-win64-src\lib\qtmain.lib",
     "deps\qt3-win64-src\lib\qt-mt3.dll",
-    "mss64-stub\mss64.lib"
+    "src\external\3rd\library\qt\3.3.4\bin\uic.exe",
+    "src\external\3rd\library\qt\3.3.4\bin\moc.exe"
 )
 foreach ($relativePath in $requiredInputs) {
     $path = Join-Path $repoRoot $relativePath
@@ -101,14 +86,43 @@ foreach ($relativePath in $requiredInputs) {
     }
 }
 
-$stubRoot = Join-Path $repoRoot "mss64-stub"
-Push-Location $stubRoot
+# The converted project can compile generated UI sources before its CustomBuild
+# items run, so generate them explicitly to make clean worktrees deterministic.
+$uiRoot = Join-Path $repoRoot "src\game\client\application\SwgGodClient\src\shared\ui"
+$uiOutputRoot = Join-Path $repoRoot "src\compile\win32\SwgGodClient\$Configuration"
+$uic = Join-Path $repoRoot "src\external\3rd\library\qt\3.3.4\bin\uic.exe"
+$moc = Join-Path $repoRoot "src\external\3rd\library\qt\3.3.4\bin\moc.exe"
+[void](New-Item -ItemType Directory -Path $uiOutputRoot -Force)
+
+foreach ($uiFile in Get-ChildItem -LiteralPath $uiRoot -Filter "*.ui" -File | Sort-Object Name) {
+    $header = Join-Path $uiOutputRoot ($uiFile.BaseName + ".h")
+    $source = Join-Path $uiOutputRoot ($uiFile.BaseName + "_r.cpp")
+
+    & $uic -o $header $uiFile.FullName
+    if ($LASTEXITCODE -ne 0) {
+        throw "uic failed to generate $header."
+    }
+    & $uic -o $source -impl $header $uiFile.FullName
+    if ($LASTEXITCODE -ne 0) {
+        throw "uic failed to generate $source."
+    }
+    & $moc $header | Out-File -LiteralPath $source -Append -Encoding ascii
+    if ($LASTEXITCODE -ne 0) {
+        throw "moc failed to generate metadata for $header."
+    }
+}
+
+$compatSourceRoot = Join-Path $repoRoot "deps\x64\compat-source"
+$compatLibraryRoot = Join-Path $repoRoot "deps\x64\lib"
+$compatObject = Join-Path $compatLibraryRoot "lgLcd_stubs.obj"
+$compatLibrary = Join-Path $compatLibraryRoot "lgLcd.lib"
+Push-Location $compatSourceRoot
 try {
-    & cl.exe /nologo /c /O2 /MT /EHsc misc_stubs.cpp /Fo:lgLcd_stubs.obj
+    & cl.exe /nologo /c /O2 /MT /EHsc misc_stubs.cpp "/Fo:$compatObject"
     if ($LASTEXITCODE -ne 0) {
         throw "The x64 LCD compatibility stub compile failed with exit code $LASTEXITCODE."
     }
-    & lib.exe /nologo /MACHINE:X64 /OUT:lgLcd.lib lgLcd_stubs.obj
+    & lib.exe /nologo /MACHINE:X64 "/OUT:$compatLibrary" $compatObject
     if ($LASTEXITCODE -ne 0) {
         throw "The x64 LCD compatibility library build failed with exit code $LASTEXITCODE."
     }
@@ -142,7 +156,7 @@ $artifacts = @(
     "src\build\win32\x64\$Configuration\gl07_r.dll",
     "src\build\win32\x64\$Configuration\DllExport.dll",
     "deps\qt3-win64-src\lib\qt-mt3.dll",
-    "mss64-stub\mss64.dll",
+    "deps\x64\bin\SDL3.dll",
     "deps\x64\bin\libxml2.dll",
     "deps\x64\bin\iconv-2.dll",
     "deps\x64\bin\z.dll"

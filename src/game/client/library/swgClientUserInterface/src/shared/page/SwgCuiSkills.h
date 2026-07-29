@@ -11,9 +11,7 @@
 #define SwgCuiSkills_H
 
 #include "UIEventCallback.h"
-#include "clientGame/ClientCommandQueue.h"
 #include "clientUserInterface/CuiMediator.h"
-#include "sharedFoundation/NetworkId.h"
 
 #include <map>
 #include <set>
@@ -28,13 +26,6 @@ class UITabbedPane;
 class UIText;
 class UITreeView;
 class SkillObject;
-class CreatureObject;
-class PlayerObject;
-
-namespace MessageDispatch
-{
-	class Callback;
-}
 
 class SwgCuiSkills :
 public CuiMediator,
@@ -47,13 +38,6 @@ public:
 	virtual void               OnButtonPressed       (UIWidget * context);
 	virtual void               OnGenericSelectionChanged (UIWidget * context);
 	virtual void               OnTabbedPaneChanged   (UIWidget * context);
-	virtual void               update                (float deltaTimeSecs);
-
-	void                       onSkillsChanged       (CreatureObject const & creature);
-	void                       onExperienceChanged   (PlayerObject const & player);
-	void                       onSkillModsChanged    (CreatureObject const & creature);
-	void                       onDeleteSkillConfirmation (std::string const & skillName);
-	void                       onSceneChanged        (bool const &);
 
 protected:
 	virtual void               performActivate       ();
@@ -65,17 +49,11 @@ private:
 	SwgCuiSkills &             operator=             (const SwgCuiSkills &);
 
 	void                       populateProfessionList ();
-	void                       synchronizeProfessionTreeSelection ();
 	void                       populateExperience    ();
 	void                       populateSkillMods     ();
 	void                       populateSelectedProfession ();
 	void                       populateSelectedSkill  ();
 	void                       updateSkillPointsDisplay ();
-	void                       updateSurrenderButton ();
-	void                       clearConfirmationSnapshot ();
-	void                       clearPendingSurrender ();
-	void                       reconcilePendingSurrender ();
-	void                       onCommandRemoving     (ClientCommandQueue::Messages::Removing::Payload const & payload);
 	bool                       tryPopulateGraph4x4    (SkillObject const * novice, std::set<std::string> const & playerSkills);
 	void                       applyTreeBox           (char const * path, std::string const & skillName, std::set<std::string> const & playerSkills, bool nextTrainable);
 	void                       applySkillBoxXp        (char const * path, class UIButton * btn, std::string const & skillName, bool hasSkill, bool nextTrainable);
@@ -129,17 +107,6 @@ private:
 
 	std::string                m_selectedProfession;
 	std::string                m_selectedSkill;
-
-	// Confirmation and command snapshots keep the request tied to the skill
-	// that was validated, even if the player changes tree selection while the
-	// dialog or server command is in flight. Player ids prevent a snapshot from
-	// crossing a scene/character transition.
-	std::string                m_confirmationSkill;
-	NetworkId                  m_confirmationPlayerId;
-	std::string                m_pendingSurrenderSkill;
-	NetworkId                  m_pendingSurrenderPlayerId;
-	uint32                     m_surrenderSequenceId;
-	MessageDispatch::Callback * m_callback;
 };
 
 #endif // SwgCuiSkills_H

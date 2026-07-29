@@ -7,48 +7,11 @@ param(
 
     [string]$VisualStudioRoot,
 
-    [string]$StagePath,
-
-    [ValidateSet("None", "Precu")]
-    [string]$RuntimeProfile = "None",
-
-    [ValidateRange(1, 64)]
-    [int]$MaxCpuCount = 4
+    [string]$StagePath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
-function Get-MsBuildPath {
-    param([string]$RequestedVisualStudioRoot)
-
-    if ($RequestedVisualStudioRoot) {
-        $candidate = Join-Path $RequestedVisualStudioRoot "MSBuild\Current\Bin\MSBuild.exe"
-        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-            throw "MSBuild was not found below VisualStudioRoot: $RequestedVisualStudioRoot"
-        }
-
-        return (Resolve-Path -LiteralPath $candidate).Path
-    }
-
-    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
-    if (Test-Path -LiteralPath $vswhere -PathType Leaf) {
-        $matches = @(
-            & $vswhere -latest -products * -requires Microsoft.Component.MSBuild `
-                -find "MSBuild\**\Bin\MSBuild.exe"
-        )
-        if ($matches.Count -gt 0) {
-            return $matches[0]
-        }
-    }
-
-    $command = Get-Command msbuild.exe -ErrorAction SilentlyContinue
-    if ($command) {
-        return $command.Source
-    }
-
-    throw "MSBuild was not found. Install Visual Studio Build Tools with Desktop development with C++."
-}
 
 function Get-PeMachine {
     param([Parameter(Mandatory)][string]$Path)
@@ -77,26 +40,26 @@ function Get-PeMachine {
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $solution = Join-Path $repoRoot "src\build\win32\swg.sln"
-$msbuild = Get-MsBuildPath -RequestedVisualStudioRoot $VisualStudioRoot
-
-if (-not $env:DXSDK_DIR) {
-    $defaultDirectX = Join-Path ${env:ProgramFiles(x86)} "Microsoft DirectX SDK (June 2010)"
-    if (Test-Path -LiteralPath $defaultDirectX -PathType Container) {
-        $env:DXSDK_DIR = $defaultDirectX.TrimEnd("\") + "\"
-    }
-}
-
-if (-not $env:DXSDK_DIR -or -not (Test-Path -LiteralPath $env:DXSDK_DIR -PathType Container)) {
-    throw "Set DXSDK_DIR to the Microsoft DirectX SDK (June 2010) installation directory."
-}
+$prerequisites = & (Join-Path $PSScriptRoot "Test-X64BuildPrerequisites.ps1") `
+    -PlatformToolset $PlatformToolset `
+    -VisualStudioRoot $VisualStudioRoot `
+    -Quiet `
+    -PassThru
+$msbuild = $prerequisites.VisualStudio.MSBuildPath
+$env:DXSDK_DIR = $prerequisites.DirectXSdk.Root.TrimEnd("\") + "\"
 
 $requiredInputs = @(
+    "deps\x64\include\SDL3\SDL.h",
+    "deps\x64\lib\SDL3.lib",
+    "deps\x64\bin\SDL3.dll",
+    "deps\x64\include\libjpeg-turbo\jpeglib.h",
+    "deps\x64\lib\jpeg-static.lib",
     "deps\x64\lib\libxml2.lib",
     "deps\x64\lib\pcre.lib",
     "deps\x64\lib\dpvs.lib",
     "deps\x64\lib\libEverQuestTCG.lib",
     "deps\x64\lib\vivoxSharedWrapper.lib",
-    "mss64-stub\mss64.lib"
+    "deps\x64\lib\swg-stubs.lib"
 )
 
 foreach ($relativePath in $requiredInputs) {
@@ -112,7 +75,7 @@ $arguments = @(
     "/p:Configuration=$Configuration",
     "/p:Platform=x64",
     "/p:PlatformToolset=$PlatformToolset",
-    "/m:$MaxCpuCount",
+    "/m",
     "/nr:false",
     "/v:minimal"
 )
@@ -137,6 +100,8 @@ $artifacts = @(
     "src\build\win32\x64\$Configuration\gl05_$suffix.dll",
     "src\build\win32\x64\$Configuration\gl06_$suffix.dll",
     "src\build\win32\x64\$Configuration\gl07_$suffix.dll",
+    "src\build\win32\x64\$Configuration\gl11_$suffix.dll",
+    "src\build\win32\x64\$Configuration\gl00_$suffix.dll",
     "src\build\win32\x64\$Configuration\DllExport.dll"
 )
 
@@ -159,6 +124,5 @@ foreach ($relativePath in $artifacts) {
 if ($StagePath) {
     & (Join-Path $PSScriptRoot "Stage-X64Client.ps1") `
         -ClientRoot $StagePath `
-        -Configuration $Configuration `
-        -RuntimeProfile $RuntimeProfile
+        -Configuration $Configuration
 }

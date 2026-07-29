@@ -224,17 +224,17 @@ m_radarSkinLargeWidth  (0)
 	getCodeDataObject (TUIWidget, widget, "RadarWidget");
 	m_groundRadar = NON_NULL (dynamic_cast<CuiWidgetGroundRadar *>(widget));
 
-	getCodeDataObject (TUIImage,    m_radarSkinSmall,    "RadarSkinSmall", true);
-	getCodeDataObject (TUIImage,    m_radarSkinMedium,   "RadarSkinMedium", true);
-	getCodeDataObject (TUIImage,    m_radarSkinLarge,    "RadarSkinLarge", true);
+	getCodeDataObject (TUIImage,    m_radarSkinSmall,    "RadarSkinSmall");
+	getCodeDataObject (TUIImage,    m_radarSkinMedium,   "RadarSkinMedium");
+	getCodeDataObject (TUIImage,    m_radarSkinLarge,    "RadarSkinLarge");
 
 	getCodeDataObject (TUIImage,    m_radarCompass,       "RadarCompass");
-	getCodeDataObject (TUIWidget,   m_radarCompassTop,    "RadarCompassTop");
-	getCodeDataObject (TUIImage,    m_radarCompassTopSmall, "RadarCompassTopSmall", true);
-	getCodeDataObject (TUIImage,    m_radarCompassTopMedium,"RadarCompassTopMedium", true);
-	getCodeDataObject (TUIImage,    m_radarCompassTopLarge, "RadarCompassTopLarge", true);
+	getCodeDataObject (TUIPage,     m_radarCompassTop,    "RadarCompassTop");
+	getCodeDataObject (TUIImage,    m_radarCompassTopSmall, "RadarCompassTopSmall");
+	getCodeDataObject (TUIImage,    m_radarCompassTopMedium,"RadarCompassTopMedium");
+	getCodeDataObject (TUIImage,    m_radarCompassTopLarge, "RadarCompassTopLarge");
 	getCodeDataObject (TUIText,     m_rangeIndicatorText, "RangeIndicator");
-	getCodeDataObject (TUIText,     m_regionIndicatorText,"RegionIndicator", true);
+	getCodeDataObject (TUIText,     m_regionIndicatorText,"RegionIndicator");
 	getCodeDataObject (TUIButton,   m_topZoomButton,      "ZoomTop");
 	getCodeDataObject (TUIButton,   m_bottomZoomButton,   "ZoomBottom");
 
@@ -325,8 +325,6 @@ m_radarSkinLargeWidth  (0)
 		getCodeDataObject (TUIImage, blipGroup,     "blipGroup",    true);
 		getCodeDataObject (TUIImage, blipRing,      "blipRing",     true);
 		getCodeDataObject (TUIImage, blipEntrance,  "blipEntrance", true);
-		if (!blipEntrance)
-			blipEntrance = blipWaypoint;
 
 		if (blipWaypoint && effectorWaypoint)
 			blipWaypoint->ExecuteEffector (*effectorWaypoint);
@@ -556,8 +554,7 @@ void  SwgCuiGroundRadar::updateRadar (const Vector & pos, const ClientProcedural
 				regionString = StringId ("zone_n", zoneName).localize ();			
 			}
 		}
-		if (m_regionIndicatorText)
-			m_regionIndicatorText->SetText(regionString);
+		m_regionIndicatorText->SetText(regionString);
 	}
 
 

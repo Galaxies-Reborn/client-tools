@@ -69,7 +69,6 @@
 #include "swgClientUserInterface/SwgCuiChatWindow.h"
 #include "swgClientUserInterface/SwgCuiColorTest.h"
 #include "swgClientUserInterface/SwgCuiCommunity.h"
-#include "swgClientUserInterface/SwgCuiCombatQueue.h"
 #include "swgClientUserInterface/SwgCuiCustomize.h"
 #include "swgClientUserInterface/SwgCuiDpsMeter.h"
 #include "swgClientUserInterface/SwgCuiHarassmentMessage.h"
@@ -157,12 +156,8 @@ m_callback                  (new MessageDispatch::Callback),
 m_chatWindowMediator        (0),
 m_mfdStatusMediator         (0),
 m_toolbarMediator           (0),
-m_combatQueueMediator       (0),
-m_notificationsMediator     (0),
-m_highlightMediator         (0),
 m_inventory                 (0),
 m_buttonBar                 (0),
-m_questHelper               (0),
 m_workspace                 (&workspace),
 m_lastFrameUpdateMFD        (0),
 m_WindowManagerActive       (false),
@@ -191,9 +186,10 @@ m_doubleToolbar(0)
 	{
 		UIPage * mediatorPage = 0;
 
-		// Each HUD sub-page is wrapped in a null-guard. The Publish 14 HUD
-		// XML doesn't have several later additions (DoubleToolbar,
-		// Notifications, Highlight, and questHelper). With getCodeDataObject demoted to
+		// Each HUD sub-page is wrapped in a null-guard. The NGE-retail HUD
+		// XML doesn't have many of these post-NGE additions (Toolbar/
+		// DoubleToolbar/Notifications/Highlight/ButtonBar/incap/ChatWindow/
+		// questHelper/SystemMessage). With getCodeDataObject demoted to
 		// warning-on-miss earlier in the session, mediatorPage stays at its
 		// previous value (or 0) when a page is missing - dereferencing it
 		// AVs. Skipping the block when the page isn't present means the
@@ -232,11 +228,7 @@ m_doubleToolbar(0)
 			m_singleToolbarPage = 0;
 			m_doubleToolbarPage = 0;
 			hud.getCodeDataObject (TUIPage,     m_singleToolbarPage,    "Toolbar");
-			hud.getCodeDataObject (TUIPage,     m_doubleToolbarPage,    "DoubleToolbar", true);
-			if (m_singleToolbarPage && !m_doubleToolbarPage)
-				CuiPreferences::setUseDoubleToolbar(false);
-			else if (!m_singleToolbarPage && m_doubleToolbarPage)
-				CuiPreferences::setUseDoubleToolbar(true);
+			hud.getCodeDataObject (TUIPage,     m_doubleToolbarPage,    "DoubleToolbar");
 			if (m_singleToolbarPage) m_singleToolbarPage->SetVisible(false);
 			if (m_doubleToolbarPage) m_doubleToolbarPage->SetVisible(false);
 			if (m_singleToolbarPage || m_doubleToolbarPage)
@@ -256,24 +248,7 @@ m_doubleToolbar(0)
 		//-----------------------------------------------------------------
 		{
 			mediatorPage = 0;
-			hud.getCodeDataObject(TUIPage, mediatorPage, "CombatQueue");
-			if (mediatorPage)
-			{
-				mediatorPage->SetEnabled(false);
-				m_combatQueueMediator = new SwgCuiCombatQueue(*mediatorPage);
-				m_combatQueueMediator->setSettingsAutoSizeLocation(true, true);
-				m_combatQueueMediator->setStickyVisible(true);
-				m_combatQueueMediator->setShowFocusedGlowRect(false);
-				m_combatQueueMediator->fetch();
-				m_combatQueueMediator->activate();
-				m_workspace->addMediator(*m_combatQueueMediator);
-			}
-		}
-
-		//-----------------------------------------------------------------
-		{
-			mediatorPage = 0;
-			hud.getCodeDataObject (TUIPage,     mediatorPage,           "Notifications", true);
+			hud.getCodeDataObject (TUIPage,     mediatorPage,           "Notifications");
 			if (mediatorPage)
 			{
 				m_notificationsMediator = new SwgCuiNotifications (*mediatorPage, Game::getHudSceneType());
@@ -289,7 +264,7 @@ m_doubleToolbar(0)
 		//-----------------------------------------------------------------
 		{
 			mediatorPage = 0;
-			hud.getCodeDataObject (TUIPage,     mediatorPage,           "Highlight", true);
+			hud.getCodeDataObject (TUIPage,     mediatorPage,           "Highlight");
 			if (mediatorPage)
 			{
 				m_highlightMediator = new SwgCuiHighlight (*mediatorPage, Game::getHudSceneType());
@@ -355,7 +330,7 @@ m_doubleToolbar(0)
 		//-----------------------------------------------------------------
 		{
 			mediatorPage = 0;
-			hud.getCodeDataObject(TUIPage, mediatorPage, "questHelper", true);
+			hud.getCodeDataObject(TUIPage, mediatorPage, "questHelper");
 			if (mediatorPage)
 			{
 				m_questHelper = new SwgCuiQuestHelper(*mediatorPage);
@@ -421,11 +396,6 @@ SwgCuiHudWindowManager::~SwgCuiHudWindowManager ()
 			m_workspace->removeMediator (*m_toolbarMediator);
 		}
 
-		if (m_combatQueueMediator != NULL)
-		{
-			m_workspace->removeMediator(*m_combatQueueMediator);
-		}
-
 		if (m_buttonBar != NULL)
 		{
 			m_workspace->removeMediator (*m_buttonBar);
@@ -476,12 +446,6 @@ SwgCuiHudWindowManager::~SwgCuiHudWindowManager ()
 	{
 		m_toolbarMediator->release ();
 		m_toolbarMediator = 0;
-	}
-
-	if (m_combatQueueMediator)
-	{
-		m_combatQueueMediator->release();
-		m_combatQueueMediator = 0;
 	}
 
 	if (m_notificationsMediator)
@@ -848,9 +812,6 @@ void SwgCuiHudWindowManager::update ()
 {
 	if (m_lastHudOpacity != CuiPreferences::getHudOpacity ()) //lint !e777 //floats equality
 		updateHudOpacity ();
-
-	if (m_combatQueueMediator && m_combatQueueMediator->isActive())
-		m_combatQueueMediator->updateTarget();
 }
 
 //----------------------------------------------------------------------
@@ -1740,12 +1701,10 @@ void SwgCuiHudWindowManager::setSpaceChatVisible(bool val)
 
 UIPage *SwgCuiHudWindowManager::getToolbarPage()
 {
-	if(CuiPreferences::getUseDoubleToolbar() && m_doubleToolbarPage)
+	if(CuiPreferences::getUseDoubleToolbar())
 		return m_doubleToolbarPage;
-	else if (m_singleToolbarPage)
+	else
 		return m_singleToolbarPage;
-
-	return m_doubleToolbarPage;
 }
 
 //----------------------------------------------------------------------

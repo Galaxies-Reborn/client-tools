@@ -28,7 +28,6 @@ namespace SwgCuiActions
 	MAKE_ACTION(clientSocial);
 	MAKE_ACTION(combatQueueCollapse);
 	MAKE_ACTION(combatQueueExpand);
-	MAKE_ACTION(clearCombatQueue);
 	MAKE_ACTION(dataStorage);
 	MAKE_ACTION(debugPrint);
 	MAKE_ACTION(inventoryClose);

@@ -32,7 +32,6 @@ namespace ConfigDirect3d9Namespace
 	bool ms_disableMultiStreamVertexBuffers;
 	bool ms_doNotLockBackBuffer;
 	bool ms_screenShotBackBuffer;
-	bool ms_doNotActivateWindow;
 
 	bool ms_createShaders;
 
@@ -74,7 +73,6 @@ void ConfigDirect3d9::install()
 	KEY_BOOL(disableMultiStreamVertexBuffers, false);
 	KEY_BOOL(screenShotBackBuffer, false);
 	KEY_BOOL(doNotLockBackBuffer, false);
-	KEY_BOOL(doNotActivateWindow, false);
 
 	KEY_BOOL(createShaders, true);
 
@@ -177,13 +175,6 @@ bool ConfigDirect3d9::getScreenShotBackBuffer()
 bool ConfigDirect3d9::getDoNotLockBackBuffer()
 {
 	return ms_doNotLockBackBuffer;
-}
-
-// ----------------------------------------------------------------------
-
-bool ConfigDirect3d9::getDoNotActivateWindow()
-{
-	return ms_doNotActivateWindow;
 }
 
 // ----------------------------------------------------------------------

@@ -39,7 +39,6 @@ public:
 	static bool getDisableMultiStreamVertexBuffers();
 	static bool getScreenShotBackBuffer();
 	static bool getDoNotLockBackBuffer();
-	static bool getDoNotActivateWindow();
 
 	static bool getCreateShaders();
 

@@ -29,19 +29,9 @@
 #include "clientGame/ClientCommandQueue.h"
 #include "clientGame/CreatureObject.h"
 #include "clientGame/Game.h"
-#include "clientGame/PlayerObject.h"
-#include "clientUserInterface/CuiDeleteSkillConfirmation.h"
-#include "clientUserInterface/CuiMediatorFactory.h"
-#include "clientUserInterface/CuiMediatorTypes.h"
-#include "clientUserInterface/CuiMessageBox.h"
 #include "clientUserInterface/CuiSkillManager.h"
-#include "clientUserInterface/CuiStringIdsSkill.h"
 #include "sharedDebug/Report.h"
-#include "sharedFoundation/Crc.h"
 #include "sharedFoundation/FormattedString.h"
-#include "sharedGame/Command.h"
-#include "sharedGame/CommandTable.h"
-#include "sharedMessageDispatch/Transceiver.h"
 #include "sharedSkillSystem/SkillManager.h"
 #include "sharedSkillSystem/SkillObject.h"
 
@@ -209,54 +199,6 @@ namespace
 		}
 		return Unicode::narrowToWide(out);
 	}
-
-	SkillObject const * findOwnedSkill(CreatureObject const & player, std::string const & skillName)
-	{
-		CreatureObject::SkillList const & playerSkills = player.getSkills();
-		for (CreatureObject::SkillList::const_iterator it = playerSkills.begin(); it != playerSkills.end(); ++it)
-		{
-			SkillObject const * const skill = *it;
-			if (skill && skill->getSkillName() == skillName)
-				return skill;
-		}
-		return 0;
-	}
-
-	void findLearnedDependentSkills(CreatureObject const & player, SkillObject const & selectedSkill,
-	                                std::vector<SkillObject const *> & dependents)
-	{
-		dependents.clear();
-		CreatureObject::SkillList const & playerSkills = player.getSkills();
-		for (CreatureObject::SkillList::const_iterator it = playerSkills.begin(); it != playerSkills.end(); ++it)
-		{
-			SkillObject const * const candidate = *it;
-			// dependsUponSkill() intentionally returns true for the skill itself.
-			if (candidate && candidate != &selectedSkill && candidate->dependsUponSkill(selectedSkill))
-				dependents.push_back(candidate);
-		}
-	}
-
-	void showSurrenderDependencies(std::vector<SkillObject const *> const & dependents)
-	{
-		std::vector<Unicode::String> localizedNames;
-		localizedNames.reserve(dependents.size());
-		for (std::vector<SkillObject const *>::const_iterator it = dependents.begin(); it != dependents.end(); ++it)
-		{
-			Unicode::String localized;
-			if (!CuiSkillManager::localizeSkillName((*it)->getSkillName(), localized) || localized.empty())
-				localized = Unicode::narrowToWide((*it)->getSkillName());
-			localizedNames.push_back(localized);
-		}
-		std::sort(localizedNames.begin(), localizedNames.end());
-
-		Unicode::String message = CuiStringIdsSkill::err_surrender_deps.localize();
-		for (std::vector<Unicode::String>::const_iterator it = localizedNames.begin(); it != localizedNames.end(); ++it)
-		{
-			message += Unicode::narrowToWide("\n- ");
-			message += *it;
-		}
-		IGNORE_RETURN(CuiMessageBox::createInfoBox(message));
-	}
 }
 
 //-----------------------------------------------------------------------
@@ -291,13 +233,7 @@ m_textSkillPoints   (0),
 m_buttonSurrender   (0),
 m_buttonSkills      (),
 m_selectedProfession(),
-m_selectedSkill     (),
-m_confirmationSkill (),
-m_confirmationPlayerId(NetworkId::cms_invalid),
-m_pendingSurrenderSkill(),
-m_pendingSurrenderPlayerId(NetworkId::cms_invalid),
-m_surrenderSequenceId(0),
-m_callback          (new MessageDispatch::Callback)
+m_selectedSkill     ()
 {
 	getCodeDataObject(TUITabbedPane, m_tabs,               "tabs");
 	getCodeDataObject(TUIPage,       m_pageProfessionList, "pageProfessionList");
@@ -403,30 +339,12 @@ m_callback          (new MessageDispatch::Callback)
 
 	setState(MS_closeable);
 	setState(MS_closeDeactivates);
-
-	// Confirmation and command completion must be observed even if the skills
-	// page is closed while its confirmation dialog or request remains in flight.
-	// Live UI refresh subscriptions remain activation-scoped below.
-	m_callback->connect(*this, &SwgCuiSkills::onSceneChanged,
-		static_cast<Game::Messages::SceneChanged *>(0));
-	m_callback->connect(*this, &SwgCuiSkills::onDeleteSkillConfirmation,
-		static_cast<CuiDeleteSkillConfirmation::Message::DeleteSkillConfirmation *>(0));
-	m_callback->connect(*this, &SwgCuiSkills::onCommandRemoving,
-		static_cast<ClientCommandQueue::Messages::Removing *>(0));
 }
 
 //-----------------------------------------------------------------------
 
 SwgCuiSkills::~SwgCuiSkills()
 {
-	m_callback->disconnect(*this, &SwgCuiSkills::onSceneChanged,
-		static_cast<Game::Messages::SceneChanged *>(0));
-	m_callback->disconnect(*this, &SwgCuiSkills::onDeleteSkillConfirmation,
-		static_cast<CuiDeleteSkillConfirmation::Message::DeleteSkillConfirmation *>(0));
-	m_callback->disconnect(*this, &SwgCuiSkills::onCommandRemoving,
-		static_cast<ClientCommandQueue::Messages::Removing *>(0));
-	delete m_callback;
-	m_callback = 0;
 }
 
 //-----------------------------------------------------------------------
@@ -434,23 +352,6 @@ SwgCuiSkills::~SwgCuiSkills()
 void SwgCuiSkills::performActivate()
 {
 	CuiMediator::performActivate();
-	setIsUpdating(true);
-
-	m_callback->connect(*this, &SwgCuiSkills::onSkillsChanged,
-		static_cast<CreatureObject::Messages::SkillsChanged *>(0));
-	m_callback->connect(*this, &SwgCuiSkills::onExperienceChanged,
-		static_cast<PlayerObject::Messages::ExperienceChanged *>(0));
-	m_callback->connect(*this, &SwgCuiSkills::onSkillModsChanged,
-		static_cast<CreatureObject::Messages::SkillModsChanged *>(0));
-
-	// A confirmation or successful request may have become stale while the page
-	// was inactive or while the active player was replaced.
-	CreatureObject const * const player = Game::getPlayerCreature();
-	if (!m_confirmationSkill.empty() &&
-		(!player || player->getNetworkId() != m_confirmationPlayerId ||
-		 !findOwnedSkill(*player, m_confirmationSkill)))
-		clearConfirmationSnapshot();
-	reconcilePendingSurrender();
 
 	REPORT_LOG(true, ("SwgCuiSkills: performActivate (activeTab=%ld)\n",
 		m_tabs ? static_cast<long>(m_tabs->GetActiveTab()) : -1L));
@@ -466,205 +367,7 @@ void SwgCuiSkills::performActivate()
 
 void SwgCuiSkills::performDeactivate()
 {
-	setIsUpdating(false);
-	m_callback->disconnect(*this, &SwgCuiSkills::onSkillsChanged,
-		static_cast<CreatureObject::Messages::SkillsChanged *>(0));
-	m_callback->disconnect(*this, &SwgCuiSkills::onExperienceChanged,
-		static_cast<PlayerObject::Messages::ExperienceChanged *>(0));
-	m_callback->disconnect(*this, &SwgCuiSkills::onSkillModsChanged,
-		static_cast<CreatureObject::Messages::SkillModsChanged *>(0));
 	CuiMediator::performDeactivate();
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::update(float deltaTimeSecs)
-{
-	CuiMediator::update(deltaTimeSecs);
-	reconcilePendingSurrender();
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::clearConfirmationSnapshot()
-{
-	m_confirmationSkill.clear();
-	m_confirmationPlayerId = NetworkId::cms_invalid;
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::clearPendingSurrender()
-{
-	m_pendingSurrenderSkill.clear();
-	m_pendingSurrenderPlayerId = NetworkId::cms_invalid;
-	m_surrenderSequenceId = 0;
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::reconcilePendingSurrender()
-{
-	if (m_pendingSurrenderSkill.empty())
-	{
-		m_pendingSurrenderPlayerId = NetworkId::cms_invalid;
-		m_surrenderSequenceId = 0;
-		return;
-	}
-
-	CreatureObject const * const player = Game::getPlayerCreature();
-	bool const wrongPlayer = !player ||
-		player->getNetworkId() != m_pendingSurrenderPlayerId;
-	bool const skillRemoved = player && !wrongPlayer &&
-		!findOwnedSkill(*player, m_pendingSurrenderSkill);
-	bool const queueEntryLost = m_surrenderSequenceId != 0 &&
-		ClientCommandQueue::findEntry(m_surrenderSequenceId) == 0;
-
-	if (wrongPlayer || skillRemoved || queueEntryLost)
-	{
-		REPORT_LOG(true, ("SwgCuiSkills: cleared stale surrender '%s' (player=%d, removed=%d, queue=%d)\n",
-			m_pendingSurrenderSkill.c_str(), wrongPlayer ? 1 : 0,
-			skillRemoved ? 1 : 0, queueEntryLost ? 1 : 0));
-		clearPendingSurrender();
-		if (isActive())
-			updateSurrenderButton();
-	}
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::onSkillsChanged(CreatureObject const & creature)
-{
-	if (&creature != Game::getPlayerCreature())
-		return;
-
-	if (!m_confirmationSkill.empty() &&
-		(creature.getNetworkId() != m_confirmationPlayerId ||
-		 !findOwnedSkill(creature, m_confirmationSkill)))
-		clearConfirmationSnapshot();
-	reconcilePendingSurrender();
-
-	populateProfessionList();
-	populateSelectedProfession();
-	updateSkillPointsDisplay();
-	updateSurrenderButton();
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::onExperienceChanged(PlayerObject const & player)
-{
-	if (&player != Game::getConstPlayerObject())
-		return;
-
-	populateExperience();
-	// XP bars and their tooltips are rendered as part of the profession graph.
-	populateSelectedProfession();
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::onSkillModsChanged(CreatureObject const & creature)
-{
-	if (&creature == Game::getPlayerCreature())
-		populateSkillMods();
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::onDeleteSkillConfirmation(std::string const & skillName)
-{
-	if (skillName.empty() || skillName != m_confirmationSkill)
-	{
-		REPORT_LOG(true, ("SwgCuiSkills: ignored stale surrender confirmation for '%s'\n",
-			skillName.c_str()));
-		return;
-	}
-
-	// Clear first so a duplicate transceiver emission cannot submit twice.
-	NetworkId const confirmationPlayerId = m_confirmationPlayerId;
-	clearConfirmationSnapshot();
-	if (!m_pendingSurrenderSkill.empty())
-		return;
-
-	CreatureObject const * const player = Game::getPlayerCreature();
-	SkillObject const * const selectedSkill = player &&
-		player->getNetworkId() == confirmationPlayerId ?
-		findOwnedSkill(*player, skillName) : 0;
-	if (!player || !selectedSkill)
-	{
-		updateSurrenderButton();
-		return;
-	}
-
-	// Ownership and dependency state can change while the dialog is open, so
-	// repeat both checks at the point of submission. The server remains final
-	// authority and performs the same policy checks.
-	std::vector<SkillObject const *> dependents;
-	findLearnedDependentSkills(*player, *selectedSkill, dependents);
-	if (!dependents.empty())
-	{
-		showSurrenderDependencies(dependents);
-		updateSurrenderButton();
-		return;
-	}
-
-	Command const & surrenderCommand = CommandTable::getCommand(
-		Crc::normalizeAndCalculate("surrenderSkill"));
-	if (surrenderCommand.isNull() || !surrenderCommand.m_visibleToClients)
-	{
-		REPORT_LOG(true, ("SwgCuiSkills: surrenderSkill is unavailable as a client-visible command\n"));
-		updateSurrenderButton();
-		return;
-	}
-
-	m_pendingSurrenderSkill = skillName;
-	m_pendingSurrenderPlayerId = player->getNetworkId();
-	updateSurrenderButton();
-	m_surrenderSequenceId = ClientCommandQueue::enqueueCommand(
-		surrenderCommand, player->getNetworkId(), Unicode::narrowToWide(skillName));
-	if (m_surrenderSequenceId == 0)
-	{
-		REPORT_LOG(true, ("SwgCuiSkills: surrenderSkill enqueue failed for '%s'\n", skillName.c_str()));
-		clearPendingSurrender();
-		updateSurrenderButton();
-		return;
-	}
-
-	REPORT_LOG(true, ("SwgCuiSkills: surrenderSkill enqueued for '%s' (sequence=%u)\n",
-		skillName.c_str(), static_cast<unsigned int>(m_surrenderSequenceId)));
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::onSceneChanged(bool const &)
-{
-	clearConfirmationSnapshot();
-	clearPendingSurrender();
-	IGNORE_RETURN(CuiMediatorFactory::deactivateInWorkspace(
-		CuiMediatorTypes::DeleteSkillConfirmation));
-	if (isActive())
-		updateSurrenderButton();
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::onCommandRemoving(ClientCommandQueue::Messages::Removing::Payload const & payload)
-{
-	if (m_surrenderSequenceId == 0 || payload.sequenceId != m_surrenderSequenceId)
-		return;
-
-	if (payload.status != Command::CEC_Success)
-	{
-		REPORT_LOG(true, ("SwgCuiSkills: surrenderSkill rejected (status=%d, detail=%d)\n",
-			static_cast<int>(payload.status), payload.statusDetail));
-	}
-	// Native command hooks are void and can report queue success for a policy
-	// rejection/no-op, so every matching completion ends the in-flight guard.
-	// A successful authoritative SkillsChanged delta refreshes the display.
-	clearPendingSurrender();
-	if (isActive())
-		updateSurrenderButton();
 }
 
 //-----------------------------------------------------------------------
@@ -679,7 +382,6 @@ bool SwgCuiSkills::OnMessage(UIWidget * context, const UIMessage & msg)
 		if (link != m_linkSkills.end())
 		{
 			m_selectedProfession = link->second;
-			synchronizeProfessionTreeSelection();
 			REPORT_LOG(true, ("SwgCuiSkills: link click -> profession='%s'\n", m_selectedProfession.c_str()));
 			populateSelectedProfession();
 			return false;   // consume
@@ -700,44 +402,20 @@ void SwgCuiSkills::OnButtonPressed(UIWidget * context)
 
 	if (context == m_buttonSurrender)
 	{
-		if (m_selectedSkill.empty() || !m_pendingSurrenderSkill.empty())
+		if (m_selectedSkill.empty())
 		{
-			REPORT_LOG(true, ("SwgCuiSkills: surrender ignored (selection='%s', pending='%s')\n",
-				m_selectedSkill.c_str(), m_pendingSurrenderSkill.c_str()));
+			REPORT_LOG(true, ("SwgCuiSkills: surrender ignored (no skill selected)\n"));
 			return;
 		}
-
+		// V14: real surrender via ClientCommandQueue. Sends the
+		// "surrenderSkill" command (registered on the server in
+		// commands.iff) with the skill name as a parameter; the server
+		// validates ownership and revokes via the standard skill path.
 		CreatureObject const * const player = Game::getPlayerCreature();
-		SkillObject const * const selectedSkill = player ? findOwnedSkill(*player, m_selectedSkill) : 0;
-		if (!player || !selectedSkill)
-		{
-			REPORT_LOG(true, ("SwgCuiSkills: surrender ignored; player does not own '%s'\n",
-				m_selectedSkill.c_str()));
-			updateSurrenderButton();
-			return;
-		}
-
-		std::vector<SkillObject const *> dependents;
-		findLearnedDependentSkills(*player, *selectedSkill, dependents);
-		if (!dependents.empty())
-		{
-			showSurrenderDependencies(dependents);
-			return;
-		}
-
-		// Snapshot before opening the retained typed confirmation mediator.
-		// The callback revalidates this exact skill before enqueueing.
-		m_confirmationSkill = m_selectedSkill;
-		m_confirmationPlayerId = player->getNetworkId();
-		CuiDeleteSkillConfirmation * const confirmation = dynamic_cast<CuiDeleteSkillConfirmation *>(
-			CuiMediatorFactory::activateInWorkspace(CuiMediatorTypes::DeleteSkillConfirmation));
-		if (!confirmation)
-		{
-			REPORT_LOG(true, ("SwgCuiSkills: unable to activate surrender confirmation\n"));
-			clearConfirmationSnapshot();
-			return;
-		}
-		confirmation->setSelectedSkill(m_confirmationSkill);
+		NetworkId const & playerId = player ? player->getNetworkId() : NetworkId::cms_invalid;
+		ClientCommandQueue::enqueueCommand("surrenderSkill", playerId,
+			Unicode::narrowToWide(m_selectedSkill));
+		REPORT_LOG(true, ("SwgCuiSkills: surrenderSkill enqueued for '%s'\n", m_selectedSkill.c_str()));
 		return;
 	}
 
@@ -746,7 +424,6 @@ void SwgCuiSkills::OnButtonPressed(UIWidget * context)
 	if (link != m_linkSkills.end())
 	{
 		m_selectedProfession = link->second;
-		synchronizeProfessionTreeSelection();
 		REPORT_LOG(true, ("SwgCuiSkills: link click -> profession='%s'\n", m_selectedProfession.c_str()));
 		populateSelectedProfession();
 		return;
@@ -786,19 +463,6 @@ void SwgCuiSkills::updateSkillPointsDisplay()
 	char buf[64];
 	snprintf(buf, sizeof(buf), "%d / %d", used, k_skillPointCap);
 	m_textSkillPoints->SetLocalText(Unicode::narrowToWide(buf));
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::updateSurrenderButton()
-{
-	if (!m_buttonSurrender)
-		return;
-
-	CreatureObject const * const player = Game::getPlayerCreature();
-	bool const ownsSelectedSkill = player && !m_selectedSkill.empty() &&
-		findOwnedSkill(*player, m_selectedSkill);
-	m_buttonSurrender->SetEnabled(ownsSelectedSkill && m_pendingSurrenderSkill.empty());
 }
 
 //-----------------------------------------------------------------------
@@ -958,12 +622,6 @@ void SwgCuiSkills::populateProfessionList()
 		rows.push_back(std::make_pair(localizeProfessionDisplay(*it), *it));
 	std::sort(rows.begin(), rows.end());
 
-	// Keep the model selection sane before rebuilding the matching visible row.
-	if (!m_selectedProfession.empty() && noviceSet.find(m_selectedProfession) == noviceSet.end())
-		m_selectedProfession.clear();
-	if (m_selectedProfession.empty() && !rows.empty())
-		m_selectedProfession = rows.front().second;
-
 	for (std::vector<NameRow>::const_iterator it = rows.begin(); it != rows.end(); ++it)
 	{
 		UIDataSourceContainer * const child = new UIDataSourceContainer;
@@ -973,31 +631,11 @@ void SwgCuiSkills::populateProfessionList()
 		m_dsProfTree->AddChild(child);
 	}
 
-	synchronizeProfessionTreeSelection();
-}
-
-//-----------------------------------------------------------------------
-
-void SwgCuiSkills::synchronizeProfessionTreeSelection()
-{
-	if (!m_treeProf)
-		return;
-
-	long selectedRow = -1;
-	for (long row = 0; row < m_treeProf->GetRowCount(); ++row)
-	{
-		UIDataSourceContainer const * const data =
-			m_treeProf->GetDataSourceContainerAtRow(row);
-		if (data && m_selectedProfession == data->GetName())
-		{
-			selectedRow = row;
-			break;
-		}
-	}
-
-	m_treeProf->SelectRow(selectedRow);
-	if (selectedRow >= 0)
-		m_treeProf->ScrollToRow(static_cast<int>(selectedRow));
+	// Keep the selection sane.
+	if (!m_selectedProfession.empty() && noviceSet.find(m_selectedProfession) == noviceSet.end())
+		m_selectedProfession.clear();
+	if (m_selectedProfession.empty() && !rows.empty())
+		m_selectedProfession = rows.front().second;
 }
 
 //-----------------------------------------------------------------------
@@ -1011,10 +649,10 @@ void SwgCuiSkills::populateSelectedProfession()
 
 	if (m_selectedProfession.empty())
 	{
-		m_selectedSkill.clear();
 		if (m_textProfName)
 			m_textProfName->SetLocalText(Unicode::emptyString);
-		populateSelectedSkill();
+		if (m_textProfessionBody)
+			m_textProfessionBody->SetLocalText(Unicode::emptyString);
 		return;
 	}
 
@@ -1047,8 +685,6 @@ void SwgCuiSkills::populateSelectedProfession()
 	}
 
 	// Non-4x4 fallback: text dump of descendants with [X]/[ ] indicators.
-	m_selectedSkill.clear();
-	populateSelectedSkill();
 	std::set<SkillObject const *> visited;
 	std::vector<SkillObject const *> stack;
 	stack.push_back(profSkill);
@@ -1128,8 +764,7 @@ void SwgCuiSkills::applyTreeBox(char const * path, std::string const & skillName
 
 	// Click identifies which skill the user picked for the detail panels.
 	m_buttonSkills[btn] = skillName;
-	if (!isRegisteredMediatorObject(*btn))
-		registerMediatorObject(*btn, true);
+	registerMediatorObject(*btn, true);
 
 	applySkillBoxXp(path, btn, skillName, has, nextTrainable);
 }
@@ -1283,8 +918,7 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 			if (linkedDef)
 			{
 				m_linkSkills[linkText] = noviceCandidate;
-				if (!isRegisteredMediatorObject(*linkText))
-					registerMediatorObject(*linkText, true);
+				registerMediatorObject(*linkText, true);
 			}
 		}
 	}
@@ -1388,8 +1022,7 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 				label += Unicode::narrowToWide(d.displayName);
 				t->SetLocalText(label);
 				m_linkSkills[t] = d.noviceSkill;
-				if (!isRegisteredMediatorObject(*t))
-					registerMediatorObject(*t, true);
+				registerMediatorObject(*t, true);
 			}
 			++prevSlot;
 		}
@@ -1408,20 +1041,9 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 		m_pageGraph4x4->IsVisible() ? 1 : 0,
 		static_cast<int>(m_pageGraph4x4->GetSize().x), static_cast<int>(m_pageGraph4x4->GetSize().y)));
 
-	// Preserve the selected box during live XP/skill refresh. Fall back to the
-	// novice only when switching profession or when the old box disappeared.
-	bool selectionStillVisible = false;
-	for (std::map<UIWidget *, std::string>::const_iterator it = m_buttonSkills.begin();
-		it != m_buttonSkills.end(); ++it)
-	{
-		if (it->second == m_selectedSkill)
-		{
-			selectionStillVisible = true;
-			break;
-		}
-	}
-	if (!selectionStillVisible)
-		m_selectedSkill = novice->getSkillName();
+	// Default-select the novice skill so the detail panels at the bottom
+	// show *something* meaningful as soon as a profession is picked.
+	m_selectedSkill = novice->getSkillName();
 	populateSelectedSkill();
 
 	return true;
@@ -1431,8 +1053,6 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 
 void SwgCuiSkills::populateSelectedSkill()
 {
-	updateSurrenderButton();
-
 	// Clear all four per-skill detail data sources first.
 	if (m_dsInfoModsName)   m_dsInfoModsName->Clear();
 	if (m_dsInfoModsPoints) m_dsInfoModsPoints->Clear();

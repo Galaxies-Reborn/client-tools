@@ -59,9 +59,9 @@ m_rechargeInterpolated    (0.0f),
 m_rechargeUpdateMultiplier(3.0f)
 {
 	getCodeDataObject (TUIText, m_valueText,      "ValueText", true);
-	getCodeDataObject (TUIPage, m_currentPage,    "current");
-	getCodeDataObject (TUIPage, m_rechargePage,   "recentCurrent");
-	getCodeDataObject (TUIPage, m_currentMaxPage, "currentMax", true);
+	getCodeDataObject (TUIPage, m_currentPage,    "juice");
+	getCodeDataObject (TUIPage, m_rechargePage ,    "moves");
+	getCodeDataObject (TUIPage, m_currentMaxPage, "cap");
 
 	m_currentPage->SetMinimumSize( UISize( 0, 0 ) );
 

@@ -221,7 +221,6 @@ namespace Direct3d9Namespace
 
 	StaticIndexBufferGraphicsData *    createIndexBufferData(const StaticIndexBuffer &indexBuffer);
 	DynamicIndexBufferGraphicsData *   createIndexBufferData();
-	void                               setDynamicIndexBufferSize(int numberOfIndices);
 
 	void                               getOneToOneUVMapping(int textureWidth, int textureHeight, float &u0, float &v0, float &u1, float &v1);
 	TextureGraphicsData *              createTextureData(const Texture &texture, const TextureFormat *runtimeFormats, int numberOfRuntimeFormats);
@@ -501,6 +500,16 @@ using namespace Direct3d9Namespace;
 
 extern "C" __declspec(dllexport) Gl_api const * GetApi();
 
+// The engine calls this before it trusts a single Gl_api slot.  Gl_api has three
+// distinct binary layouts -- five slots are #ifdef _DEBUG and four more are
+// #if PRODUCTION == 0 -- discriminated only by the _r/_o/_d suffix in the DLL
+// name.  A mismatched pair loads cleanly and then calls the wrong function
+// through every slot past the first conditional one, so the size is reported
+// out of band and checked in Graphics::install.  It cannot be a struct field:
+// Headless.cpp blanket-fills Gl_api as void** over sizeof(Gl_api)/sizeof(void*)
+// and would overwrite it.
+extern "C" __declspec(dllexport) unsigned int GetGlApiStructSize();
+
 // ======================================================================
 
 Gl_api const * GetApi()
@@ -508,6 +517,13 @@ Gl_api const * GetApi()
 	ms_glApi.verify  = verify;
 	ms_glApi.install = Direct3d9::install;
 	return &ms_glApi;
+}
+
+// ----------------------------------------------------------------------
+
+unsigned int GetGlApiStructSize()
+{
+	return static_cast<unsigned int>(sizeof(Gl_api));
 }
 
 // ----------------------------------------------------------------------
@@ -1739,7 +1755,6 @@ void Direct3d9Namespace::updateWindowSettings()
 	{
 		DWORD const windowStyleWindowed    = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_BORDER | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 		DWORD const windowStyleFullscreen  = WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
-		UINT const windowActivationFlag = ConfigDirect3d9::getDoNotActivateWindow() ? SWP_NOACTIVATE : 0;
 
 		if (ms_windowed)
 		{
@@ -1777,7 +1792,7 @@ void Direct3d9Namespace::updateWindowSettings()
 				}
 
 			// reposition and resize the window
-			const BOOL result2 = SetWindowPos(ms_window, HWND_NOTOPMOST, ms_windowX, ms_windowY, rect.right - rect.left, rect.bottom - rect.top, SWP_NOCOPYBITS | SWP_SHOWWINDOW | windowActivationFlag);
+			const BOOL result2 = SetWindowPos(ms_window, HWND_NOTOPMOST, ms_windowX, ms_windowY, rect.right - rect.left, rect.bottom - rect.top, SWP_NOCOPYBITS |  SWP_SHOWWINDOW);
 			FATAL(!result2, ("SetWindowPos failed"));
 		}
 		else
@@ -1791,7 +1806,7 @@ void Direct3d9Namespace::updateWindowSettings()
 			GetMonitorInfo(monitor, &monitorInfo);
 			RECT const & r = monitorInfo.rcMonitor;
 
-			const BOOL result2 = SetWindowPos(ms_window, HWND_TOPMOST, r.left, r.top, ms_width, ms_height, SWP_NOCOPYBITS | SWP_SHOWWINDOW | windowActivationFlag);
+			const BOOL result2 = SetWindowPos(ms_window, HWND_TOPMOST, r.left, r.top, ms_width, ms_height, SWP_NOCOPYBITS |  SWP_SHOWWINDOW);
 			FATAL(!result2, ("SetWindowPos failed"));
 		}
 	}
@@ -3539,13 +3554,6 @@ StaticIndexBufferGraphicsData *Direct3d9Namespace::createIndexBufferData(const S
 DynamicIndexBufferGraphicsData *Direct3d9Namespace::createIndexBufferData()
 {
 	return new Direct3d9_DynamicIndexBufferData();
-}
-
-// ----------------------------------------------------------------------
-
-void Direct3d9Namespace::setDynamicIndexBufferSize(int numberOfIndices)
-{
-	Direct3d9_DynamicIndexBufferData::setSize(numberOfIndices);
 }
 
 // ----------------------------------------------------------------------

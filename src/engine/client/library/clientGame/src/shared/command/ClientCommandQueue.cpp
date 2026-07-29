@@ -773,27 +773,6 @@ uint32 ClientCommandQueue::enqueueCommand(std::string const &commandName, Networ
 
 // ----------------------------------------------------------------------
 
-bool ClientCommandQueue::removeCommand(uint32 sequenceId)
-{
-	// Sequence 0 is the server protocol sentinel for clearing the entire queue.
-	if (sequenceId == 0 || ms_commandQueue.find(sequenceId) == ms_commandQueue.end())
-		return false;
-
-	Object * const player = Game::getPlayer();
-	PlayerCreatureController * const playerController = player ? dynamic_cast<PlayerCreatureController *>(player->getController()) : 0;
-	if (!playerController)
-		return false;
-
-	// The authoritative queue replies with CM_commandQueueRemove for commands
-	// it can cancel.  That existing receive path carries the real wait/status
-	// payload into handleCommandRemoved() and deliberately leaves an executing
-	// front command intact until its normal completion reply.
-	playerController->sendCommandQueueRemove(sequenceId);
-	return true;
-}
-
-// ----------------------------------------------------------------------
-
 void ClientCommandQueue::clear()
 {
 	DEBUG_REPORT_LOG(cms_debug, ("ClientCommandQueue::clear()\n"));

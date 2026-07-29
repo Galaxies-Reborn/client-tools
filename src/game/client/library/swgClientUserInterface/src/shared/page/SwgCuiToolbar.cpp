@@ -143,31 +143,6 @@ namespace SwgCuiToolbarNamespace
 		SwgCuiToolbar * toolbar;
 	};
 
-	class ClientCommandQueueFlagGuard
-	{
-	public:
-		typedef void (*Setter)(bool const enabled);
-
-		explicit ClientCommandQueueFlagGuard(Setter setter) :
-			m_setter(setter)
-		{
-			(*m_setter)(true);
-		}
-
-		~ClientCommandQueueFlagGuard()
-		{
-			(*m_setter)(false);
-		}
-
-	private:
-		ClientCommandQueueFlagGuard();
-		ClientCommandQueueFlagGuard(ClientCommandQueueFlagGuard const &);
-		ClientCommandQueueFlagGuard & operator=(ClientCommandQueueFlagGuard const &);
-
-	private:
-		Setter m_setter;
-	};
-
 	
 	KeybindingChangedCallbackReceiver s_chatFontSizeCallbackReceiver[Game::ST_numTypes];
 
@@ -2051,7 +2026,7 @@ void SwgCuiToolbar::performPrimaryAttack(NetworkId const & target)
 
 	Unicode::String params = Unicode::emptyString;
 
-	ClientCommandQueueFlagGuard const commandsFromToolbarGuard(&ClientCommandQueue::commandsAreNowFromToolbar);
+	ClientCommandQueue::commandsAreNowFromToolbar(true);
 	std::string actionName = player->getCurrentPrimaryActionName();
 
 	// Add on extra command information if neccessary
@@ -2080,6 +2055,7 @@ void SwgCuiToolbar::performPrimaryAttack(NetworkId const & target)
 		params += Unicode::narrowToWide("c");
 
 	ClientCommandQueue::enqueueCommand(Crc::normalizeAndCalculate(actionName.c_str()), target, params);
+	ClientCommandQueue::commandsAreNowFromToolbar(false);	
 }
 
 //----------------------------------------------------------------------
@@ -2087,7 +2063,7 @@ void SwgCuiToolbar::performPrimaryAttack(NetworkId const & target)
 void SwgCuiToolbar::performSecondaryAttack(NetworkId const & target)
 {
 	UNREF(target);
-	ClientCommandQueueFlagGuard const combatTargetingGuard(&ClientCommandQueue::useCombatTargeting);
+	ClientCommandQueue::useCombatTargeting(true);
 
 	// TODO: move up the call chain
 	CreatureObject const * const player = Game::getPlayerCreature();
@@ -2095,10 +2071,13 @@ void SwgCuiToolbar::performSecondaryAttack(NetworkId const & target)
 		return;
 	if (s_activeToolbar != NULL)
 	{
-		ClientCommandQueueFlagGuard const secondaryCommandGuard(&ClientCommandQueue::setIsSecondaryCommand);
+		ClientCommandQueue::setIsSecondaryCommand(true);
 		int const slot = s_activeToolbar->m_defaultActionSlot;
 		IGNORE_RETURN(s_activeToolbar->performToolbarAction(slot));
+		ClientCommandQueue::setIsSecondaryCommand(false);
 	}
+
+	ClientCommandQueue::useCombatTargeting(false);
 }
 
 //----------------------------------------------------------------------
@@ -2121,7 +2100,7 @@ bool SwgCuiToolbar::performToolbarAction(int slot, bool pet)
 		return false;
 	}
 
-	ClientCommandQueueFlagGuard const commandsFromToolbarGuard(&ClientCommandQueue::commandsAreNowFromToolbar);
+	ClientCommandQueue::commandsAreNowFromToolbar(true);
 
 	UIWidget * const parent = getToolbarItemWidget (slot, pet);
 
@@ -2298,6 +2277,8 @@ bool SwgCuiToolbar::performToolbarAction(int slot, bool pet)
 		}
 	}
 
+	ClientCommandQueue::commandsAreNowFromToolbar(false);
+	
 	return true;
 }
 
@@ -2426,7 +2407,7 @@ void SwgCuiToolbar::onCommandRemoved (const CreatureObject::Messages::CommandRem
 			{
 				compareString = item.str;
 			}
-			else if (!item.cmd.empty ())
+			else if (item.cmd.empty ())
 			{						
 				std::string str;
 				if (CuiMessageQueueManager::findCommandString (item.cmd, str, false))
@@ -3071,7 +3052,7 @@ void SwgCuiToolbar::update (float deltaTimeSecs)
 						
 						compareCrc = Crc::normalizeAndCalculate(compareString.c_str());			
 
-						if(showNewCurrentActionPages && m_currentActionPage && m_effectorCurrent && (compareCrc == m_commandExecutingCrc))
+						if(showNewCurrentActionPages && (compareCrc == m_commandExecutingCrc))
 						{							
 							UIPage *currentActionPage = getPageFromPool(m_currentActionPage, m_currentActionPages, m_nextCurrentActionPage);
 							bool resetVisiblity = false;
@@ -4558,16 +4539,13 @@ void SwgCuiToolbar::setPetBarVisible(const bool visible)
 	{
 		// reset all of our pet checkboxes to invisible.
 		// TODO: set these correctly.
-		if (m_petVolumeHighlightsPage)
+		const UIBaseObject::UIObjectList & olist = m_petVolumeHighlightsPage->GetChildrenRef();
+		for (UIBaseObject::UIObjectList::const_iterator it = olist.begin (); it != olist.end (); ++it)
 		{
-			const UIBaseObject::UIObjectList & olist = m_petVolumeHighlightsPage->GetChildrenRef();
-			for (UIBaseObject::UIObjectList::const_iterator it = olist.begin (); it != olist.end (); ++it)
-			{
-				UIBaseObject * const obj = *it;
-				NOT_NULL (obj);
-				if (obj->IsA (TUIImage))
-					safe_cast<UIImage *>(obj)->SetOpacity (0.0f);
-			}
+			UIBaseObject * const obj = *it;
+			NOT_NULL (obj);
+			if (obj->IsA (TUIImage))
+				safe_cast<UIImage *>(obj)->SetOpacity (0.0f);
 		}
 
 		repopulateSlots(true);

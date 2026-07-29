@@ -19,12 +19,12 @@ function Get-VisualStudioRoot {
 
     $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
     if (-not (Test-Path -LiteralPath $vswhere -PathType Leaf)) {
-        throw "vswhere.exe was not found. Pass -VisualStudioRoot explicitly."
+        throw "vswhere.exe was not found. Run .\scripts\Setup-X64BuildPrerequisites.ps1 -Install or pass -VisualStudioRoot explicitly."
     }
 
     $root = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath).Trim()
     if (-not $root) {
-        throw "Visual Studio with the x64 C++ toolchain was not found."
+        throw "Visual Studio with the x64 C++ toolchain was not found. Run .\scripts\Setup-X64BuildPrerequisites.ps1 -Install."
     }
     return $root
 }
@@ -64,6 +64,20 @@ if (-not (Test-Path -LiteralPath (Join-Path $qtRoot "qmake\Makefile") -PathType 
 & $devShell -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
 $env:QTDIR = $qtRoot
 $env:QMAKESPEC = "win32-msvc2005"
+
+# Qt 3's generated nmake files assume their output directories already exist.
+$qtBuildDirectories = @(
+    (Join-Path $qtRoot "bin"),
+    (Join-Path $qtRoot "lib"),
+    (Join-Path $qtRoot "qmake\tmp"),
+    (Join-Path $qtRoot "src\moc\tmp\obj\release-shared-mt"),
+    (Join-Path $qtRoot "src\moc\tmp\moc\release-shared-mt"),
+    (Join-Path $qtRoot "src\tmp\obj\release-shared-mt"),
+    (Join-Path $qtRoot "src\tmp\moc\release-shared-mt")
+)
+foreach ($directory in $qtBuildDirectories) {
+    [void](New-Item -ItemType Directory -Path $directory -Force)
+}
 
 # qmake consumes this generated cache, so keep checkout-specific paths out of Git.
 $qtPath = $qtRoot -replace '\\', '/'

@@ -91,10 +91,6 @@ namespace AssetCustomizationManagerNamespace
 		uint16  assetId;
 	} PACKING_END_STRUCT;
 
-	int const cs_variableUsageComponentCount       = 3;
-	int const cs_compactVariableUsageComponentSize = isizeof(uint8);
-	int const cs_wideVariableUsageComponentSize    = isizeof(uint16);
-
 	// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #ifdef PLATFORM_WIN32
@@ -107,8 +103,6 @@ namespace AssetCustomizationManagerNamespace
 
 	void                   load(Iff &iff);
 	void                   load_0000(Iff &iff);
-	uint16                 readVariableUsageComponent(uint8 const *data, int componentOffset, int componentSize);
-	bool                   isVariableUsageEncodingValid(uint8 const *data, int dataSize, int componentSize);
 
 	char const            *getNameFromOffset(int offset);
 	char const            *getPaletteNameFromPaletteId(int paletteId);
@@ -272,53 +266,6 @@ void AssetCustomizationManagerNamespace::load(Iff &iff)
 
 // ----------------------------------------------------------------------
 
-uint16 AssetCustomizationManagerNamespace::readVariableUsageComponent(uint8 const *data, int componentOffset, int componentSize)
-{
-	NOT_NULL(data);
-
-	if (componentSize == cs_compactVariableUsageComponentSize)
-		return static_cast<uint16>(data[componentOffset]);
-
-	DEBUG_FATAL(componentSize != cs_wideVariableUsageComponentSize, ("unsupported variable usage component size [%d]", componentSize));
-
-	return static_cast<uint16>(
-		static_cast<uint16>(data[componentOffset]) |
-		(static_cast<uint16>(data[componentOffset + 1]) << 8));
-}
-
-// ----------------------------------------------------------------------
-
-bool AssetCustomizationManagerNamespace::isVariableUsageEncodingValid(uint8 const *data, int dataSize, int componentSize)
-{
-	NOT_NULL(data);
-
-	int const entrySize = cs_variableUsageComponentCount * componentSize;
-	if ((dataSize <= 0) || (entrySize <= 0) || ((dataSize % entrySize) != 0))
-		return false;
-
-	int const maximumIds[cs_variableUsageComponentCount] =
-	{
-		s_maxValidVariableId,
-		s_maxValidRangeId,
-		s_maxValidDefaultId
-	};
-
-	for (int entryOffset = 0; entryOffset < dataSize; entryOffset += entrySize)
-	{
-		for (int componentIndex = 0; componentIndex < cs_variableUsageComponentCount; ++componentIndex)
-		{
-			int const componentOffset = entryOffset + componentIndex * componentSize;
-			int const id = static_cast<int>(readVariableUsageComponent(data, componentOffset, componentSize));
-			if ((id < 1) || (id > maximumIds[componentIndex]))
-				return false;
-		}
-	}
-
-	return true;
-}
-
-// ----------------------------------------------------------------------
-
 void AssetCustomizationManagerNamespace::load_0000(Iff &iff)
 {
 	iff.enterForm(TAG_0000);
@@ -380,35 +327,9 @@ void AssetCustomizationManagerNamespace::load_0000(Iff &iff)
 		//-- Read the variable usage composition table.
 		iff.enterChunk(TAG_UCMP);
 
-			// Publish 14.1 stores the three ids in each UCMP entry as uint8 values.
-			// Later assets widened the fields to uint16 without changing ACST version 0000.
-			// Read the chunk as bytes and validate both layouts against the tables already
-			// loaded above.  Prefer the widened layout only when it is semantically valid.
-			int const variableUsageDataSize = iff.getChunkLengthLeft();
-			FATAL(variableUsageDataSize <= 0, ("AssetCustomizationManager UCMP chunk is empty."));
-
-			uint8 *const variableUsageData = new uint8[static_cast<size_t>(variableUsageDataSize)];
-			iff.read_uint8(variableUsageDataSize, variableUsageData);
-
-			bool const compactEncodingValid = isVariableUsageEncodingValid(variableUsageData, variableUsageDataSize, cs_compactVariableUsageComponentSize);
-			bool const wideEncodingValid    = isVariableUsageEncodingValid(variableUsageData, variableUsageDataSize, cs_wideVariableUsageComponentSize);
-			FATAL(!compactEncodingValid && !wideEncodingValid, ("AssetCustomizationManager UCMP chunk has no valid compact or widened encoding."));
-
-			int const componentSize = wideEncodingValid ? cs_wideVariableUsageComponentSize : cs_compactVariableUsageComponentSize;
-			int const entrySize     = cs_variableUsageComponentCount * componentSize;
-			s_maxValidVariableUsageId = variableUsageDataSize / entrySize;
+			s_maxValidVariableUsageId = iff.getChunkLengthLeft(sizeof(VariableUsage));
 			s_variableUsageMap        = new VariableUsage[static_cast<size_t>(s_maxValidVariableUsageId)];
-
-			for (int entryIndex = 0; entryIndex < s_maxValidVariableUsageId; ++entryIndex)
-			{
-				int const entryOffset = entryIndex * entrySize;
-				s_variableUsageMap[entryIndex].variableId = readVariableUsageComponent(variableUsageData, entryOffset, componentSize);
-				s_variableUsageMap[entryIndex].rangeId    = readVariableUsageComponent(variableUsageData, entryOffset + componentSize, componentSize);
-				s_variableUsageMap[entryIndex].defaultId  = readVariableUsageComponent(variableUsageData, entryOffset + 2 * componentSize, componentSize);
-			}
-
-			DEBUG_REPORT_LOG(!wideEncodingValid && compactEncodingValid, ("AssetCustomizationManager: loaded legacy compact UCMP entries [%d].\n", s_maxValidVariableUsageId));
-			delete [] variableUsageData;
+			iff.read_uint16(3 * s_maxValidVariableUsageId, reinterpret_cast<uint16*>(s_variableUsageMap));
 
 		iff.exitChunk(TAG_UCMP);
 

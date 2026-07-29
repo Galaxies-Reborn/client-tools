@@ -330,7 +330,7 @@ bool SwgCuiAvatarCreationHelper::finishCreation (bool automatic)
 			serverTemplateName = "object/creature/player/human_male.iff";
 
 			if (s_profession.empty ())
-				SwgCuiAvatarCreationHelper::setProfession ("crafting_artisan");
+				SwgCuiAvatarCreationHelper::setProfession ("artisan");
 
 			s_lastCreationAutomatic = true;
 			s_automaticName         = name;
