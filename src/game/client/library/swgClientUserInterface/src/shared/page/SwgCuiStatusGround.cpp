@@ -569,6 +569,23 @@ m_buffIconSettingsChangedCallback(0)
 		IGNORE_RETURN(pageSetVisible(m_textDistance, false));
 	}
 
+	// Publish 14's AllTargets.SampleStatus contains an authored "+50%"
+	// Accuracy preview that is not bound to any runtime status data.  Every
+	// duplicated overhead status page otherwise exposes that design-time text.
+	// Do not present the retired client-side estimate as an authoritative value.
+	UIPage * const legacyAccuracyPage = dynamic_cast<UIPage *>(page.GetObjectFromPath("Accuracy", TUIPage));
+	if(legacyAccuracyPage)
+	{
+		UIText * const legacyAccuracyText = dynamic_cast<UIText *>(legacyAccuracyPage->GetObjectFromPath("text", TUIText));
+		if(legacyAccuracyText)
+		{
+			legacyAccuracyText->SetPreLocalized(true);
+			legacyAccuracyText->SetLocalText(Unicode::emptyString);
+		}
+
+		legacyAccuracyPage->SetVisible(false);
+	}
+
 	getCodeDataObject(TUIText, m_textStatus, "textStatus", true);
 	if(m_textStatus)
 	{
