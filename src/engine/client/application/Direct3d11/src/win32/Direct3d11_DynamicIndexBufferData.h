@@ -10,9 +10,9 @@
 //
 // Two differences from the vertex side, both from the interface rather than from
 // choice. There is no capacity query at all -- DynamicIndexBufferGraphicsData has
-// only lock and unlock -- so callers assume a size, and at least one assumes 32768
-// indices are available. And the offset the draw path consumes is counted in
-// INDICES, not bytes.
+// only lock and unlock -- so callers submit their complete generated index sets.
+// The ring therefore has to cover the largest supported tessellation request. And
+// the offset the draw path consumes is counted in INDICES, not bytes.
 //
 // Indices are 16 bit everywhere in the engine, so the ring is R16_UINT and its
 // capacity is stated in indices throughout.

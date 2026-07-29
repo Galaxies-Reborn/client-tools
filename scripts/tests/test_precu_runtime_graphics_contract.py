@@ -20,6 +20,10 @@ DIRECT3D_CONFIG_SOURCE = REPOSITORY_ROOT / (
 DIRECT3D_SOURCE = REPOSITORY_ROOT / (
     "src/engine/client/application/Direct3d9/src/win32/Direct3d9.cpp"
 )
+DIRECT3D11_DYNAMIC_INDEX_SOURCE = REPOSITORY_ROOT / (
+    "src/engine/client/application/Direct3d11/src/win32/"
+    "Direct3d11_DynamicIndexBufferData.cpp"
+)
 STAGE_SCRIPT = REPOSITORY_ROOT / "scripts" / "Stage-X64Client.ps1"
 BUILD_SCRIPT = REPOSITORY_ROOT / "scripts" / "Build-X64Client.ps1"
 
@@ -149,6 +153,12 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
         script = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn("[int]$MaxCpuCount = 4", script)
         self.assertIn('"/m:$MaxCpuCount"', script)
+
+    def test_dx11_index_ring_covers_expanded_water_tessellation(self):
+        source = DIRECT3D11_DYNAMIC_INDEX_SOURCE.read_text(encoding="utf-8")
+        capacity = re.search(r"cms_defaultIndices\s*=\s*(\d+)", source)
+        self.assertIsNotNone(capacity)
+        self.assertGreaterEqual(int(capacity.group(1)), 65536)
 
     def test_background_profile_cannot_activate_the_client_window(self):
         client = CLIENT_CONFIG.read_text(encoding="utf-8")

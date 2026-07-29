@@ -23,12 +23,13 @@ namespace Direct3d11_DynamicIndexBufferDataNamespace
 	int            ms_used;       // indices
 	bool           ms_newFrame;
 
-	// DX9's default is 64 KB, which is 32768 sixteen-bit indices, and at least one
-	// engine path assumes exactly that many are available. Matched rather than
-	// raised, for the same reason the vertex ring is: batch sizes derived from ring
-	// capacity feed draw counts, and draw counts are what the geometry gate
-	// compares.
-	int const      cms_defaultIndices = 32768;
+	// The DX9 default is 64 KB, or 32768 sixteen-bit indices.  The DX11 client can
+	// render with a 1024-meter far plane, however, and the global-water tessellator
+	// produces more than 32768 indices at that distance (34203 in the character
+	// selection scene).  Index count is independent of the 16-bit index value
+	// range, so a 128 KB ring preserves the existing format while accommodating
+	// the expanded view distance.
+	int const      cms_defaultIndices = 65536;
 }
 using namespace Direct3d11_DynamicIndexBufferDataNamespace;
 
