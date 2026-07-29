@@ -1,0 +1,111 @@
+import re
+import unittest
+from pathlib import Path
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+STATUS_SOURCE = REPOSITORY_ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/page/"
+    "SwgCuiStatusGround.cpp"
+)
+BUFF_UTILS_SOURCE = REPOSITORY_ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/core/"
+    "SwgCuiBuffUtils.cpp"
+)
+BUFF_MANAGER_SOURCE = REPOSITORY_ROOT / (
+    "src/engine/client/library/clientGame/src/shared/core/ClientBuffManager.cpp"
+)
+BUFF_DISPLAY_SOURCE = REPOSITORY_ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/page/"
+    "SwgCuiBuffDisplay.cpp"
+)
+HUD_MANAGER_SOURCE = REPOSITORY_ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/page/"
+    "SwgCuiHudWindowManagerGround.cpp"
+)
+
+
+class Publish14BuffStatusCompatibilityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.status_source = STATUS_SOURCE.read_text(encoding="utf-8")
+        cls.buff_utils_source = BUFF_UTILS_SOURCE.read_text(encoding="utf-8")
+        cls.buff_manager_source = BUFF_MANAGER_SOURCE.read_text(encoding="utf-8")
+        cls.buff_display_source = BUFF_DISPLAY_SOURCE.read_text(encoding="utf-8")
+        cls.hud_manager_source = HUD_MANAGER_SOURCE.read_text(encoding="utf-8")
+
+    def test_publish14_combined_status_volume_is_supported(self):
+        self.assertIn("if(m_volumeStates && m_sampleStateIcon)", self.status_source)
+        self.assertNotIn(
+            "if(m_volumeStates && m_debuffStates && m_sampleStateIcon)",
+            self.status_source,
+        )
+        self.assertIn(
+            "UIVolumePage & debuffPage = m_debuffStates ? *m_debuffStates : "
+            "*m_volumeStates;",
+            self.status_source,
+        )
+        self.assertIn("if (!m_debuffStates)", self.status_source)
+
+    def test_authored_placeholders_are_removed_before_population(self):
+        self.assertIn("void removePlaceholderIcons(UIVolumePage & page)", self.buff_utils_source)
+        self.assertIn(
+            "if (!object->GetPropertyInteger(BUFF_ID_PROPERTY, buffId))",
+            self.buff_utils_source,
+        )
+        self.assertIn("removePlaceholderIcons(buffPage);", self.buff_utils_source)
+
+    def test_shared_volume_is_enumerated_and_cleared_only_once(self):
+        self.assertIn(
+            "bool const sharedStatusPage = (&buffPage == &debuffPage);",
+            self.buff_utils_source,
+        )
+        self.assertEqual(
+            2,
+            len(re.findall(r"if \(!sharedStatusPage\)", self.buff_utils_source)),
+        )
+        self.assertIn(
+            "if (!sharedStatusPage && debuffPage.GetChildCount() > 0)",
+            self.buff_utils_source,
+        )
+
+    def test_missing_later_icon_styles_use_publish14_polarity_fallbacks(self):
+        self.assertIn('"/Styles.Icon.buffs.healthBuff"', self.buff_manager_source)
+        self.assertIn('"/Styles.Icon.buffs.healthDebuff"', self.buff_manager_source)
+        self.assertLess(
+            self.buff_manager_source.index("compatibleFallback"),
+            self.buff_manager_source.index("CuiIconManager::getFallback", 0),
+        )
+
+    def test_optional_debuff_volume_is_guarded_for_pointer_input(self):
+        right_mouse = re.search(
+            r"if \(msg\.Type == UIMessage::RightMouseUp\).*?"
+            r"const CreatureObject \* const player",
+            self.status_source,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(right_mouse)
+        self.assertIn("if (m_debuffStates)", right_mouse.group(0))
+
+    def test_publish14_attribute_modifier_panel_is_bound_to_real_buffs(self):
+        self.assertIn('GetObjectFromPath("AttribMod", TUIPage)', self.hud_manager_source)
+        self.assertIn("new SwgCuiBuffDisplay(*mediatorPage)", self.hud_manager_source)
+        self.assertIn('"VolumePage"', self.buff_display_source)
+        self.assertIn('"sampleIcon"', self.buff_display_source)
+        self.assertIn("m_volume->Clear();", self.buff_display_source)
+        self.assertIn(
+            "SwgCuiBuffUtils::updateBuffs(",
+            self.buff_display_source,
+        )
+
+    def test_attribute_modifier_panel_hides_when_empty_and_honors_close(self):
+        self.assertIn(
+            "getPage().SetVisible(hasActiveEffects && !m_userClosed);",
+            self.buff_display_source,
+        )
+        self.assertIn("if (context == m_closeButton)", self.buff_display_source)
+        self.assertIn("getPage().SetVisible(false);", self.buff_display_source)
+
+
+if __name__ == "__main__":
+    unittest.main()

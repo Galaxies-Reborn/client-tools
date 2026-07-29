@@ -14,6 +14,7 @@
 
 class CreatureObject;
 class PlayerObject;
+class SwgCuiBuffDisplay;
 class SwgCuiGroundRadar;
 class SwgCuiStatusGround;
 
@@ -60,6 +61,7 @@ private:
 	void removePlayerStatusPage();
 
 	SwgCuiGroundRadar * m_groundRadarMediator;
+	SwgCuiBuffDisplay * m_attributeModifierDisplay;
 	SwgCuiStatusGround *  m_targetStatusPage;
 	SwgCuiStatusGround *  m_secondaryTargetStatusPage;
 	SwgCuiStatusGround *  m_playerStatusPage;

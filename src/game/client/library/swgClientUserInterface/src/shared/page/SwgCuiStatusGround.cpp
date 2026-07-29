@@ -871,25 +871,30 @@ bool SwgCuiStatusGround::OnMessage(UIWidget * context, const UIMessage & msg)
 	}
 	if (msg.Type == UIMessage::RightMouseUp)
 	{
-		UISize size = m_volumeStates->GetSize();
-		UIPoint Min = m_volumeStates->GetLocation() + getPage().GetWorldLocation();
-		UIPoint Max = Min + size;
-
 		UIPoint mouse = getPage().GetWorldLocation() + msg.MouseCoords;
+		bool overBuffs = false;
 
-		bool overBuffs = (mouse.x >= Min.x && mouse.x <= Max.x && mouse.y >= Min.y && mouse.y <= Max.y) && m_volumeStates->GetCellCount().y;
-				
-		if (overBuffs)
-			return true;
+		if (m_volumeStates)
+		{
+			UISize const size = m_volumeStates->GetSize();
+			UIPoint const min = m_volumeStates->GetLocation() + getPage().GetWorldLocation();
+			UIPoint const max = min + size;
+			overBuffs = (mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y) && m_volumeStates->GetCellCount().y;
 
-		size = m_debuffStates->GetSize();
-		Min = m_debuffStates->GetLocation() + getPage().GetWorldLocation();
-		Max = Min + size;
-				
-		overBuffs = (mouse.x >= Min.x && mouse.x <= Max.x && mouse.y >= Min.y && mouse.y <= Max.y) && m_debuffStates->GetCellCount().y;
+			if (overBuffs)
+				return true;
+		}
 
-		if (overBuffs)
-			return true;
+		if (m_debuffStates)
+		{
+			UISize const size = m_debuffStates->GetSize();
+			UIPoint const min = m_debuffStates->GetLocation() + getPage().GetWorldLocation();
+			UIPoint const max = min + size;
+			overBuffs = (mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y) && m_debuffStates->GetCellCount().y;
+
+			if (overBuffs)
+				return true;
+		}
 
 		const CreatureObject * const player = Game::getPlayerCreature();
 		if (!player)
@@ -1312,9 +1317,45 @@ int SwgCuiStatusGround::getBuffIconType()
 
 void SwgCuiStatusGround::updateCreatureBuffs(CreatureObject const & creature)
 {
-	if(m_volumeStates && m_debuffStates && m_sampleStateIcon)
+	if(m_volumeStates && m_sampleStateIcon)
 	{
-		uint32 const buffStates = SwgCuiBuffUtils::updateBuffs(creature, *m_volumeStates, *m_debuffStates, *m_sampleStateIcon, m_effectorBlink, m_sampleIconPage);
+		UIVolumePage & debuffPage = m_debuffStates ? *m_debuffStates : *m_volumeStates;
+		uint32 const buffStates = SwgCuiBuffUtils::updateBuffs(creature, *m_volumeStates, debuffPage, *m_sampleStateIcon, m_effectorBlink, m_sampleIconPage);
+
+		// Publish 14 uses one combined volume for buffs and debuffs.  Later UI
+		// layouts split them into two volumes, so preserve that layout below when
+		// it is available and use the original combined layout otherwise.
+		if (!m_debuffStates)
+		{
+			bool const hasStatusIcons = (buffStates & (SwgCuiBuffUtils::UBRT_hasBuffs | SwgCuiBuffUtils::UBRT_hasDebufs)) != 0;
+			bool const visibilityChanged = pageSetVisible(m_volumeStates, hasStatusIcons);
+			if (!hasStatusIcons)
+			{
+				if (visibilityChanged)
+					getPage().ForcePackChildren();
+				return;
+			}
+
+			UISize stateSize = m_volumeStates->GetSize();
+			UISize const stateCellCount = m_volumeStates->GetCellCount();
+			UISize const stateCellSize = m_volumeStates->GetCellSize();
+			int const stateHeight = stateCellSize.y * stateCellCount.y;
+			bool const resizeParent = getPage().GetSize().y < m_volumeStates->GetLocation().y + stateHeight;
+
+			if (stateHeight != stateSize.y || resizeParent || visibilityChanged)
+			{
+				stateSize.y = stateHeight;
+				m_volumeStates->SetMaximumSize(stateSize);
+				m_volumeStates->SetSize(stateSize);
+
+				UISize parentSize = getPage().GetSize();
+				parentSize.y = m_volumeStates->GetLocation().y + stateHeight;
+				getPage().SetMaximumSize(parentSize);
+				getPage().SetSize(parentSize);
+				getPage().ForcePackChildren();
+			}
+			return;
+		}
 
 		bool buffVisibilityChanged = pageSetVisible(m_volumeStates, buffStates&SwgCuiBuffUtils::UBRT_hasBuffs); 
 		bool debuffVisibilityChanged = pageSetVisible(m_debuffStates, buffStates&SwgCuiBuffUtils::UBRT_hasDebufs);

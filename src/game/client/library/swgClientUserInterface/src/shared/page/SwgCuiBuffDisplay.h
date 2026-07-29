@@ -24,8 +24,11 @@ class CreatureObject;
 class StringId;
 class TangibleObject;
 class Transform;
+class UIButton;
 class UIImage;
+class UIImageStyle;
 class UIVolumePage;
+class UIWidget;
 
 namespace MessageDispatch
 {
@@ -46,6 +49,7 @@ public:
 	virtual const CachedNetworkId & getTarget() const;
 
 	virtual void update(float deltaTimeSecs);
+	virtual void OnButtonPressed(UIWidget * context);
 
 
 protected:
@@ -60,10 +64,14 @@ protected:
 	MessageDispatch::Callback * m_callback;
 	UIVolumePage * m_volume;
 	UIImageStyle * m_blank;
+	UIImage * m_sampleIcon;
+	UIButton * m_closeButton;
 
 	float m_internalTimer;
 
 	UIEffector *m_effectorBlink;
+	bool m_dynamicIcons;
+	bool m_userClosed;
 
 private:
 	SwgCuiBuffDisplay();

@@ -38,6 +38,23 @@ namespace SwgCuiBuffUtilsNamespace
 	static const UILowerString BUFF_SORT_PROPERTY = UILowerString("BuffSort");
 	static const UILowerString ISGROUPWINDOW_PROPERTY = UILowerString("IsGroupWindow");
 
+	void removePlaceholderIcons(UIVolumePage & page)
+	{
+		UIBaseObject::UIObjectList children;
+		page.GetChildren(children);
+
+		for (UIBaseObject::UIObjectList::iterator i = children.begin(); i != children.end(); ++i)
+		{
+			UIBaseObject * const object = *i;
+			int buffId = 0;
+			if (!object->GetPropertyInteger(BUFF_ID_PROPERTY, buffId))
+			{
+				page.RemoveChild(object);
+				object->Detach(0);
+			}
+		}
+	}
+
 	static const int CREATURE_BUFF_BLINK_TIME = 10;
 
 	static const char CHILD_ICON_NAME[] = "icon";
@@ -263,6 +280,11 @@ void SwgCuiBuffUtils::setBuffDurationWhirlygigOpacity(UIVolumePage & page, float
 
 uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePage & buffPage, UIVolumePage & debuffPage, const UIImage & sampleStateIcon, UIEffector * effectorBlink, UIPage * sampleIconPage)
 {
+	bool const sharedStatusPage = (&buffPage == &debuffPage);
+	removePlaceholderIcons(buffPage);
+	if (!sharedStatusPage)
+		removePlaceholderIcons(debuffPage);
+
 	uint32 currentTime = creature.getPlayedTime();
 	uint32 creatureTime = currentTime;
 	uint32 serverTime = 0;
@@ -299,7 +321,8 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 		int crc;
 		UIBaseObject::UIObjectList shownBuffs;
 		buffPage.GetChildren(shownBuffs);
-		debuffPage.GetChildren(shownBuffs);
+		if (!sharedStatusPage)
+			debuffPage.GetChildren(shownBuffs);
 		UIBaseObject::UIObjectList buffsToRemove;
 		{
 			for (UIBaseObject::UIObjectList::iterator i = shownBuffs.begin(); i != shownBuffs.end(); ++i)
@@ -429,7 +452,11 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 
 				if (object->GetPropertyInteger(BUFF_ID_PROPERTY, crc))
 				{
-   					if (ClientBuffManager::getBuffIsDebuff(crc))
+					if (sharedStatusPage)
+					{
+						buffPage.RemoveChild(object);
+					}
+					else if (ClientBuffManager::getBuffIsDebuff(crc))
 					{
 						debuffPage.RemoveChild(object);
 					}
@@ -505,10 +532,10 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 	else
 	{
 		if (buffPage.GetChildCount() > 0)
-			buffPage.Clear();
+			clearBuffIcons(buffPage);
 
-		if (debuffPage.GetChildCount() > 0)
-			debuffPage.Clear();
+		if (!sharedStatusPage && debuffPage.GetChildCount() > 0)
+			clearBuffIcons(debuffPage);
 	}
 
 	return returnValue;

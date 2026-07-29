@@ -363,6 +363,13 @@ UIImageStyle * ClientBuffManager::getBuffIconStyle(uint32 buffNameCrc)
 	UIImageStyle * imageStyle = safe_cast<UIImageStyle *>(UIManager::gUIManager().GetRootPage()->GetObjectFromPath (buffRecord.iconName.c_str(), TUIImageStyle));
 
 	if (!imageStyle)
+	{
+		char const * const compatibleFallback = buffRecord.debuff ? "/Styles.Icon.buffs.healthDebuff" : "/Styles.Icon.buffs.healthBuff";
+		imageStyle = safe_cast<UIImageStyle *>(UIManager::gUIManager().GetRootPage()->GetObjectFromPath(compatibleFallback, TUIImageStyle));
+		WARNING(true, ("Missing buff icon style %s; using %s for buff %s\n", buffRecord.iconName.c_str(), compatibleFallback, buffRecord.name.c_str()));
+	}
+
+	if (!imageStyle)
 		imageStyle = CuiIconManager::getFallback ();
 
 	return imageStyle;	

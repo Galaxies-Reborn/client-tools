@@ -27,6 +27,7 @@
 #include "sharedObject/NetworkIdManager.h"
 #include "sharedTerrain/TerrainObject.h"
 #include "swgClientUserInterface/SwgCuiAllTargetsGround.h"
+#include "swgClientUserInterface/SwgCuiBuffDisplay.h"
 #include "swgClientUserInterface/SwgCuiCybernetics.h"
 #include "swgClientUserInterface/SwgCuiDroidCommand.h"
 #include "swgClientUserInterface/SwgCuiGroundRadar.h"
@@ -65,12 +66,34 @@ using namespace SwgCuiHudWindowManagerGroundNamespace;
 SwgCuiHudWindowManagerGround::SwgCuiHudWindowManagerGround (const SwgCuiHud & hud, CuiWorkspace & workspace) :
 SwgCuiHudWindowManager(hud, workspace),
 m_groundRadarMediator(NULL),
+m_attributeModifierDisplay(NULL),
 m_targetStatusPage(NULL),
 m_secondaryTargetStatusPage(NULL),
 m_playerStatusPage(NULL),
 m_petStatusPage(NULL)
 {
 	UIPage * mediatorPage = NULL;
+
+	{
+		// The Publish 14 HUD keeps its player buff/debuff window as a direct
+		// child instead of exposing it through the HUD CodeData map.
+		mediatorPage = dynamic_cast<UIPage *>(hud.getPage().GetObjectFromPath("AttribMod", TUIPage));
+		if (mediatorPage)
+		{
+			mediatorPage->SetEnabled(false);
+			mediatorPage->SetEnabled(true);
+			m_attributeModifierDisplay = new SwgCuiBuffDisplay(*mediatorPage);
+			m_attributeModifierDisplay->setSettingsAutoSizeLocation(true, true);
+			m_attributeModifierDisplay->setStickyVisible(true);
+			m_attributeModifierDisplay->fetch();
+			m_attributeModifierDisplay->activate();
+			getWorkspace().addMediator(*m_attributeModifierDisplay);
+
+			CreatureObject * const player = Game::getPlayerCreature();
+			if (player)
+				m_attributeModifierDisplay->setTarget(player);
+		}
+	}
 
 	{
 		mediatorPage = NULL;
@@ -218,6 +241,13 @@ m_petStatusPage(NULL)
 
 SwgCuiHudWindowManagerGround::~SwgCuiHudWindowManagerGround ()
 {
+	if (m_attributeModifierDisplay)
+	{
+		getWorkspace().removeMediator(*m_attributeModifierDisplay);
+		m_attributeModifierDisplay->release();
+		m_attributeModifierDisplay = 0;
+	}
+
 	if (m_groundRadarMediator)
 	{
 		getWorkspace().removeMediator(*m_groundRadarMediator);
@@ -471,6 +501,14 @@ void SwgCuiHudWindowManagerGround::receiveMessage(const MessageDispatch::Emitter
 
 void SwgCuiHudWindowManagerGround::update ()
 {
+	CreatureObject * const playerCreature = Game::getPlayerCreature();
+	if (m_attributeModifierDisplay)
+	{
+		NetworkId const playerId = playerCreature ? playerCreature->getNetworkId() : NetworkId::cms_invalid;
+		if (m_attributeModifierDisplay->getTarget() != playerId)
+			m_attributeModifierDisplay->setTarget(playerId);
+	}
+
 	const TerrainObject * const terrainObject = TerrainObject::getInstance();
 	const ClientProceduralTerrainAppearance * const cmtat = terrainObject ? dynamic_cast<const ClientProceduralTerrainAppearance *> (terrainObject->getAppearance ()) : 0;			
 
@@ -612,6 +650,9 @@ void SwgCuiHudWindowManagerGround::onPlayerSetup(const CreatureObject & payload)
 	CreatureObject const * const player = Game::getPlayerCreature();
 	if (player && (player == &payload)) 
 	{
+		if (m_attributeModifierDisplay)
+			m_attributeModifierDisplay->setTarget(payload.getNetworkId());
+
 		createPlayerStatusPage();
 		onTargetChanged(*player);
 	}
