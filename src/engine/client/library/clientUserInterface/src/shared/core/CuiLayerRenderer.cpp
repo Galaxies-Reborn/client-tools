@@ -315,10 +315,17 @@ void CuiLayerRenderer::renderLineStrip  (const Shader * shader, const int numPoi
 
 //----------------------------------------------------------------------
 
+// The 500-vertex flush cap that used to sit beside the capacity check on the line paths is gone.
+//
+// The capacity term on the same condition already prevents overflow, so 500 was a second and far
+// tighter limit that forced a draw call every 250 lines for no reason the buffer needed. UI line
+// work is a measurable share of the frame's draw calls and this cost draws without bounding
+// anything.
+
 void CuiLayerRenderer::renderLines     (const Shader * shader, const int numLines,  const UILine       * lines,  const UILine * uvs, const VectorArgb & color)
 {
 	int const requiredVertices = numLines * 2;
-	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices > 500 || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
+	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
 		flushRenderQueue ();
 
 	if (s_numberOfVertices == 0 && !lockDynamicVertexBuffer(requiredVertices))
@@ -368,7 +375,7 @@ void CuiLayerRenderer::renderLines     (const Shader * shader, const int numLine
 void CuiLayerRenderer::renderLines(const Shader * shader, const int numLines, const UILine * lines, const UILine * uvs, const VectorArgb * colors)
 {
 	int const requiredVertices = numLines * 2;
-	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices > 500 || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
+	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
 		flushRenderQueue ();
 
 	if (s_numberOfVertices == 0 && !lockDynamicVertexBuffer(requiredVertices))
@@ -421,7 +428,7 @@ void CuiLayerRenderer::renderTriangles (const Shader * shader, int numTris, cons
 	DEBUG_FATAL(numTris == 0, ("numTris is 0"));
 
 	int const requiredVertices = numTris * 3;
-	if (s_vertexType != VIT_triangleList || (s_curShader && shader != s_curShader || s_numberOfVertices > 500 || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
+	if (s_vertexType != VIT_triangleList || (s_curShader && shader != s_curShader || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
 		flushRenderQueue ();
 
 	if (s_numberOfVertices == 0 && !lockDynamicVertexBuffer(requiredVertices))
@@ -480,7 +487,10 @@ void CuiLayerRenderer::renderTriangles (const Shader * shader, int numTris, cons
 
 void CuiLayerRenderer::renderLine (const Shader * shader, const UILine & verts, const UILine & UVs, const VectorArgb & color)
 {
-	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices > 500))
+	//-- Bounded by the buffer rather than by an arbitrary 500. This site had no capacity term beside
+	//   the cap, so the cap was the only thing preventing overflow and could not simply be dropped
+	//   the way the other two were; renderLine contributes two vertices.
+	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices + 2 > s_maxNumberOfVertices))
 		flushRenderQueue ();
 
 	if (s_numberOfVertices == 0)
