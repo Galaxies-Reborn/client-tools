@@ -108,6 +108,20 @@ namespace
 		page->SetWidth(boundedWidth);
 	}
 
+	void setVerticalBarFill(UIPage * page, UIScalar height, UIScalar fullHeight)
+	{
+		if (!page)
+			return;
+
+		UIScalar const boundedFullHeight = std::max<UIScalar>(0, fullHeight);
+		UIScalar const boundedHeight = std::max<UIScalar>(0,
+			std::min(boundedFullHeight, height));
+		UIPoint location = page->GetLocation();
+		location.y = boundedFullHeight - boundedHeight;
+		page->SetLocation(location);
+		page->SetHeight(boundedHeight);
+	}
+
 	bool isCanonicalProfession(std::string const & name)
 	{
 		return findProfessionDef(name) != 0;
@@ -274,6 +288,69 @@ namespace
 				return false;
 		}
 		return true;
+	}
+
+	void updateSkillBoxExperience(UIButton & button, std::string const & skillName)
+	{
+		UIWidget * const parentWidget = button.GetParentWidget();
+		if (!parentWidget || !parentWidget->IsA(TUIPage))
+			return;
+
+		UIPage * const skillBox = static_cast<UIPage *>(parentWidget);
+		UIBaseObject * const xpBarObject = skillBox->GetObjectFromPath("xpbar", TUIPage);
+		if (!xpBarObject)
+			return;
+
+		UIPage * const xpBar = static_cast<UIPage *>(xpBarObject);
+		UIBaseObject * const fillObject = xpBar->GetObjectFromPath("fill", TUIPage);
+		UIPage * const fill = fillObject ? static_cast<UIPage *>(fillObject) : 0;
+
+		// Every tree refresh starts hidden. Only the immediately learnable boxes
+		// below are allowed to expose progress; this also clears stale bars after
+		// training a skill or switching professions.
+		xpBar->SetVisible(false);
+		if (fill)
+			fill->SetVisible(false);
+
+		CreatureObject const * const player = Game::getPlayerCreature();
+		SkillObject const * const skill = SkillManager::getInstance().getSkill(skillName);
+		if (!player || !skill || findOwnedSkill(*player, skillName) ||
+			!hasAllPrerequisiteSkills(*player, *skill))
+		{
+			return;
+		}
+
+		SkillObject::ExperiencePair const * const experience =
+			skill->getPrerequisiteExperience();
+		int const required = experience ? std::max(0, experience->second.first) : 0;
+		if (!experience || required <= 0 || !fill)
+			return;
+
+		int current = 0;
+		if (!player->getExperience(experience->first, current))
+			current = 0;
+		current = std::max(0, current);
+
+		// The authored xpbar is the six-pixel vertical track at the left edge of
+		// this skill-box wrapper. Fill it bottom-to-top without tinting the whole
+		// button surface.
+		UIScalar const fullHeight = std::max<UIScalar>(0, skillBox->GetHeight());
+		UIPoint trackLocation = xpBar->GetLocation();
+		trackLocation.x = 0;
+		trackLocation.y = 0;
+		xpBar->SetLocation(trackLocation);
+		xpBar->SetHeight(fullHeight);
+		UIPoint fillLocation = fill->GetLocation();
+		fillLocation.x = 0;
+		fill->SetLocation(fillLocation);
+		fill->SetWidth(xpBar->GetWidth());
+		setVerticalBarFill(fill,
+			calculateProportionalWidth(fullHeight, current, required), fullHeight);
+		fill->SetBackgroundTint(current >= required
+			? UIColor::green
+			: UIColor(255, 170, 0));
+		fill->SetVisible(true);
+		xpBar->SetVisible(true);
 	}
 
 	void findLearnedDependentSkills(CreatureObject const & player, SkillObject const & selectedSkill,
@@ -1503,8 +1580,8 @@ void SwgCuiSkills::applyTreeBox(UIPage * graphPage, char const * path, std::stri
 		return;
 
 	// Publish 14 uses a nested .b button for novice/master and bare buttons for
-	// branch rows. Resolve both authentic shapes without requiring per-box
-	// child widgets from a modified asset.
+	// branch rows. Resolve both authentic shapes; the DX11 Pre-CU asset wraps
+	// each button with its own xpbar progress track.
 	std::string const btnPath = std::string(path) + ".b";
 	UIBaseObject * obj = graphPage->GetObjectFromPath(btnPath.c_str(), TUIButton);
 	if (!obj)
@@ -1527,6 +1604,7 @@ void SwgCuiSkills::applyTreeBox(UIPage * graphPage, char const * path, std::stri
 	bool const has = playerSkills.find(skillName) != playerSkills.end();
 	btn->SetProperty(UILowerString("Style"), Unicode::narrowToWide(
 		has ? "/Styles.New.tree_acquired.style" : "/Styles.New.tree_default.style"));
+	updateSkillBoxExperience(*btn, skillName);
 
 	// Click identifies which skill the user picked for the detail panels.
 	m_buttonSkills[btn] = skillName;
@@ -1989,9 +2067,9 @@ void SwgCuiSkills::populateSelectedSkill()
 		m_textAcquire->SetVisible(showAcquisition);
 	}
 
-	// The selected-skill XP bar is the one horizontal bar supplied by the
-	// retail right-panel CodeData. Owned skills and zero-XP boxes do not need
-	// acquisition progress, so clear and hide both pieces together.
+	// Keep the selected-skill requirement prose, but never display the retail
+	// singleton bar. Progress belongs to every immediately learnable tree box
+	// and is updated by updateSkillBoxExperience() during the graph refresh.
 	SkillObject::ExperiencePair const * const experience = selectedSkill
 		? selectedSkill->getPrerequisiteExperience()
 		: 0;
@@ -2042,16 +2120,7 @@ void SwgCuiSkills::populateSelectedSkill()
 		m_textExpRequired->SetVisible(showExperience);
 	}
 	if (m_barExp)
-	{
-		UIWidget * const experienceBarParent = m_barExp->GetParentWidget();
-		UIScalar const experienceBarWidth = experienceBarParent
-			? std::max<UIScalar>(0, experienceBarParent->GetWidth())
-			: 0;
-		setHorizontalBarRange(m_barExp, 0,
-			calculateProportionalWidth(experienceBarWidth, experienceCurrent, experienceRequired),
-			experienceBarWidth);
-		m_barExp->SetVisible(showExperience);
-	}
+		m_barExp->SetVisible(false);
 
 	if (!selectedSkill)
 		return;

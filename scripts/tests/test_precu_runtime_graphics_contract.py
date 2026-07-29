@@ -146,8 +146,15 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
         script = STAGE_SCRIPT.read_text(encoding="utf-8")
         self.assertIn('[ValidateSet("None", "Precu")]', script)
         self.assertIn('Join-Path $repoRoot "config\\precu"', script)
-        self.assertIn("$stagedSources = @($runtimeFiles) + @($profileFiles)", script)
+        self.assertIn(
+            'Join-Path (Split-Path -Parent $repoRoot) "pre-cu-reborn-assets"',
+            script,
+        )
+        self.assertIn('foreach ($relativePath in @("ui\\ui_skill.inc"))', script)
+        self.assertIn("Name='xpbar'", script)
+        self.assertIn("@($precuAssetOverrideFiles)", script)
         self.assertIn("runtimeProfile   = $RuntimeProfile", script)
+        self.assertIn("precuAssetOverrideCount", script)
 
     def test_client_build_uses_bounded_parallelism(self):
         script = BUILD_SCRIPT.read_text(encoding="utf-8")

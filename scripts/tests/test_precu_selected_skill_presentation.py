@@ -203,7 +203,7 @@ class PrecuSelectedSkillSourceContractTests(unittest.TestCase):
         populate = function_body(
             self.source, "void SwgCuiSkills::populateSelectedSkill()"
         )
-        self.assertEqual(4, populate.count("setHorizontalBarRange("))
+        self.assertEqual(3, populate.count("setHorizontalBarRange("))
         self.assertIn(
             "learningBarWidth, availableSkillPoints, k_skillPointCap", populate
         )
@@ -271,10 +271,33 @@ class PrecuSelectedSkillSourceContractTests(unittest.TestCase):
         self.assertNotIn("MarcJoyce", populate)
         self.assertNotIn("stock TRE skills.iff", populate)
 
-    def test_source_has_no_custom_per_box_xpbar_or_respec_dependency(self) -> None:
-        self.assertNotIn("applySkillBoxXp", self.source)
-        self.assertNotIn("applySkillBoxXp", self.header)
-        self.assertNotIn('".xpbar"', self.source.casefold())
+    def test_source_updates_every_immediately_learnable_box_xpbar(self) -> None:
+        update = function_body(
+            self.source, "void updateSkillBoxExperience("
+        )
+        for contract in (
+            'GetObjectFromPath("xpbar", TUIPage)',
+            'GetObjectFromPath("fill", TUIPage)',
+            "findOwnedSkill(*player, skillName)",
+            "hasAllPrerequisiteSkills(*player, *skill)",
+            "skill->getPrerequisiteExperience()",
+            "player->getExperience(experience->first, current)",
+            "setVerticalBarFill(fill",
+            "calculateProportionalWidth(fullHeight, current, required)",
+            "UIColor::green",
+            "UIColor(255, 170, 0)",
+        ):
+            with self.subTest(contract=contract):
+                self.assertIn(contract, update)
+
+        tree_box = function_body(self.source, "void SwgCuiSkills::applyTreeBox(")
+        self.assertIn("updateSkillBoxExperience(*btn, skillName)", tree_box)
+
+        selected = function_body(
+            self.source, "void SwgCuiSkills::populateSelectedSkill()"
+        )
+        self.assertIn("m_barExp->SetVisible(false)", selected)
+        self.assertNotIn("m_barExp->SetVisible(showExperience)", selected)
         self.assertNotIn("skillsrespec", self.source.casefold())
         self.assertNotIn("skillsrespec", self.header.casefold())
 
@@ -320,7 +343,7 @@ class PrecuSelectedSkillAssetContractTests(unittest.TestCase):
                 target = resolve_asset_path(self.right_page, asset_path)
                 self.assertEqual(binding.ui_type, target.tag)
 
-    def test_asset_needs_no_custom_per_box_xpbar_or_skills_respec_page(self) -> None:
+    def test_locked_patch13_reference_has_no_custom_xpbar_or_respec_page(self) -> None:
         element_names = {
             element.attrib.get("Name", "").casefold()
             for element in self.root.iter()

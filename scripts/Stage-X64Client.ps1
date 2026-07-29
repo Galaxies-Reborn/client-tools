@@ -64,6 +64,7 @@ $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 
 $profileFiles = @()
 $shaderOverrideFiles = @()
+$precuAssetOverrideFiles = @()
 if ($RuntimeProfile -eq "Precu") {
     $profileDirectory = Join-Path $repoRoot "config\precu"
     $profileFiles = @(
@@ -112,6 +113,30 @@ if ($RuntimeProfile -eq "Precu") {
     )
     if ($shaderOverrideFiles.Count -eq 0) {
         throw "The DX11 legacy shader override directory is empty: $shaderOverrideDirectory"
+    }
+
+    # The restored skills mediator depends on the asset repository's proven
+    # Publish 14 layout. In particular, each skill-box wrapper owns an xpbar;
+    # leaving this override behind falls back to the retail singleton bar.
+    $precuAssetsRoot = Join-Path (Split-Path -Parent $repoRoot) "pre-cu-reborn-assets"
+    foreach ($relativePath in @("ui\ui_skill.inc")) {
+        $sourcePath = Join-Path $precuAssetsRoot $relativePath
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+            throw "The Pre-CU asset override is missing: $sourcePath"
+        }
+
+        $precuAssetOverrideFiles += [pscustomobject]@{
+            Source = $sourcePath
+            Name   = $relativePath
+        }
+    }
+
+    $skillUiText = Get-Content -LiteralPath (
+        Join-Path $precuAssetsRoot "ui\ui_skill.inc"
+    ) -Raw
+    if ($skillUiText -notmatch "Name='xpbar'" -or
+        $skillUiText -notmatch "Name='fill'") {
+        throw "The Pre-CU skill asset does not contain per-box XP progress widgets."
     }
 }
 elseif (-not (Test-Path -LiteralPath (Join-Path $clientRootPath "client.cfg") -PathType Leaf)) {
@@ -220,7 +245,8 @@ if (-not $PSCmdlet.ShouldProcess($clientRootPath, "stage $Configuration x64 game
     return
 }
 
-$stagedSources = @($runtimeFiles) + @($profileFiles) + @($shaderOverrideFiles)
+$stagedSources = @($runtimeFiles) + @($profileFiles) +
+    @($shaderOverrideFiles) + @($precuAssetOverrideFiles)
 
 $backupDirectory = $null
 if (-not $NoBackup) {
@@ -295,6 +321,7 @@ $manifest = [ordered]@{
     rootTreCount     = $treFiles.Count
     rendererBackend = "Direct3d11 (gl11)"
     shaderOverrideCount = $shaderOverrideFiles.Count
+    precuAssetOverrideCount = $precuAssetOverrideFiles.Count
     inputBackend     = "SDL 3.4.10 multi-device controller input"
     audioBackend     = "JUCE 8.0.14 with WASAPI and WAV/MP3/Ogg decoders"
     backupDirectory  = $backupDirectory
@@ -307,7 +334,7 @@ $json = $manifest | ConvertTo-Json -Depth 5
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
 [IO.File]::WriteAllText((Join-Path $clientRootPath "x64-runtime-manifest.json"), $json + [Environment]::NewLine, $utf8NoBom)
 
-Write-Host "Staged $($stagedSources.Count) x64 runtime/profile/shader files to $clientRootPath"
+Write-Host "Staged $($stagedSources.Count) x64 runtime/profile/shader/asset files to $clientRootPath"
 if ($backupDirectory) {
     Write-Host "Previous runtime files were backed up to $backupDirectory"
 }
