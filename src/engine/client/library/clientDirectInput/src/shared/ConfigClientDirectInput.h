@@ -16,6 +16,7 @@ class ConfigClientDirectInput
 public:
 
 	static void         install();
+	static bool         getUseKeyboard();
 	static bool         getUseJoysticks();
 	static int          getUseJoystick();
 	static bool         getUseMouse();

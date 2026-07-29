@@ -29,6 +29,7 @@
 #include "clientGame/PlayerObject.h"
 #include "clientGame/Species.h"
 #include "clientUserInterface/CuiManager.h"
+#include "clientUserInterface/CuiMediatorFactory.h"
 #include "clientUserInterface/CuiStringIdsCharacterSheet.h"
 #include "clientUserInterface/CuiUtils.h"
 #include "sharedFoundation/Watcher.h"
@@ -43,6 +44,7 @@
 #include "sharedNetworkMessages/GuildRequestMessage.h"
 #include "sharedNetworkMessages/GuildResponseMessage.h"
 #include "swgSharedUtility/Attributes.h"
+#include "swgClientUserInterface/SwgCuiMediatorTypes.h"
 
 //-----------------------------------------------------------------------
 
@@ -65,19 +67,18 @@ namespace SwgCuiCharacterSheetNamespace
 		TAB_numTabPages
 	};
 
-	// The retained NGE protocol only exposes six attributes. Keep the original
-	// nine-row Publish 14 order and mark the three absent secondary attributes
-	// unavailable until the three-pool protocol milestone restores them.
+	// The dedicated Publish 14 protocol exposes the original nine attributes in
+	// retail order.
 	int const s_attributeForRow[9] =
 	{
 		Attributes::Health,
-		-1,
+		Attributes::Strength,
 		Attributes::Constitution,
 		Attributes::Action,
-		-1,
+		Attributes::Quickness,
 		Attributes::Stamina,
 		Attributes::Mind,
-		-1,
+		Attributes::Focus,
 		Attributes::Willpower
 	};
 
@@ -234,6 +235,8 @@ m_creatureObjectWatcher(new CreatureObjectWatcher)
 	getCodeDataObject(TUIText, m_badgeWindow, "badges");
 	getCodeDataObject(TUIText, m_bio, "bio");
 	getCodeDataObject(TUIButton, m_statMigrationButton, "buttonStatMigration", true);
+	if (m_statMigrationButton)
+		registerMediatorObject(*m_statMigrationButton, true);
 
 	m_characterName->Clear();
 	m_rank->Clear();
@@ -252,8 +255,8 @@ m_creatureObjectWatcher(new CreatureObjectWatcher)
 
 	clearPrivateFields();
 
-	// Stat migration requires the nine-attribute protocol and remains disabled
-	// until that protocol is restored; the authentic widget stays in the page.
+	// The migration action belongs only to the local player's private sheet.
+	// setExamineMode() makes it visible after the initial subject is selected.
 	if (m_statMigrationButton)
 		m_statMigrationButton->SetVisible(false);
 
@@ -455,6 +458,8 @@ void SwgCuiCharacterSheet::setExamineMode(CreatureObject * playerToExamine)
 	m_bio->Clear();
 
 	bool const examiningSelf = creature && creature == Game::getPlayerCreature();
+	if (m_statMigrationButton)
+		m_statMigrationButton->SetVisible(examiningSelf);
 	UIButton * const factionsTab = m_tabbedPane->GetTabButton(TAB_factions);
 	if (factionsTab)
 		factionsTab->SetVisible(examiningSelf);
@@ -493,9 +498,8 @@ CreatureObject * SwgCuiCharacterSheet::getCreatureToExamine() const
 
 void SwgCuiCharacterSheet::OnButtonPressed(UIWidget * context)
 {
-	// The authentic button is deliberately hidden until the nine-attribute
-	// migration protocol is restored. Do not route it into the NGE workflow.
-	UNREF(context);
+	if (context == m_statMigrationButton && isExaminingSelf())
+		CuiMediatorFactory::activateInWorkspace(CuiMediatorTypes::WS_StatMigration);
 }
 
 //-----------------------------------------------------------------------
@@ -837,9 +841,18 @@ void SwgCuiCharacterSheet::refreshBadgeWindow()
 	if (!isExaminingSelf())
 		return;
 
+	std::vector<CollectionsDataTable::CollectionInfoSlot const *> const & allBadges = CollectionsDataTable::getSlotsInBook("badge_book");
+	if (allBadges.empty())
+	{
+		// Publish 14 uses datatables/badge/badge_map.iff rather than the later
+		// collection book. Until that catalog is bridged, do not interpret an
+		// absent NGE badge_book as the player having earned every possible badge.
+		m_badgeWindow->SetLocalText(current);
+		return;
+	}
+
 	current += CuiStringIdsCharacterSheet::badges_unearned.localize();
 	current.push_back('\n');
-	std::vector<CollectionsDataTable::CollectionInfoSlot const *> const & allBadges = CollectionsDataTable::getSlotsInBook("badge_book");
 	if (allBadges.size() == earnedBadges.size())
 	{
 		current += Unicode::narrowToWide("\\>025");

@@ -20,6 +20,7 @@
 
 namespace ConfigClientDirectInputNamespace
 {
+	bool         ms_useKeyboard;
 	bool         ms_useJoysticks;
 	int          ms_useJoystick;
 	bool         ms_useMouse;
@@ -34,6 +35,7 @@ using namespace ConfigClientDirectInputNamespace;
 
 void ConfigClientDirectInput::install()
 {
+	KEY_BOOL(useKeyboard,                     true);
 	KEY_BOOL(useJoysticks,                    true);
 	KEY_INT(useJoystick,                      0);
 	KEY_BOOL(useMouse,                        true);
@@ -41,6 +43,13 @@ void ConfigClientDirectInput::install()
 	KEY_BOOL(windowsKeyEnabledWhenWindowed,   true);
 	KEY_STRING(keyboardTranslationTable,      NULL);
 	KEY_BOOL(enableForceFeedback,             true);
+}
+
+// ----------------------------------------------------------------------
+
+bool ConfigClientDirectInput::getUseKeyboard()
+{
+	return ms_useKeyboard;
 }
 
 // ----------------------------------------------------------------------

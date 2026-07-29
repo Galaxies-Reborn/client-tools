@@ -28,6 +28,8 @@
 
 #include "clientGame/ClientCommandQueue.h"
 #include "clientGame/CreatureObject.h"
+#include "clientGame/DraftSchematicInfo.h"
+#include "clientGame/DraftSchematicManager.h"
 #include "clientGame/Game.h"
 #include "clientGame/PlayerObject.h"
 #include "clientUserInterface/CuiDeleteSkillConfirmation.h"
@@ -36,22 +38,24 @@
 #include "clientUserInterface/CuiMessageBox.h"
 #include "clientUserInterface/CuiSkillManager.h"
 #include "clientUserInterface/CuiStringIdsSkill.h"
+#include "clientUserInterface/CuiStringVariablesData.h"
+#include "clientUserInterface/CuiStringVariablesManager.h"
 #include "sharedDebug/Report.h"
 #include "sharedFoundation/Crc.h"
 #include "sharedFoundation/FormattedString.h"
 #include "sharedGame/Command.h"
 #include "sharedGame/CommandTable.h"
+#include "sharedGame/DraftSchematicGroupManager.h"
 #include "sharedMessageDispatch/Transceiver.h"
 #include "sharedSkillSystem/SkillManager.h"
 #include "sharedSkillSystem/SkillObject.h"
 
 #include "SwgCuiSkillsData.h"
-#include "SwgCuiSkillBoxData.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
-#include <cstring>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -70,25 +74,38 @@ namespace
 		return 0;
 	}
 
-	// Binary-search the sorted k_skillCosts table for a skill's
-	// skillPoints cost. Returns 0 if the skill name is unknown
-	// (e.g. NGE expertise leaf, chronicler skill, etc.).
-	int findSkillCost(std::string const & skillName)
+	int calculateAvailableSkillPoints(int usedSkillPoints)
 	{
-		int lo = 0;
-		int hi = k_skillCostsCount;
-		while (lo < hi)
-		{
-			int const mid = (lo + hi) / 2;
-			int const cmp = std::strcmp(k_skillCosts[mid].skillName, skillName.c_str());
-			if (cmp == 0)
-				return k_skillCosts[mid].cost;
-			if (cmp < 0)
-				lo = mid + 1;
-			else
-				hi = mid;
-		}
-		return 0;
+		return std::max(0, std::min(k_skillPointCap, k_skillPointCap - usedSkillPoints));
+	}
+
+	UIScalar calculateProportionalWidth(UIScalar fullWidth, int value, int maximum)
+	{
+		UIScalar const boundedFullWidth = std::max<UIScalar>(0, fullWidth);
+		if (boundedFullWidth == 0 || maximum <= 0)
+			return 0;
+
+		int const boundedValue = std::max(0, std::min(maximum, value));
+		UIScalar const width = static_cast<UIScalar>(
+			(boundedFullWidth * boundedValue) / maximum);
+		return std::max<UIScalar>(0, std::min(boundedFullWidth, width));
+	}
+
+	void setHorizontalBarRange(UIPage * page, UIScalar start, UIScalar width, UIScalar fullWidth)
+	{
+		if (!page)
+			return;
+
+		UIScalar const boundedFullWidth = std::max<UIScalar>(0, fullWidth);
+		UIScalar const boundedStart = std::max<UIScalar>(0, std::min(boundedFullWidth, start));
+		UIScalar const requestedEnd = start + std::max<UIScalar>(0, width);
+		UIScalar const boundedEnd = std::max<UIScalar>(0, std::min(boundedFullWidth, requestedEnd));
+		UIScalar const boundedWidth = std::max<UIScalar>(0, boundedEnd - boundedStart);
+
+		UIPoint location = page->GetLocation();
+		location.x = boundedStart;
+		page->SetLocation(location);
+		page->SetWidth(boundedWidth);
 	}
 
 	bool isCanonicalProfession(std::string const & name)
@@ -164,6 +181,30 @@ namespace
 		pointsDs->AddChild(pointsRow);
 	}
 
+	void appendGrantedDetailRow(UIDataSource * nameDs, UIDataSource * iconDs,
+	                            Unicode::String const & nameText,
+	                            std::string const & iconPath, int rowIndex)
+	{
+		if (!nameDs)
+			return;
+
+		char rowKey[16];
+		snprintf(rowKey, sizeof(rowKey), "row%d", rowIndex);
+
+		UIData * const nameRow = new UIData;
+		nameRow->SetName(rowKey);
+		nameRow->SetProperty(UILowerString("Value"), nameText);
+		nameDs->AddChild(nameRow);
+
+		if (iconDs)
+		{
+			UIData * const iconRow = new UIData;
+			iconRow->SetName(rowKey);
+			iconRow->SetProperty(UILowerString("Value"), Unicode::narrowToWide(iconPath));
+			iconDs->AddChild(iconRow);
+		}
+	}
+
 	// "private_*" commands and skill mods are internal markers (skill-tree
 	// bookkeeping, combat-difficulty flags), not player-facing abilities/stats.
 	// Retail hides them from the granted lists; so do we.
@@ -222,6 +263,19 @@ namespace
 		return 0;
 	}
 
+	bool hasAllPrerequisiteSkills(CreatureObject const & player, SkillObject const & skill)
+	{
+		SkillObject::SkillVector const & prerequisites = skill.getPrerequisiteSkills();
+		for (SkillObject::SkillVector::const_iterator it = prerequisites.begin();
+			it != prerequisites.end(); ++it)
+		{
+			SkillObject const * const prerequisite = *it;
+			if (!prerequisite || !findOwnedSkill(player, prerequisite->getSkillName()))
+				return false;
+		}
+		return true;
+	}
+
 	void findLearnedDependentSkills(CreatureObject const & player, SkillObject const & selectedSkill,
 	                                std::vector<SkillObject const *> & dependents)
 	{
@@ -270,6 +324,8 @@ m_pageProfessionList(0),
 m_pageMyStats       (0),
 m_pageProfession    (0),
 m_buttonClose       (0),
+m_textProfessionListMy(0),
+m_textProfessionListAll(0),
 m_textProfName      (0),
 m_textProfessionBody(0),
 m_pageGraphs        (0),
@@ -283,11 +339,19 @@ m_dsExpName         (0),
 m_dsExpPoints       (0),
 m_dsModsName        (0),
 m_dsModsPoints      (0),
+m_dsCertsName       (0),
 m_dsInfoModsName    (0),
 m_dsInfoModsPoints  (0),
 m_dsInfoCmdsName    (0),
 m_dsInfoCmdsIcons   (0),
 m_textSkillPoints   (0),
+m_textAcquire       (0),
+m_textSurrender     (0),
+m_textExpRequired   (0),
+m_pageLearningCurrent(0),
+m_pageLearningCost (0),
+m_pageLearningRecover(0),
+m_barExp            (0),
 m_buttonSurrender   (0),
 m_buttonSkills      (),
 m_selectedProfession(),
@@ -319,18 +383,29 @@ m_callback          (new MessageDispatch::Callback)
 		if (dsObj)
 			m_dsProfTree = static_cast<UIDataSourceContainer *>(dsObj);
 
-		REPORT_LOG(true, ("SwgCuiSkills:   pageProfList children: tree=%p data=%p\n",
-			(void *)m_treeProf, (void *)m_dsProfTree));
+		UIBaseObject * const labelMyObj =
+			m_pageProfessionList->GetObjectFromPath("labelMy", TUIText);
+		UIBaseObject * const labelAllObj =
+			m_pageProfessionList->GetObjectFromPath("labelAll", TUIText);
+		if (labelMyObj)
+			m_textProfessionListMy = static_cast<UIText *>(labelMyObj);
+		if (labelAllObj)
+			m_textProfessionListAll = static_cast<UIText *>(labelAllObj);
+
+		REPORT_LOG(true, ("SwgCuiSkills:   pageProfList children: tree=%p data=%p labelMy=%p labelAll=%p\n",
+			(void *)m_treeProf, (void *)m_dsProfTree,
+			(void *)m_textProfessionListMy, (void *)m_textProfessionListAll));
 	}
 
-	// XP and Skill-Mods table column DataSources, nested as
-	// myStats.comp.TableExp.containerall.{name,points} and same for TableMods.
+	// XP, Skill-Mod, and weapon-certification table column DataSources, nested
+	// under the authentic myStats.comp tables.
 	if (m_pageMyStats)
 	{
 		UIBaseObject * const expNameObj   = m_pageMyStats->GetObjectFromPath("comp.TableExp.containerall.name",    TUIDataSource);
 		UIBaseObject * const expPointsObj = m_pageMyStats->GetObjectFromPath("comp.TableExp.containerall.points",  TUIDataSource);
 		UIBaseObject * const modsNameObj  = m_pageMyStats->GetObjectFromPath("comp.TableMods.containerall.name",   TUIDataSource);
 		UIBaseObject * const modsPtsObj   = m_pageMyStats->GetObjectFromPath("comp.TableMods.containerall.points", TUIDataSource);
+		UIBaseObject * const certsNameObj = m_pageMyStats->GetObjectFromPath("comp.TableCerts.containerall.name",  TUIDataSource);
 		if (expNameObj)
 			m_dsExpName = static_cast<UIDataSource *>(expNameObj);
 		if (expPointsObj)
@@ -339,9 +414,12 @@ m_callback          (new MessageDispatch::Callback)
 			m_dsModsName = static_cast<UIDataSource *>(modsNameObj);
 		if (modsPtsObj)
 			m_dsModsPoints = static_cast<UIDataSource *>(modsPtsObj);
+		if (certsNameObj)
+			m_dsCertsName = static_cast<UIDataSource *>(certsNameObj);
 
-		REPORT_LOG(true, ("SwgCuiSkills:   myStats columns: expName=%p expPoints=%p modsName=%p modsPoints=%p\n",
-			(void *)m_dsExpName, (void *)m_dsExpPoints, (void *)m_dsModsName, (void *)m_dsModsPoints));
+		REPORT_LOG(true, ("SwgCuiSkills:   myStats columns: expName=%p expPoints=%p modsName=%p modsPoints=%p certsName=%p\n",
+			(void *)m_dsExpName, (void *)m_dsExpPoints, (void *)m_dsModsName,
+			(void *)m_dsModsPoints, (void *)m_dsCertsName));
 	}
 
 	// Right-panel header + V2 text-body fallback + V3 graph containers.
@@ -367,15 +445,30 @@ m_callback          (new MessageDispatch::Callback)
 			(void *)m_dsInfoModsName, (void *)m_dsInfoModsPoints,
 			(void *)m_dsInfoCmdsName, (void *)m_dsInfoCmdsIcons));
 
-		// Skill-points display + surrender button.
-		UIBaseObject * const spTextObj = m_pageProfession->GetObjectFromPath("all.skillPoints.textSkillPoints", TUIText);
-		UIBaseObject * const spBtnObj  = m_pageProfession->GetObjectFromPath("all.skillPoints.buttonSurrender", TUIButton);
-		if (spTextObj) m_textSkillPoints = static_cast<UIText *>(spTextObj);
-		if (spBtnObj)  m_buttonSurrender = static_cast<UIButton *>(spBtnObj);
+		// The selected-skill presentation is an immediate CodeData contract on
+		// both.right in the authentic patch-13 ui_skill.inc. Bind through those
+		// names so the mediator follows the retail paths without an asset shim.
+		UIData const * const rightCodeData = static_cast<UIData const *>(
+			m_pageProfession->GetObjectFromPath("CodeData", TUIData));
+		if (rightCodeData)
+		{
+			getCodeDataObject(m_pageProfession, rightCodeData, TUIText, m_textSkillPoints, "textSkillPoints");
+			getCodeDataObject(m_pageProfession, rightCodeData, TUIText, m_textAcquire, "textAcquire");
+			getCodeDataObject(m_pageProfession, rightCodeData, TUIText, m_textSurrender, "textSurrender");
+			getCodeDataObject(m_pageProfession, rightCodeData, TUIText, m_textExpRequired, "textExpRequired");
+			getCodeDataObject(m_pageProfession, rightCodeData, TUIPage, m_pageLearningCurrent, "pageLearningCurrent");
+			getCodeDataObject(m_pageProfession, rightCodeData, TUIPage, m_pageLearningCost, "pageLearningCost");
+			getCodeDataObject(m_pageProfession, rightCodeData, TUIPage, m_pageLearningRecover, "pageLearningRecover");
+			getCodeDataObject(m_pageProfession, rightCodeData, TUIPage, m_barExp, "barExp");
+			getCodeDataObject(m_pageProfession, rightCodeData, TUIButton, m_buttonSurrender, "buttonSurrender");
+		}
 		if (m_buttonSurrender)
 			registerMediatorObject(*m_buttonSurrender, true);
-		REPORT_LOG(true, ("SwgCuiSkills:   skill points: textSP=%p btnSurrender=%p\n",
-			(void *)m_textSkillPoints, (void *)m_buttonSurrender));
+		REPORT_LOG(true, ("SwgCuiSkills:   selected skill: textSP=%p acquire=%p surrender=%p expText=%p current=%p cost=%p recover=%p expBar=%p btn=%p\n",
+			(void *)m_textSkillPoints, (void *)m_textAcquire, (void *)m_textSurrender,
+			(void *)m_textExpRequired, (void *)m_pageLearningCurrent,
+			(void *)m_pageLearningCost, (void *)m_pageLearningRecover,
+			(void *)m_barExp, (void *)m_buttonSurrender));
 
 		UIBaseObject * const graphsObj    = m_pageProfession->GetObjectFromPath("all.graphs",              TUIPage);
 		UIBaseObject * const graph4x4Obj  = m_pageProfession->GetObjectFromPath("all.graphs.graph4x4",     TUIPage);
@@ -442,6 +535,8 @@ void SwgCuiSkills::performActivate()
 		static_cast<PlayerObject::Messages::ExperienceChanged *>(0));
 	m_callback->connect(*this, &SwgCuiSkills::onSkillModsChanged,
 		static_cast<CreatureObject::Messages::SkillModsChanged *>(0));
+	m_callback->connect(*this, &SwgCuiSkills::onCommandsChanged,
+		static_cast<CreatureObject::Messages::CommandsChanged *>(0));
 
 	// A confirmation or successful request may have become stale while the page
 	// was inactive or while the active player was replaced.
@@ -458,6 +553,7 @@ void SwgCuiSkills::performActivate()
 	populateProfessionList();
 	populateExperience();
 	populateSkillMods();
+	populateCertifications();
 	populateSelectedProfession();
 	updateSkillPointsDisplay();
 }
@@ -473,6 +569,8 @@ void SwgCuiSkills::performDeactivate()
 		static_cast<PlayerObject::Messages::ExperienceChanged *>(0));
 	m_callback->disconnect(*this, &SwgCuiSkills::onSkillModsChanged,
 		static_cast<CreatureObject::Messages::SkillModsChanged *>(0));
+	m_callback->disconnect(*this, &SwgCuiSkills::onCommandsChanged,
+		static_cast<CreatureObject::Messages::CommandsChanged *>(0));
 	CuiMediator::performDeactivate();
 }
 
@@ -572,6 +670,14 @@ void SwgCuiSkills::onSkillModsChanged(CreatureObject const & creature)
 
 //-----------------------------------------------------------------------
 
+void SwgCuiSkills::onCommandsChanged(CreatureObject const & creature)
+{
+	if (&creature == Game::getPlayerCreature())
+		populateCertifications();
+}
+
+//-----------------------------------------------------------------------
+
 void SwgCuiSkills::onDeleteSkillConfirmation(std::string const & skillName)
 {
 	if (skillName.empty() || skillName != m_confirmationSkill)
@@ -621,8 +727,11 @@ void SwgCuiSkills::onDeleteSkillConfirmation(std::string const & skillName)
 	m_pendingSurrenderSkill = skillName;
 	m_pendingSurrenderPlayerId = player->getNetworkId();
 	updateSurrenderButton();
+	// surrenderSkill is actor-routed and declares targetType=none. Supplying
+	// the player as a target makes the authoritative command gate reject an
+	// otherwise valid request with CEC_TargetType.
 	m_surrenderSequenceId = ClientCommandQueue::enqueueCommand(
-		surrenderCommand, player->getNetworkId(), Unicode::narrowToWide(skillName));
+		surrenderCommand, NetworkId::cms_invalid, Unicode::narrowToWide(skillName));
 	if (m_surrenderSequenceId == 0)
 	{
 		REPORT_LOG(true, ("SwgCuiSkills: surrenderSkill enqueue failed for '%s'\n", skillName.c_str()));
@@ -771,7 +880,7 @@ void SwgCuiSkills::updateSkillPointsDisplay()
 	if (!m_textSkillPoints)
 		return;
 
-	int used = 0;
+	int usedSkillPoints = 0;
 	CreatureObject const * const player = Game::getPlayerCreature();
 	if (player)
 	{
@@ -779,12 +888,13 @@ void SwgCuiSkills::updateSkillPointsDisplay()
 		for (CreatureObject::SkillList::const_iterator it = playerSkills.begin(); it != playerSkills.end(); ++it)
 		{
 			if (*it)
-				used += findSkillCost((*it)->getSkillName());
+				usedSkillPoints += std::max(0, (*it)->getSkillPointsRequired());
 		}
 	}
 
+	int const availableSkillPoints = calculateAvailableSkillPoints(usedSkillPoints);
 	char buf[64];
-	snprintf(buf, sizeof(buf), "%d / %d", used, k_skillPointCap);
+	snprintf(buf, sizeof(buf), "%d / %d", availableSkillPoints, k_skillPointCap);
 	m_textSkillPoints->SetLocalText(Unicode::narrowToWide(buf));
 }
 
@@ -792,13 +902,19 @@ void SwgCuiSkills::updateSkillPointsDisplay()
 
 void SwgCuiSkills::updateSurrenderButton()
 {
-	if (!m_buttonSurrender)
-		return;
-
 	CreatureObject const * const player = Game::getPlayerCreature();
 	bool const ownsSelectedSkill = player && !m_selectedSkill.empty() &&
 		findOwnedSkill(*player, m_selectedSkill);
-	m_buttonSurrender->SetEnabled(ownsSelectedSkill && m_pendingSurrenderSkill.empty());
+	if (m_buttonSurrender)
+		m_buttonSurrender->SetEnabled(ownsSelectedSkill && m_pendingSurrenderSkill.empty());
+
+	// The retail button's OnEnable/OnDisable scripts also toggle these labels.
+	// Restore selection semantics after changing enabled state so a pending
+	// owned-skill request never displays the acquisition prose.
+	if (m_textSurrender)
+		m_textSurrender->SetVisible(ownsSelectedSkill);
+	if (m_textAcquire)
+		m_textAcquire->SetVisible(!m_selectedSkill.empty() && !ownsSelectedSkill);
 }
 
 //-----------------------------------------------------------------------
@@ -830,6 +946,83 @@ void SwgCuiSkills::OnTabbedPaneChanged(UIWidget * context)
 		m_tabs ? static_cast<long>(m_tabs->GetActiveTab()) : -1L));
 	populateProfessionList();
 	populateSelectedProfession();
+}
+
+//-----------------------------------------------------------------------
+
+int SwgCuiSkills::showAllProfessionsForBackgroundValidation()
+{
+	if (!m_tabs || !m_treeProf)
+		return -1;
+
+	// This is used only by the opt-in, window-targeted Pre-CU validation bridge.
+	// It exercises the same tab state and population methods as a retail click,
+	// without requiring foreground focus or synthesizing system-wide input.
+	m_tabs->SetActiveTab(1);
+	populateProfessionList();
+	populateSelectedProfession();
+
+	int const rowCount = static_cast<int>(m_treeProf->GetRowCount());
+	REPORT_LOG(true, ("SwgCuiSkills: background All Professions validation rows=%d activeTab=%ld\n",
+		rowCount, static_cast<long>(m_tabs->GetActiveTab())));
+	return rowCount;
+}
+
+//-----------------------------------------------------------------------
+
+int SwgCuiSkills::selectAllProfessionForBackgroundValidation(int row)
+{
+	int const rowCount = showAllProfessionsForBackgroundValidation();
+	if (!m_treeProf || row < 0 || row >= rowCount)
+		return -1;
+
+	UIDataSourceContainer const * const data =
+		m_treeProf->GetDataSourceContainerAtRow(static_cast<long>(row));
+	if (!data)
+		return -1;
+
+	// Follow the production selection path after resolving the requested row.
+	// This avoids synthetic system input while exercising the same selected
+	// profession model and graph presentation as a retail tree click.
+	m_selectedProfession = data->GetName();
+	synchronizeProfessionTreeSelection();
+	populateSelectedProfession();
+	REPORT_LOG(true, ("SwgCuiSkills: background selected profession row=%d skill='%s'\n",
+		row, m_selectedProfession.c_str()));
+	return row;
+}
+
+//-----------------------------------------------------------------------
+
+int SwgCuiSkills::showMyProfessionsForBackgroundValidation()
+{
+	if (!m_tabs || !m_treeProf)
+		return -1;
+
+	m_tabs->SetActiveTab(0);
+	populateProfessionList();
+	populateSelectedProfession();
+	return static_cast<int>(m_treeProf->GetRowCount());
+}
+
+//-----------------------------------------------------------------------
+
+int SwgCuiSkills::selectMyProfessionForBackgroundValidation(int row)
+{
+	int const rowCount = showMyProfessionsForBackgroundValidation();
+	if (!m_treeProf || row < 0 || row >= rowCount)
+		return -1;
+
+	UIDataSourceContainer const * const data =
+		m_treeProf->GetDataSourceContainerAtRow(static_cast<long>(row));
+	if (!data)
+		return -1;
+
+	m_selectedProfession = data->GetName();
+	m_selectedSkill.clear();
+	synchronizeProfessionTreeSelection();
+	populateSelectedProfession();
+	return row;
 }
 
 //-----------------------------------------------------------------------
@@ -895,8 +1088,58 @@ void SwgCuiSkills::populateSkillMods()
 
 //-----------------------------------------------------------------------
 
+void SwgCuiSkills::populateCertifications()
+{
+	// ui_skill.inc intentionally carries four editor sample rows in this data
+	// source. Retail clears them and rebuilds the list from the player's granted
+	// cert_* commands; clearing before the player check prevents those samples
+	// from leaking through during login or scene transitions.
+	if (m_dsCertsName)
+		m_dsCertsName->Clear();
+	if (!m_dsCertsName)
+		return;
+
+	CreatureObject const * const player = Game::getPlayerCreature();
+	if (!player)
+		return;
+
+	std::map<std::string, int> const & commands = player->getCommands();
+	int rowIdx = 0;
+	for (std::map<std::string, int>::const_iterator it = commands.begin();
+		it != commands.end(); ++it)
+	{
+		std::string const & commandName = it->first;
+		if (commandName.compare(0, 5, "cert_") != 0)
+			continue;
+
+		Unicode::String localizedName;
+		if (!CuiSkillManager::localizeCmdName(Unicode::toLower(commandName), localizedName) ||
+			localizedName.empty())
+		{
+			localizedName = prettifyKey(commandName);
+		}
+
+		appendGrantedDetailRow(m_dsCertsName, 0, localizedName, std::string(), rowIdx);
+		++rowIdx;
+	}
+}
+
+//-----------------------------------------------------------------------
+
 void SwgCuiSkills::populateProfessionList()
 {
+	// The authentic page supplies distinct headings for both tabs, and its
+	// personal XP/mod/certification stack belongs only to My Character. Hiding
+	// that stack lets the profession tree consume the full left column in the
+	// All Professions view, matching the Publish 14 presentation contract.
+	bool const showAll = (m_tabs && m_tabs->GetActiveTab() == 1);
+	if (m_pageMyStats)
+		m_pageMyStats->SetVisible(!showAll);
+	if (m_textProfessionListMy)
+		m_textProfessionListMy->SetVisible(!showAll);
+	if (m_textProfessionListAll)
+		m_textProfessionListAll->SetVisible(showAll);
+
 	if (!m_dsProfTree)
 	{
 		REPORT_LOG(true, ("SwgCuiSkills: populateProfessionList skipped: m_dsProfTree is null\n"));
@@ -907,20 +1150,25 @@ void SwgCuiSkills::populateProfessionList()
 
 	// Determine the set of profession-novice skills to display based on
 	// the active tab.
-	bool const showAll = (m_tabs && m_tabs->GetActiveTab() == 1);
-
 	std::set<std::string> noviceSet;
 
 	if (showAll)
 	{
 		// "All Professions": iterate the canonical k_professionDefs table
-		// (derived from the SWG Profession Calculator). Include each
-		// entry whose novice skill exists in SkillManager.
+		// (derived from the SWG Profession Calculator), but let the restored
+		// Publish 14 root row remain authoritative for public visibility.
+		// Force-sensitive and Jedi progression roots are valid graph definitions
+		// with SEARCHABLE=0 and must not leak into the trainer-facing list.
 		SkillManager & skillMgr = SkillManager::getInstance();
-		for (int i = 0; i < k_professionDefCount; ++i)
+		for (int i = 0; i < k_publicProfessionDefCount; ++i)
 		{
 			char const * const nov = k_professionDefs[i].noviceSkill;
-			if (nov && skillMgr.getSkill(nov))
+			if (!nov || !skillMgr.getSkill(nov))
+				continue;
+
+			std::string const rootName = stripNoviceSuffix(nov);
+			SkillObject const * const root = skillMgr.getSkill(rootName);
+			if (root && root->isProfession() && root->isSearchable())
 				noviceSet.insert(nov);
 		}
 	}
@@ -929,7 +1177,7 @@ void SwgCuiSkills::populateProfessionList()
 		// "My Character": canonical professions the player has any skill
 		// from. Walk parent chain (getPrevSkill) for each granted skill
 		// until we find a pre-CU profession root; ignore NGE expertise /
-		// chronicler / pilot trees whose roots aren't pre-CU.
+		// chronicler trees whose roots aren't in the authoritative matrix.
 		CreatureObject const * const player = Game::getPlayerCreature();
 		if (player)
 		{
@@ -1038,7 +1286,7 @@ void SwgCuiSkills::populateSelectedProfession()
 		}
 	}
 
-	bool const handledVisually = tryPopulateGraph4x4(profSkill, playerSkillNames);
+	bool const handledVisually = tryPopulateGraph(profSkill, playerSkillNames);
 	if (handledVisually)
 	{
 		if (m_textProfessionBody)
@@ -1085,6 +1333,10 @@ void SwgCuiSkills::populateSelectedProfession()
 
 void SwgCuiSkills::hideAllGraphs()
 {
+	resetGraph4x4Presentation();
+	resetSpecialGraphPresentation(m_pageGraph1x4, 1);
+	resetSpecialGraphPresentation(m_pageGraphPyramid, 5);
+	if (m_pageGraphs)         m_pageGraphs->SetVisible(false);
 	if (m_pageGraph4x4)     m_pageGraph4x4->SetVisible(false);
 	if (m_pageGraph2x4)     m_pageGraph2x4->SetVisible(false);
 	if (m_pageGraph1x4)     m_pageGraph1x4->SetVisible(false);
@@ -1093,20 +1345,170 @@ void SwgCuiSkills::hideAllGraphs()
 
 //-----------------------------------------------------------------------
 
-void SwgCuiSkills::applyTreeBox(char const * path, std::string const & skillName,
-                                std::set<std::string> const & playerSkills, bool nextTrainable)
+void SwgCuiSkills::resetSpecialGraphPresentation(UIPage * graphPage, int graphType)
 {
-	if (!m_pageGraph4x4 || !path || !path[0])
+	if (!graphPage)
 		return;
 
-	// The Pre-CU ui_skill.inc override wraps each box in a Page (so a child
-	// xpbar can render -- UIButton itself does not render children), putting
-	// the button at "<path>.b". Fall back to the bare "<path>" button so this
-	// also works against the stock un-wrapped layout.
+	int const rowWidths[4] = { graphType == 5 ? 4 : 1,
+		graphType == 5 ? 3 : 1, graphType == 5 ? 2 : 1, 1 };
+	char path[64];
+	for (int row = 0; row < 4; ++row)
+	{
+		for (int col = 0; col < rowWidths[row]; ++col)
+		{
+			snprintf(path, sizeof(path), "graph.row%d.%d", row, col);
+			std::string const buttonPath = std::string(path) + ".b";
+			UIBaseObject * object = graphPage->GetObjectFromPath(buttonPath.c_str(), TUIButton);
+			if (!object)
+				object = graphPage->GetObjectFromPath(path, TUIButton);
+			if (object)
+			{
+				UIButton * const button = static_cast<UIButton *>(object);
+				button->SetText(Unicode::emptyString);
+				button->SetLocalTooltip(Unicode::emptyString);
+			}
+		}
+	}
+
+	char const * const terminalButtons[] = { "graph.master.b", "graph.novice.b" };
+	for (int terminal = 0; terminal < 2; ++terminal)
+	{
+		UIBaseObject * const object = graphPage->GetObjectFromPath(terminalButtons[terminal], TUIButton);
+		if (object)
+		{
+			UIButton * const button = static_cast<UIButton *>(object);
+			button->SetText(Unicode::emptyString);
+			button->SetLocalTooltip(Unicode::emptyString);
+		}
+	}
+
+	for (int slot = 0; slot < 7; ++slot)
+	{
+		snprintf(path, sizeof(path), "graph.disciplineNext.0.%d", slot);
+		UIBaseObject * const object = graphPage->GetObjectFromPath(path, TUIText);
+		if (object)
+		{
+			UIText * const text = static_cast<UIText *>(object);
+			text->SetLocalText(Unicode::emptyString);
+			text->SetVisible(false);
+		}
+	}
+	for (int slot = 0; slot < 4; ++slot)
+	{
+		char const * const groups[] = { "graph.next.%d", "graph.prev.%d" };
+		for (int group = 0; group < 2; ++group)
+		{
+			snprintf(path, sizeof(path), groups[group], slot);
+			UIBaseObject * const object = graphPage->GetObjectFromPath(path, TUIText);
+			if (object)
+			{
+				UIText * const text = static_cast<UIText *>(object);
+				text->SetLocalText(Unicode::emptyString);
+				text->SetVisible(false);
+			}
+		}
+	}
+}
+
+//-----------------------------------------------------------------------
+
+void SwgCuiSkills::resetGraph4x4Presentation()
+{
+	m_buttonSkills.clear();
+	m_linkSkills.clear();
+
+	if (!m_pageGraph4x4)
+		return;
+
+	// Publish 14's ui_skill.inc is an editor-authored template. Every graph
+	// button and transition label contains visible sample text, so a character
+	// with no profession (or an unrecognized profession) must explicitly erase
+	// the complete template before the graph can fail closed.
+	char path[64];
+	for (int col = 0; col < 4; ++col)
+	{
+		for (int row = 0; row < 4; ++row)
+		{
+			snprintf(path, sizeof(path), "graph.row%d.%d", row, col);
+			UIBaseObject * const object =
+				m_pageGraph4x4->GetObjectFromPath(path, TUIButton);
+			if (!object)
+				continue;
+
+			UIButton * const button = static_cast<UIButton *>(object);
+			button->SetText(Unicode::emptyString);
+			button->SetLocalTooltip(Unicode::emptyString);
+		}
+
+		for (int slot = 0; slot < 6; ++slot)
+		{
+			snprintf(path, sizeof(path), "graph.disciplineNext.%d.%d", col, slot);
+			UIBaseObject * const object =
+				m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+			if (!object)
+				continue;
+
+			UIText * const text = static_cast<UIText *>(object);
+			text->SetLocalText(Unicode::emptyString);
+			text->SetVisible(false);
+		}
+	}
+
+	char const * const terminalButtons[] =
+	{
+		"graph.master.b",
+		"graph.novice.b"
+	};
+	for (int terminal = 0; terminal < 2; ++terminal)
+	{
+		UIBaseObject * const object =
+			m_pageGraph4x4->GetObjectFromPath(terminalButtons[terminal], TUIButton);
+		if (!object)
+			continue;
+
+		UIButton * const button = static_cast<UIButton *>(object);
+		button->SetText(Unicode::emptyString);
+		button->SetLocalTooltip(Unicode::emptyString);
+	}
+
+	for (int slot = 0; slot < 4; ++slot)
+	{
+		char const * const linkGroups[] =
+		{
+			"graph.next.%d",
+			"graph.prev.%d"
+		};
+		for (int group = 0; group < 2; ++group)
+		{
+			snprintf(path, sizeof(path), linkGroups[group], slot);
+			UIBaseObject * const object =
+				m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+			if (!object)
+				continue;
+
+			UIText * const text = static_cast<UIText *>(object);
+			text->SetLocalText(Unicode::emptyString);
+			text->SetVisible(false);
+		}
+	}
+}
+
+//-----------------------------------------------------------------------
+
+void SwgCuiSkills::applyTreeBox(UIPage * graphPage, char const * path, std::string const & skillName,
+                                std::set<std::string> const & playerSkills)
+{
+	if (!graphPage || !path || !path[0])
+		return;
+
+	// Publish 14 uses a nested .b button for novice/master and bare buttons for
+	// branch rows. Resolve both authentic shapes without requiring per-box
+	// child widgets from a modified asset.
 	std::string const btnPath = std::string(path) + ".b";
-	UIBaseObject * obj = m_pageGraph4x4->GetObjectFromPath(btnPath.c_str(), TUIButton);
+	UIBaseObject * obj = graphPage->GetObjectFromPath(btnPath.c_str(), TUIButton);
 	if (!obj)
-		obj = m_pageGraph4x4->GetObjectFromPath(path, TUIButton);
+		obj = graphPage->GetObjectFromPath(path, TUIButton);
 	if (!obj)
 		return;
 
@@ -1130,86 +1532,78 @@ void SwgCuiSkills::applyTreeBox(char const * path, std::string const & skillName
 	m_buttonSkills[btn] = skillName;
 	if (!isRegisteredMediatorObject(*btn))
 		registerMediatorObject(*btn, true);
-
-	applySkillBoxXp(path, btn, skillName, has, nextTrainable);
+	btn->SetLocalTooltip(localized);
 }
 
 //-----------------------------------------------------------------------
 
-void SwgCuiSkills::applySkillBoxXp(char const * path, UIButton * btn,
-                                   std::string const & skillName, bool hasSkill, bool nextTrainable)
+bool SwgCuiSkills::tryPopulateGraph(SkillObject const * novice, std::set<std::string> const & playerSkills)
 {
-	if (!btn || !m_pageGraph4x4 || !path)
-		return;
+	ProfessionDef const * const def = novice ? findProfessionDef(novice->getSkillName()) : 0;
+	if (!def || def->graphType == 0)
+		return tryPopulateGraph4x4(novice, playerSkills);
+	return tryPopulateSpecialGraph(novice, playerSkills);
+}
 
-	// The xpbar lives at "<path>.xpbar" with a solid 'fill' child whose height
-	// + colour we drive (added by the ui_skill.inc override; absent on the
-	// stock layout, in which case we just tooltip the box).
-	std::string const base(path);
-	UIBaseObject * const xpbarObj = m_pageGraph4x4->GetObjectFromPath((base + ".xpbar").c_str(),      TUIPage);
-	UIBaseObject * const fillObj  = m_pageGraph4x4->GetObjectFromPath((base + ".xpbar.fill").c_str(), TUIPage);
-	UIWidget * const xpbar = xpbarObj ? static_cast<UIWidget *>(xpbarObj) : 0;
-	UIWidget * const fill  = fillObj  ? static_cast<UIWidget *>(fillObj)  : 0;
+//-----------------------------------------------------------------------
 
-	SkillObject const * const skill = SkillManager::getInstance().getSkill(skillName);
-	CreatureObject const * const player = Game::getPlayerCreature();
-	SkillObject::ExperiencePair const * const exp = skill ? skill->getPrerequisiteExperience() : 0;
+bool SwgCuiSkills::tryPopulateSpecialGraph(SkillObject const * novice, std::set<std::string> const & playerSkills)
+{
+	if (!novice)
+		return false;
+	ProfessionDef const * const def = findProfessionDef(novice->getSkillName());
+	if (!def || (def->graphType != 1 && def->graphType != 5))
+		return false;
 
-	// Bar shows only on boxes the player can train next (prereq skills met, not
-	// yet owned) that carry a real XP requirement.
-	bool const showBar = nextTrainable && !hasSkill && exp && exp->second.first > 0 && player;
+	UIPage * const graphPage = def->graphType == 1 ? m_pageGraph1x4 : m_pageGraphPyramid;
+	if (!graphPage)
+		return false;
 
-	if (!showBar)
+	char path[64];
+	if (def->graphType == 1)
 	{
-		if (xpbar)
-			xpbar->SetVisible(false);
-		Unicode::String name;
-		if (CuiSkillManager::localizeSkillName(skillName, name) && !name.empty())
-			btn->SetLocalTooltip(name);
-		return;
+		for (int row = 0; row < 4; ++row)
+		{
+			snprintf(path, sizeof(path), "graph.row%d.0", row);
+			applyTreeBox(graphPage, path, def->branchSkills[0][row], playerSkills);
+		}
+	}
+	else
+	{
+		int skill = 0;
+		int const rowWidths[4] = { 4, 3, 2, 1 };
+		for (int row = 0; row < 4; ++row)
+		{
+			for (int col = 0; col < rowWidths[row]; ++col, ++skill)
+			{
+				snprintf(path, sizeof(path), "graph.row%d.%d", row, col);
+				applyTreeBox(graphPage, path, def->pyramidSkills[skill], playerSkills);
+			}
+		}
 	}
 
-	std::string const & expName = exp->first;
-	int const need = exp->second.first;
-	int cur = 0;
-	if (!player->getExperience(expName, cur))
-		cur = 0;
+	applyTreeBox(graphPage, "graph.master.b", def->masterSkill, playerSkills);
+	applyTreeBox(graphPage, "graph.novice.b", def->noviceSkill, playerSkills);
+	if (m_pageGraphs)
+		m_pageGraphs->SetVisible(true);
+	if (m_pageProfession)
+		m_pageProfession->SetVisible(true);
+	graphPage->SetVisible(true);
 
-	float ratio = static_cast<float>(cur) / static_cast<float>(need);
-	if (ratio < 0.0f) ratio = 0.0f;
-	if (ratio > 1.0f) ratio = 1.0f;
-
-	if (xpbar && fill)
+	bool selectionStillVisible = false;
+	for (std::map<UIWidget *, std::string>::const_iterator it = m_buttonSkills.begin();
+		it != m_buttonSkills.end(); ++it)
 	{
-		long const boxH = (xpbar->GetHeight() > 0) ? xpbar->GetHeight() : 46L;
-		long fillH = static_cast<long>(static_cast<float>(boxH) * ratio + 0.5f);
-		if (fillH < 2 && ratio > 0.0f) fillH = 2;     // keep a sliver visible
-		if (fillH > boxH)              fillH = boxH;
-
-		// Height = % of XP earned; bottom-anchored so it grows up from the base.
-		// Orange while < 100%, green once the XP requirement is met.
-		fill->SetProperty(UILowerString("Size"),
-			Unicode::narrowToWide(FormattedString<32>().sprintf("6,%ld", fillH)));
-		fill->SetProperty(UILowerString("Location"),
-			Unicode::narrowToWide(FormattedString<32>().sprintf("0,%ld", boxH - fillH)));
-		fill->SetProperty(UILowerString("BackgroundTint"),
-			Unicode::narrowToWide(cur >= need ? "#40FF00" : "#FFAA00"));
-		xpbar->SetVisible(true);
+		if (it->second == m_selectedSkill)
+		{
+			selectionStillVisible = true;
+			break;
+		}
 	}
-
-	Unicode::String expDisplay;
-	if (!CuiSkillManager::localizeExpName(expName, expDisplay) || expDisplay.empty())
-		expDisplay = Unicode::narrowToWide(expName);
-	Unicode::String skillDisplay;
-	if (!CuiSkillManager::localizeSkillName(skillName, skillDisplay) || skillDisplay.empty())
-		skillDisplay = Unicode::narrowToWide(skillName);
-	Unicode::String tooltip = Unicode::narrowToWide(FormattedString<256>().sprintf(
-		"You currently have %d of the %d ", cur, need));
-	tooltip += expDisplay;
-	tooltip += Unicode::narrowToWide(" experience points required to learn ");
-	tooltip += skillDisplay;
-	tooltip += Unicode::narrowToWide(".");
-	btn->SetLocalTooltip(tooltip);
+	if (!selectionStillVisible)
+		m_selectedSkill = novice->getSkillName();
+	populateSelectedSkill();
+	return true;
 }
 
 //-----------------------------------------------------------------------
@@ -1230,7 +1624,7 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 	// or alphabetical-sort name pattern guessing.
 	std::string const noviceName = novice->getSkillName();
 	ProfessionDef const * const def = findProfessionDef(noviceName);
-	if (!def)
+	if (!def || def->graphType != 0)
 	{
 		REPORT_LOG(true, ("SwgCuiSkills::tryPopulateGraph4x4: no ProfessionDef for '%s'\n", noviceName.c_str()));
 		return false;
@@ -1239,16 +1633,19 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 	REPORT_LOG(true, ("SwgCuiSkills::tryPopulateGraph4x4: using ProfessionDef for '%s' (master=%s)\n",
 		def->displayName, def->masterSkill ? def->masterSkill : "(none)"));
 
-	// Reset the per-cell skill mapping for the new profession's tree
-	// before re-registering buttons + populating labels.
-	m_buttonSkills.clear();
-	m_linkSkills.clear();
+	// hideAllGraphs() reset the complete authentic graph template before this
+	// valid definition was selected. Re-register only the live cells and links.
+	std::string const masterName = (def->masterSkill && def->masterSkill[0])
+		? std::string(def->masterSkill)
+		: stripNoviceSuffix(novice->getSkillName()) + "_master";
 
-	// Branch "To: X" labels above each column (graph.disciplineNext.<col>.<slot>).
-	// Each slot maps to one profession this branch can lead into.
+	// The Publish 14 graph contract supplies six branch-continuation text slots
+	// per column. The canonical profession map currently needs at most three,
+	// but every slot must be cleared because the authentic asset initializes all
+	// six with its editor-only "xxx to: specialist" sample.
 	for (int col = 0; col < 4; ++col)
 	{
-		for (int slot = 0; slot < 3; ++slot)
+		for (int slot = 0; slot < 6; ++slot)
 		{
 			char path[64];
 			snprintf(path, sizeof(path), "graph.disciplineNext.%d.%d", col, slot);
@@ -1256,12 +1653,89 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 			if (!linkObj)
 				continue;
 			UIText * const linkText = static_cast<UIText *>(linkObj);
+			linkText->SetLocalText(Unicode::emptyString);
+			linkText->SetVisible(false);
+		}
+	}
+
+	// The four graph.next slots describe continuations gated by this profession's
+	// master box. Clear the asset samples first, then discover those links from
+	// the runtime SkillObject prerequisites used by acquisition authority.
+	for (int slot = 0; slot < 4; ++slot)
+	{
+		char path[64];
+		snprintf(path, sizeof(path), "graph.next.%d", slot);
+		UIBaseObject * const linkObj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+		if (linkObj)
+		{
+			UIText * const linkText = static_cast<UIText *>(linkObj);
+			linkText->SetLocalText(Unicode::emptyString);
+			linkText->SetVisible(false);
+		}
+	}
+
+	int nextSlot = 0;
+	for (int i = 0; i < k_professionDefCount && nextSlot < 4; ++i)
+	{
+		ProfessionDef const & candidate = k_professionDefs[i];
+		if (!candidate.noviceSkill || !candidate.noviceSkill[0] ||
+			novice->getSkillName() == candidate.noviceSkill)
+		{
+			continue;
+		}
+
+		SkillObject const * const candidateNovice =
+			SkillManager::getInstance().getSkill(candidate.noviceSkill);
+		if (!candidateNovice)
+			continue;
+
+		bool requiresThisMaster = false;
+		SkillObject::SkillVector const & prerequisites =
+			candidateNovice->getPrerequisiteSkills();
+		for (SkillObject::SkillVector::const_iterator prerequisite = prerequisites.begin();
+			prerequisite != prerequisites.end(); ++prerequisite)
+		{
+			if (*prerequisite && (*prerequisite)->getSkillName() == masterName)
+			{
+				requiresThisMaster = true;
+				break;
+			}
+		}
+		if (!requiresThisMaster)
+			continue;
+
+		char path[64];
+		snprintf(path, sizeof(path), "graph.next.%d", nextSlot);
+		UIBaseObject * const linkObj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+		if (linkObj && candidate.displayName && candidate.displayName[0])
+		{
+			UIText * const linkText = static_cast<UIText *>(linkObj);
+			Unicode::String label = Unicode::narrowToWide("To: ");
+			label += Unicode::narrowToWide(candidate.displayName);
+			linkText->SetLocalText(label);
+			linkText->SetVisible(true);
+			m_linkSkills[linkText] = candidate.noviceSkill;
+			if (!isRegisteredMediatorObject(*linkText))
+				registerMediatorObject(*linkText, true);
+		}
+		++nextSlot;
+	}
+
+	// Populate the branch transitions backed by the canonical profession map.
+	for (int col = 0; col < 4; ++col)
+	{
+		for (int slot = 0; slot < 3; ++slot)
+		{
 			char const * const linkRoot = def->branchLinks[col][slot];
 			if (!linkRoot || !linkRoot[0])
-			{
-				linkText->SetLocalText(Unicode::emptyString);
 				continue;
-			}
+
+			char path[64];
+			snprintf(path, sizeof(path), "graph.disciplineNext.%d.%d", col, slot);
+			UIBaseObject * const linkObj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
+			if (!linkObj)
+				continue;
+			UIText * const linkText = static_cast<UIText *>(linkObj);
 			// Resolve link root (e.g. "social_imagedesigner") to a
 			// canonical display name by finding the ProfessionDef whose
 			// noviceSkill is "<root>_novice". If no match, fall back to
@@ -1277,6 +1751,7 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 			Unicode::String label = Unicode::narrowToWide("To: ");
 			label += display;
 			linkText->SetLocalText(label);
+			linkText->SetVisible(true);
 
 			// Make the link a clickable shortcut to that profession's tree
 			// (handled in OnButtonPressed via m_linkSkills).
@@ -1297,59 +1772,29 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 			if (!skillName || !skillName[0])
 				continue;
 
-			// Next-trainable = the prerequisite skill is owned (row 0 needs the
-			// novice box; row N needs the box directly below it) and this box is
-			// not yet trained. Only such boxes show the XP progress bar.
-			char const * const prereq = (row == 0)
-				? noviceName.c_str()
-				: def->branchSkills[col][row - 1];
-			bool const prereqMet = prereq && prereq[0] &&
-				playerSkills.find(prereq) != playerSkills.end();
-			bool const nextTrainable = prereqMet &&
-				(playerSkills.find(skillName) == playerSkills.end());
-
 			char path[64];
 			snprintf(path, sizeof(path), "graph.row%d.%d", row, col);
-			applyTreeBox(path, skillName, playerSkills, nextTrainable);
+			applyTreeBox(m_pageGraph4x4, path, skillName, playerSkills);
 		}
 	}
 
 	// Master + Novice boxes (graph.master.b / graph.novice.b). Previously this
 	// wrote the names into the graph.next.0 / graph.prev.0 "specialist" hint
 	// texts, leaving the actual master/novice boxes showing the template's
-	// "xxx skill_five_a" placeholder. Now we fill the real boxes, XP-tint them,
+	// "xxx skill_five_a" placeholder. Now we fill the real boxes
 	// and register them clickable so their mods/commands populate the panels.
 	{
-		std::string const masterName = (def->masterSkill && def->masterSkill[0])
-			? std::string(def->masterSkill)
-			: stripNoviceSuffix(novice->getSkillName()) + "_master";
-
-		// Master is trainable once all four branch tops (row 3) are owned.
-		bool allTops = true;
-		for (int c = 0; c < 4; ++c)
-		{
-			char const * const top = def->branchSkills[c][3];
-			if (!top || !top[0] || playerSkills.find(top) == playerSkills.end())
-			{
-				allTops = false;
-				break;
-			}
-		}
-		bool const masterNext = allTops && (playerSkills.find(masterName) == playerSkills.end());
-		bool const noviceNext = (playerSkills.find(novice->getSkillName()) == playerSkills.end());
-
-		applyTreeBox("graph.master.b", masterName,             playerSkills, masterNext);
-		applyTreeBox("graph.novice.b", novice->getSkillName(), playerSkills, noviceNext);
+		applyTreeBox(m_pageGraph4x4, "graph.master.b", masterName,             playerSkills);
+		applyTreeBox(m_pageGraph4x4, "graph.novice.b", novice->getSkillName(), playerSkills);
 	}
 
-	// Back-links at the bottom (graph.prev.*): the basic profession(s) this
-	// elite branches FROM -- e.g. Pistoleer shows "To: Marksman" below Novice.
-	// Found by reverse-searching every profession's branchLinks for this
-	// profession's root; clickable via m_linkSkills (handled in OnMessage),
-	// mirroring the forward "To: X" elite links up top.
+	// Back-links at the bottom (graph.prev.*): every profession which supplies
+	// an actual prerequisite for this novice box. Derive these from the runtime
+	// SkillObject instead of reverse-searching branchLinks: elite professions
+	// such as Bounty Hunter and Commando require both a mastered profession and
+	// a branch from another profession, which branchLinks cannot represent
+	// without incorrectly attaching the master requirement to one branch.
 	{
-		std::string const rootName = stripNoviceSuffix(novice->getSkillName());
-
 		// Clear all four bottom slots first (profession switch may leave stale).
 		for (int s = 0; s < 4; ++s)
 		{
@@ -1357,37 +1802,53 @@ bool SwgCuiSkills::tryPopulateGraph4x4(SkillObject const * novice, std::set<std:
 			snprintf(path, sizeof(path), "graph.prev.%d", s);
 			UIBaseObject * const obj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
 			if (obj)
-				static_cast<UIText *>(obj)->SetLocalText(Unicode::emptyString);
+			{
+				UIText * const text = static_cast<UIText *>(obj);
+				text->SetLocalText(Unicode::emptyString);
+				text->SetVisible(false);
+			}
 		}
 
 		int prevSlot = 0;
-		for (int i = 0; i < k_professionDefCount && prevSlot < 4; ++i)
+		std::set<ProfessionDef const *> displayed;
+		SkillObject::SkillVector const & prerequisites = novice->getPrerequisiteSkills();
+		for (SkillObject::SkillVector::const_iterator prerequisite = prerequisites.begin();
+			prerequisite != prerequisites.end() && prevSlot < 4; ++prerequisite)
 		{
-			ProfessionDef const & d = k_professionDefs[i];
-			bool linksToUs = false;
-			for (int col = 0; col < 4 && !linksToUs; ++col)
-				for (int slot = 0; slot < 3; ++slot)
-				{
-					char const * const lr = d.branchLinks[col][slot];
-					if (lr && lr[0] && rootName == lr)
-					{
-						linksToUs = true;
-						break;
-					}
-				}
-			if (!linksToUs)
+			if (!*prerequisite)
 				continue;
+
+			std::string const prerequisiteName = (*prerequisite)->getSkillName();
+			ProfessionDef const * owner = 0;
+			for (int i = 0; i < k_professionDefCount && !owner; ++i)
+			{
+				ProfessionDef const & candidate = k_professionDefs[i];
+				if (prerequisiteName == candidate.noviceSkill ||
+					prerequisiteName == candidate.masterSkill)
+					owner = &candidate;
+				for (int col = 0; col < 4 && !owner; ++col)
+					for (int row = 0; row < 4; ++row)
+						if (prerequisiteName == candidate.branchSkills[col][row])
+						{
+							owner = &candidate;
+							break;
+						}
+			}
+			if (!owner || displayed.find(owner) != displayed.end())
+				continue;
+			displayed.insert(owner);
 
 			char path[64];
 			snprintf(path, sizeof(path), "graph.prev.%d", prevSlot);
 			UIBaseObject * const obj = m_pageGraph4x4->GetObjectFromPath(path, TUIText);
-			if (obj && d.displayName && d.noviceSkill)
+			if (obj && owner->displayName && owner->noviceSkill)
 			{
 				UIText * const t = static_cast<UIText *>(obj);
 				Unicode::String label = Unicode::narrowToWide("To: ");
-				label += Unicode::narrowToWide(d.displayName);
+				label += Unicode::narrowToWide(owner->displayName);
 				t->SetLocalText(label);
-				m_linkSkills[t] = d.noviceSkill;
+				t->SetVisible(true);
+				m_linkSkills[t] = owner->noviceSkill;
 				if (!isRegisteredMediatorObject(*t))
 					registerMediatorObject(*t, true);
 			}
@@ -1451,48 +1912,219 @@ void SwgCuiSkills::populateSelectedSkill()
 		m_textProfessionBody->SetLocalText(header);
 	}
 
-	if (m_selectedSkill.empty())
+	CreatureObject const * const player = Game::getPlayerCreature();
+	SkillObject const * const selectedSkill = m_selectedSkill.empty()
+		? 0
+		: SkillManager::getInstance().getSkill(m_selectedSkill);
+	bool const ownsSelectedSkill = player && selectedSkill &&
+		findOwnedSkill(*player, m_selectedSkill);
+	int const selectedSkillCost = selectedSkill
+		? std::max(0, selectedSkill->getSkillPointsRequired())
+		: 0;
+
+	// Drive the authentic learning-capacity strip. Green is the player's
+	// bounded available capacity, orange previews an unowned selection's cost,
+	// and cyan overlays the points recovered by surrendering an owned selection.
+	int usedSkillPoints = 0;
+	if (player)
+	{
+		CreatureObject::SkillList const & playerSkills = player->getSkills();
+		for (CreatureObject::SkillList::const_iterator it = playerSkills.begin();
+			it != playerSkills.end(); ++it)
+		{
+			if (*it)
+				usedSkillPoints += std::max(0, (*it)->getSkillPointsRequired());
+		}
+	}
+	usedSkillPoints = std::max(0, std::min(k_skillPointCap, usedSkillPoints));
+	int const availableSkillPoints = calculateAvailableSkillPoints(usedSkillPoints);
+
+	UIWidget * const learningBar = m_pageLearningCurrent
+		? m_pageLearningCurrent->GetParentWidget()
+		: (m_pageLearningCost ? m_pageLearningCost->GetParentWidget() : 0);
+	UIScalar const learningBarWidth = learningBar ? std::max<UIScalar>(0, learningBar->GetWidth()) : 0;
+	UIScalar const currentWidth = calculateProportionalWidth(
+		learningBarWidth, availableSkillPoints, k_skillPointCap);
+	UIScalar const selectedCostWidth = calculateProportionalWidth(
+		learningBarWidth, selectedSkillCost, k_skillPointCap);
+	setHorizontalBarRange(m_pageLearningCurrent, 0, currentWidth, learningBarWidth);
+	if (m_pageLearningCurrent)
+		m_pageLearningCurrent->SetVisible(player != 0);
+
+	bool const showAcquisition = selectedSkill && !ownsSelectedSkill;
+	setHorizontalBarRange(m_pageLearningCost, currentWidth, selectedCostWidth, learningBarWidth);
+	if (m_pageLearningCost)
+		m_pageLearningCost->SetVisible(showAcquisition && selectedSkillCost > 0);
+
+	setHorizontalBarRange(m_pageLearningRecover, currentWidth - selectedCostWidth,
+		selectedCostWidth, learningBarWidth);
+	if (m_pageLearningRecover)
+		m_pageLearningRecover->SetVisible(ownsSelectedSkill && selectedSkillCost > 0);
+
+	Unicode::String acquireText;
+	Unicode::String surrenderText;
+	if (selectedSkill)
+	{
+		CuiStringVariablesData pointVariables;
+		pointVariables.digit_i = selectedSkillCost;
+		CuiStringVariablesManager::process(CuiStringIdsSkill::acquire_skill_points_prose,
+			pointVariables, acquireText);
+		CuiStringVariablesManager::process(CuiStringIdsSkill::surrender_prose,
+			pointVariables, surrenderText);
+		if (acquireText.empty())
+			acquireText = Unicode::narrowToWide(FormattedString<128>().sprintf(
+				"This skill costs %d skill points.", selectedSkillCost));
+		if (surrenderText.empty())
+			surrenderText = Unicode::narrowToWide(FormattedString<128>().sprintf(
+				"Surrender this skill to recover %d skill points.", selectedSkillCost));
+	}
+	if (m_textSurrender)
+	{
+		m_textSurrender->SetLocalText(surrenderText);
+		m_textSurrender->SetVisible(ownsSelectedSkill);
+	}
+	if (m_textAcquire)
+	{
+		m_textAcquire->SetLocalText(acquireText);
+		m_textAcquire->SetVisible(showAcquisition);
+	}
+
+	// The selected-skill XP bar is the one horizontal bar supplied by the
+	// retail right-panel CodeData. Owned skills and zero-XP boxes do not need
+	// acquisition progress, so clear and hide both pieces together.
+	SkillObject::ExperiencePair const * const experience = selectedSkill
+		? selectedSkill->getPrerequisiteExperience()
+		: 0;
+	int const experienceRequired = experience ? std::max(0, experience->second.first) : 0;
+	int experienceCurrent = 0;
+	if (player && experience && !player->getExperience(experience->first, experienceCurrent))
+		experienceCurrent = 0;
+	bool const hasPrerequisites = player && selectedSkill &&
+		hasAllPrerequisiteSkills(*player, *selectedSkill);
+	bool const showExperience = showAcquisition && hasPrerequisites &&
+		experience && experienceRequired > 0;
+
+	Unicode::String experienceText;
+	if (showExperience)
+	{
+		Unicode::String localizedExperience;
+		if (!CuiSkillManager::localizeExpName(experience->first, localizedExperience) ||
+			localizedExperience.empty())
+		{
+			localizedExperience = Unicode::narrowToWide(experience->first);
+		}
+
+		CuiStringVariablesData experienceVariables;
+		experienceVariables.sourceName = localizedExperience;
+		experienceVariables.digit_i = experienceRequired;
+		CuiStringVariablesManager::process(CuiStringIdsSkill::acquire_exp_prose,
+			experienceVariables, experienceText);
+
+		experienceVariables.digit_i = std::max(0, experienceCurrent);
+		Unicode::String currentExperienceText;
+		CuiStringVariablesManager::process(CuiStringIdsSkill::exp_prose,
+			experienceVariables, currentExperienceText);
+		if (!currentExperienceText.empty())
+		{
+			experienceText.append(2, ' ');
+			experienceText += currentExperienceText;
+		}
+		if (experienceText.empty())
+		{
+			experienceText = Unicode::narrowToWide(FormattedString<256>().sprintf(
+				"This skill requires %d %s experience; you have %d.",
+				experienceRequired, experience->first.c_str(), std::max(0, experienceCurrent)));
+		}
+	}
+	if (m_textExpRequired)
+	{
+		m_textExpRequired->SetLocalText(experienceText);
+		m_textExpRequired->SetVisible(showExperience);
+	}
+	if (m_barExp)
+	{
+		UIWidget * const experienceBarParent = m_barExp->GetParentWidget();
+		UIScalar const experienceBarWidth = experienceBarParent
+			? std::max<UIScalar>(0, experienceBarParent->GetWidth())
+			: 0;
+		setHorizontalBarRange(m_barExp, 0,
+			calculateProportionalWidth(experienceBarWidth, experienceCurrent, experienceRequired),
+			experienceBarWidth);
+		m_barExp->SetVisible(showExperience);
+	}
+
+	if (!selectedSkill)
 		return;
 
-	// Pre-CU: render the box's mods + commands from MarcJoyce SKILLS (k_skillBoxData),
-	// NOT the client's stock TRE skills.iff (which is NGE -- e.g. it lists "Knockdown
-	// Recovery" / "General Ranged" for Novice Marksman). See SwgCuiSkillBoxData.h. We key
-	// off m_selectedSkill directly, so boxes absent from the client's skills.iff still populate.
-
-	// Skill Mods (k_skillBoxMods, sorted by skill name).
+	// The restored runtime SkillObject is authoritative for every selected-box
+	// grant. This keeps the UI aligned with the same skills table used for
+	// acquisition and surrender instead of a second generated grant snapshot.
 	if (m_dsInfoModsName && m_dsInfoModsPoints)
 	{
 		int rowIdx = 0;
-		for (int i = 0; i < k_skillBoxModsCount; ++i)
+		SkillObject::GenericModVector const & modifiers =
+			selectedSkill->getStatisticModifiers();
+		for (SkillObject::GenericModVector::const_iterator modifier = modifiers.begin();
+			modifier != modifiers.end(); ++modifier)
 		{
-			if (m_selectedSkill != k_skillBoxMods[i].skill)
+			std::string const & modifierName = modifier->first;
+			if (isPrivateName(modifierName))
 				continue;
 
 			Unicode::String localizedName;
-			if (!CuiSkillManager::localizeSkillModName(k_skillBoxMods[i].mod, localizedName) || localizedName.empty())
-				localizedName = prettifyKey(k_skillBoxMods[i].mod);
+			if (!CuiSkillManager::localizeSkillModName(modifierName, localizedName) ||
+				localizedName.empty())
+			{
+				localizedName = prettifyKey(modifierName);
+			}
 
 			appendTableRow(m_dsInfoModsName, m_dsInfoModsPoints, localizedName,
-				Unicode::narrowToWide(FormattedString<32>().sprintf("%+d", k_skillBoxMods[i].value)), rowIdx);
+				Unicode::narrowToWide(FormattedString<32>().sprintf("%+d", modifier->second)), rowIdx);
 			++rowIdx;
 		}
 	}
 
-	// Commands and Abilities Granted: name-only for V11 (icons V12).
+	// Commands, abilities, and draft schematics granted by this box.
 	if (m_dsInfoCmdsName)
 	{
+		SkillObject::StringVector const & grantedSchematicGroups =
+			selectedSkill->getSchematicsGranted();
+		std::set<std::string> schematicGroupNames;
+		for (SkillObject::StringVector::const_iterator group = grantedSchematicGroups.begin();
+			group != grantedSchematicGroups.end(); ++group)
+		{
+			schematicGroupNames.insert(Unicode::toLower(*group));
+		}
+
 		// Two passes so CERTIFICATIONS group together as a visible block first
 		// (Pre-CU surfaced certs prominently; they were previously interleaved +
 		// scrolled off), abilities second. Both localize to SOE's real Pre-CU
 		// names (e.g. cert_rifle_dlt20 -> "DLT20 Rifle Certification").
+		SkillObject::StringVector const & commands = selectedSkill->getCommandsProvided();
 		int rowIdx = 0;
 		for (int pass = 0; pass < 2; ++pass)
-		for (int i = 0; i < k_skillBoxCommandsCount; ++i)
+		for (SkillObject::StringVector::const_iterator command = commands.begin();
+			command != commands.end(); ++command)
 		{
-			if (m_selectedSkill != k_skillBoxCommands[i].skill)
+			std::string const & cmd = *command;
+			std::string const cmdGrantKey = Unicode::toLower(cmd);
+			std::string::size_type const argumentSeparator = cmdGrantKey.find('+');
+			std::string const cmdKey = cmdGrantKey.substr(0, argumentSeparator);
+			std::string const cmdArgument = argumentSeparator == std::string::npos
+				? std::string()
+				: cmdGrantKey.substr(argumentSeparator + 1);
+			if (isPrivateName(cmdKey))
 				continue;
-			std::string const cmd = k_skillBoxCommands[i].command;
-			bool const isCert = (cmd.compare(0, 5, "cert_") == 0);
+			// Some historical tables duplicated draft group ids in COMMANDS. They
+			// are groups, not executable commands; render their member drafts below.
+			if (schematicGroupNames.find(cmdGrantKey) != schematicGroupNames.end())
+				continue;
+
+			Command const & commandDefinition = CommandTable::getCommand(
+				Crc::normalizeAndCalculate(cmdKey.c_str()));
+			if (!commandDefinition.isNull() && !commandDefinition.m_visibleToClients)
+				continue;
+			bool const isCert = (cmdKey.compare(0, 5, "cert_") == 0);
 			if ((pass == 0) != isCert)   // pass 0: certs only; pass 1: the rest
 				continue;
 
@@ -1501,29 +2133,76 @@ void SwgCuiSkills::populateSelectedSkill()
 			// are camelCase (e.g. overChargeShot1) -> lowercase for the lookup (mirrors
 			// CuiSkillManager.cpp:450) so we show SOE's real Pre-CU command names instead
 			// of the prettifyKey fallback. Keep camelCase cmd for the fallback path.
-			if (!CuiSkillManager::localizeCmdName(Unicode::toLower(cmd), localizedName) || localizedName.empty())
-				localizedName = prettifyKey(cmd);
-
-			char rowKey[16];
-			snprintf(rowKey, sizeof(rowKey), "row%d", rowIdx);
-
-			UIData * const nameRow = new UIData;
-			nameRow->SetName(rowKey);
-			nameRow->SetProperty(UILowerString("Value"), localizedName);
-			m_dsInfoCmdsName->AddChild(nameRow);
-
-			if (m_dsInfoCmdsIcons)
+			bool const localizedGrant =
+				CuiSkillManager::localizeCmdName(cmdGrantKey, localizedName) &&
+				!localizedName.empty();
+			if (!localizedGrant)
 			{
-				UIData * const iconRow = new UIData;
-				iconRow->SetName(rowKey);
-				// /styles.icon.command.<lowercasecmd> (blank until Pre-CU icon styles ship).
-				std::string iconPath = "/styles.icon.command.";
-				for (std::string::const_iterator c = cmd.begin(); c != cmd.end(); ++c)
-					iconPath += static_cast<char>(tolower(static_cast<unsigned char>(*c)));
-				iconRow->SetProperty(UILowerString("Value"), Unicode::narrowToWide(iconPath));
-				m_dsInfoCmdsIcons->AddChild(iconRow);
+				if (!CuiSkillManager::localizeCmdName(cmdKey, localizedName) ||
+					localizedName.empty())
+				{
+					// Unknown, unlocalized grants are internal bookkeeping rather than
+					// player commands. Known visible commands retain a readable fallback.
+					if (commandDefinition.isNull())
+						continue;
+					localizedName = prettifyKey(cmdKey);
+				}
+
+				// Publish 14 encodes command variants as command+argument. The base
+				// command owns visibility and icon policy; retain the argument in the
+				// label when no variant-specific cmd_n entry exists.
+				if (!cmdArgument.empty())
+				{
+					localizedName += Unicode::narrowToWide(" (");
+					localizedName += Unicode::narrowToWide(cmdArgument);
+					localizedName.push_back(')');
+				}
 			}
+
+			// /styles.icon.command.<lowercasecmd> (blank until Pre-CU icon styles ship).
+			appendGrantedDetailRow(m_dsInfoCmdsName, m_dsInfoCmdsIcons, localizedName,
+				std::string("/styles.icon.command.") + cmdKey, rowIdx);
 			++rowIdx;
+		}
+
+		DraftSchematicGroupManager::SchematicVector drafts;
+		std::set<std::pair<uint32, uint32> > displayedDrafts;
+		for (SkillObject::StringVector::const_iterator group = grantedSchematicGroups.begin();
+			group != grantedSchematicGroups.end(); ++group)
+		{
+			std::string const groupName = Unicode::toLower(*group);
+			drafts.clear();
+			if (!DraftSchematicGroupManager::getSchematicsForGroup(groupName, drafts))
+			{
+				WARNING(true, ("SwgCuiSkills selected skill [%s] calls for invalid schematic group [%s]",
+					m_selectedSkill.c_str(), groupName.c_str()));
+				continue;
+			}
+
+			for (DraftSchematicGroupManager::SchematicVector::const_iterator draft = drafts.begin();
+				draft != drafts.end(); ++draft)
+			{
+				if (!displayedDrafts.insert(*draft).second)
+					continue;
+
+				DraftSchematicInfo const * const info =
+					DraftSchematicManager::cacheDraftSchematic(*draft);
+				if (!info || info->getLocalizedName().empty())
+				{
+					WARNING(true, ("SwgCuiSkills unable to localize draft [%lu,%lu] from group [%s] on skill [%s]",
+						static_cast<unsigned long>(draft->first),
+						static_cast<unsigned long>(draft->second), groupName.c_str(),
+						m_selectedSkill.c_str()));
+					continue;
+				}
+
+				Unicode::String localizedDraftName;
+				localizedDraftName.push_back('+');
+				localizedDraftName += info->getLocalizedName();
+				appendGrantedDetailRow(m_dsInfoCmdsName, m_dsInfoCmdsIcons,
+					localizedDraftName, "/styles.icon.misc.granted", rowIdx);
+				++rowIdx;
+			}
 		}
 	}
 }

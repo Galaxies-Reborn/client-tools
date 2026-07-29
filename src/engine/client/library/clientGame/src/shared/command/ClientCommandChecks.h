@@ -48,6 +48,7 @@ public:
 	static bool doesTargetRangeInvalidateCommand(Command const * command, CreatureObject const * creature, NetworkId const & targetId, Object const * actionObject);
 	static bool doesStateInvalidateCommand(Command const * command, CreatureObject const * creature);
 	static bool doesWeaponInvalidateCommand(Command const * command, CreatureObject const * creature);
+	static int getCurrentWeaponTypeForDiagnostics(CreatureObject const * creature);
 
 	static bool hasCommandoHeavyWeaponActionCostException(Command const* command, CreatureObject const* creature);
 	static bool canDoBeneficialCommandOnTarget(CreatureObject const * const targetCreature);

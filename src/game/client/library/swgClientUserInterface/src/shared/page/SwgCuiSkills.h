@@ -52,8 +52,13 @@ public:
 	void                       onSkillsChanged       (CreatureObject const & creature);
 	void                       onExperienceChanged   (PlayerObject const & player);
 	void                       onSkillModsChanged    (CreatureObject const & creature);
+	void                       onCommandsChanged     (CreatureObject const & creature);
 	void                       onDeleteSkillConfirmation (std::string const & skillName);
 	void                       onSceneChanged        (bool const &);
+	int                        showAllProfessionsForBackgroundValidation ();
+	int                        selectAllProfessionForBackgroundValidation (int row);
+	int                        showMyProfessionsForBackgroundValidation ();
+	int                        selectMyProfessionForBackgroundValidation (int row);
 
 protected:
 	virtual void               performActivate       ();
@@ -68,6 +73,7 @@ private:
 	void                       synchronizeProfessionTreeSelection ();
 	void                       populateExperience    ();
 	void                       populateSkillMods     ();
+	void                       populateCertifications ();
 	void                       populateSelectedProfession ();
 	void                       populateSelectedSkill  ();
 	void                       updateSkillPointsDisplay ();
@@ -76,10 +82,13 @@ private:
 	void                       clearPendingSurrender ();
 	void                       reconcilePendingSurrender ();
 	void                       onCommandRemoving     (ClientCommandQueue::Messages::Removing::Payload const & payload);
+	bool                       tryPopulateGraph       (SkillObject const * novice, std::set<std::string> const & playerSkills);
 	bool                       tryPopulateGraph4x4    (SkillObject const * novice, std::set<std::string> const & playerSkills);
-	void                       applyTreeBox           (char const * path, std::string const & skillName, std::set<std::string> const & playerSkills, bool nextTrainable);
-	void                       applySkillBoxXp        (char const * path, class UIButton * btn, std::string const & skillName, bool hasSkill, bool nextTrainable);
+	bool                       tryPopulateSpecialGraph (SkillObject const * novice, std::set<std::string> const & playerSkills);
+	void                       applyTreeBox           (UIPage * graphPage, char const * path, std::string const & skillName, std::set<std::string> const & playerSkills);
 	void                       hideAllGraphs          ();
+	void                       resetGraph4x4Presentation ();
+	void                       resetSpecialGraphPresentation (UIPage * graphPage, int graphType);
 
 	// Top-level page bindings (resolved via CodeData on the /Skill.skills page).
 	UITabbedPane *             m_tabs;
@@ -87,6 +96,8 @@ private:
 	UIPage *                   m_pageMyStats;
 	UIPage *                   m_pageProfession;
 	UIButton *                 m_buttonClose;
+	UIText *                   m_textProfessionListMy;
+	UIText *                   m_textProfessionListAll;
 
 	// Right-panel text + graph layout containers.
 	UIText *                   m_textProfName;
@@ -107,6 +118,7 @@ private:
 	UIDataSource *             m_dsExpPoints;
 	UIDataSource *             m_dsModsName;
 	UIDataSource *             m_dsModsPoints;
+	UIDataSource *             m_dsCertsName;
 
 	// Right-side per-selected-skill detail panels (under both.right.all.info).
 	UIDataSource *             m_dsInfoModsName;
@@ -114,8 +126,16 @@ private:
 	UIDataSource *             m_dsInfoCmdsName;
 	UIDataSource *             m_dsInfoCmdsIcons;
 
-	// Skill-points display + surrender button (under both.right.all.skillPoints).
+	// Authentic Publish 14 selected-skill presentation contract from the nested
+	// both.right CodeData block in ui_skill.inc.
 	UIText *                   m_textSkillPoints;
+	UIText *                   m_textAcquire;
+	UIText *                   m_textSurrender;
+	UIText *                   m_textExpRequired;
+	UIPage *                   m_pageLearningCurrent;
+	UIPage *                   m_pageLearningCost;
+	UIPage *                   m_pageLearningRecover;
+	UIPage *                   m_barExp;
 	UIButton *                 m_buttonSurrender;
 
 	// Map from a tree-cell button widget to its currently-displayed skill

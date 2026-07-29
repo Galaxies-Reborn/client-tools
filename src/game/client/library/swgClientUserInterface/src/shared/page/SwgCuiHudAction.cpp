@@ -19,7 +19,6 @@
 
 #include "clientGame/AuctionManagerClient.h"
 #include "clientGame/ClientCommandQueue.h"
-#include "clientGame/ClientExpertiseManager.h"
 #include "clientGame/CreatureObject.h"
 #include "clientGame/ConfigClientGame.h"
 #include "clientGame/Game.h"
@@ -1042,26 +1041,16 @@ bool  SwgCuiHudAction::performAction (const std::string & id, const Unicode::Str
 
 	else if (id == CuiActions::roadmap)
 	{
-		if(!RoadmapManager::playerIsNewCharacter())
-		{		
-			const bool up = !params.empty () && params [0] != 0;
-			if (up)
-				CuiMediatorFactory::activateInWorkspace (CuiMediatorTypes::WS_Roadmap);		
-			else
-				CuiMediatorFactory::toggleInWorkspace (CuiMediatorTypes::WS_Roadmap);		
-		}
+		// Publish 14 has no Roadmap mediator. Route inherited commands and
+		// stale keymaps to the restored Pre-CU Skills window.
+		CuiMediatorFactory::toggleInWorkspace(CuiMediatorTypes::WS_Skills);
 	}
 
 	else if (id == CuiActions::expertise)
 	{
-		if(ClientExpertiseManager::hasExpertiseTrees())
-		{		
-			const bool up = !params.empty () && params [0] != 0;
-			if (up)
-				CuiMediatorFactory::activateInWorkspace (CuiMediatorTypes::WS_Expertise);		
-			else
-				CuiMediatorFactory::toggleInWorkspace (CuiMediatorTypes::WS_Expertise);		
-		}
+		// Publish 14 has no Expertise mediator. Preserve command compatibility
+		// without allowing the NGE progression surface to reappear.
+		CuiMediatorFactory::toggleInWorkspace(CuiMediatorTypes::WS_Skills);
 	}
 
 	else if (id == CuiActions::ticketPurchase)

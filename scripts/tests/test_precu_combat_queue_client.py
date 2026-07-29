@@ -142,6 +142,20 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
             update_target,
         )
 
+    def test_invisible_publish14_death_blow_gets_a_real_sequence(self) -> None:
+        enqueue = function_body(
+            self.command_queue_cpp,
+            "uint32 ClientCommandQueue::enqueueCommand(Command const &command",
+        )
+        self.assertIn('Crc::normalizeAndCalculate("coupDeGrace")', enqueue)
+        self.assertIn('Crc::normalizeAndCalculate("deathBlow")', enqueue)
+        self.assertIn("command.m_addToCombatQueue", enqueue)
+        self.assertIn(
+            "command.m_visibleToClients || trackPrecuDeathBlow",
+            enqueue,
+        )
+        self.assertIn("sequenceId = nextSequenceId()", enqueue)
+
 
 if __name__ == "__main__":
     unittest.main()

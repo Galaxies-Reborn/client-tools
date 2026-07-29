@@ -79,6 +79,8 @@ public:
 	static void             clear          ();
 	static EntryMap const & get            ();
 	static const Entry *    findEntry      (uint32 sequenceId);
+	static void             clearLastCommandRemoval();
+	static bool             getLastCommandRemoval(uint32 &sequenceId, Command::ErrorCode &status, int &statusDetail);
 	static void             handleCommandRemoved (uint32 sequenceId, float waitTime, Command::ErrorCode status = Command::CEC_Success, int statusDetail = 0);
 	static void             generateCommandRemovedMessage (Unicode::String & result, const Command & cmd, Command::ErrorCode status, int statusDetail);
 	static void             executeClientCommands();

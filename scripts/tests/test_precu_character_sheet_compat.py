@@ -340,6 +340,19 @@ class PrecuCharacterSheetSourceContractTests(unittest.TestCase):
             with self.subTest(member=member):
                 self.assertRegex(examine_mode, rf"{member}->Clear\s*\(\s*\)")
 
+    def test_missing_later_badge_catalog_does_not_claim_every_badge(self) -> None:
+        badge_window = function_body(
+            self.source, "void SwgCuiCharacterSheet::refreshBadgeWindow"
+        )
+        guard_start = badge_window.index("if (allBadges.empty())")
+        unearned_start = badge_window.index(
+            "CuiStringIdsCharacterSheet::badges_unearned"
+        )
+        self.assertLess(guard_start, unearned_start)
+        guard = badge_window[guard_start:unearned_start]
+        self.assertIn("m_badgeWindow->SetLocalText(current);", guard)
+        self.assertIn("return;", guard)
+
     def test_stomach_and_force_status_are_self_only(self) -> None:
         status_bars = function_body(
             self.source, "void SwgCuiCharacterSheet::updateStatusBars"

@@ -6,6 +6,7 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PROFILE_ROOT = REPOSITORY_ROOT / "config" / "precu"
 CLIENT_CONFIG = PROFILE_ROOT / "client.cfg"
+LOGIN_CONFIG = PROFILE_ROOT / "precu_login.cfg"
 LIVE_CONFIG = PROFILE_ROOT / "precu_live.cfg"
 BLOOM_SOURCE = REPOSITORY_ROOT / (
     "src/engine/client/library/clientGame/src/shared/core/Bloom.cpp"
@@ -23,6 +24,7 @@ STAGE_SCRIPT = REPOSITORY_ROOT / "scripts" / "Stage-X64Client.ps1"
 BUILD_SCRIPT = REPOSITORY_ROOT / "scripts" / "Build-X64Client.ps1"
 
 EXPECTED_TRE_ORDER = (
+    "precu_runtime.tre",
     "default_patch.tre",
     "patch_sku1_14_00.tre",
     "patch_14_00.tre",
@@ -78,6 +80,14 @@ EXPECTED_TRE_ORDER = (
 
 
 class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
+    def test_profile_owns_focus_free_local_acceptance_login(self):
+        config = LOGIN_CONFIG.read_text(encoding="utf-8")
+        self.assertRegex(config, r"(?m)^\s*loginClientID\s*=\s*1001\s*$")
+        self.assertRegex(
+            config,
+            r"(?m)^\s*loginClientPassword\s*=\s*local\s*$",
+        )
+
     def test_profile_owns_the_complete_publish14_include_chain(self):
         config = CLIENT_CONFIG.read_text(encoding="utf-8")
         includes = re.findall(r'^\.include\s+"([^"]+)"', config, re.MULTILINE)
@@ -104,13 +114,13 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
             r"(?m)^\s*disable\s*=\s*true\s*$",
         )
 
-    def test_live_manifest_is_the_canonical_51_tre_stack(self):
+    def test_live_manifest_is_the_canonical_52_tre_stack(self):
         config = LIVE_CONFIG.read_text(encoding="utf-8")
         trees = tuple(
             re.findall(r"(?m)^\s*searchTree_[^=]+\s*=\s*([^\s#]+)\s*$", config)
         )
         self.assertEqual(trees, EXPECTED_TRE_ORDER)
-        self.assertIn("maxSearchPriority=26", config)
+        self.assertIn("maxSearchPriority=27", config)
         self.assertNotIn("swgsource_3.0.tre", config.lower())
 
     def test_renderer_hard_override_cannot_be_reenabled_by_the_ui(self):
