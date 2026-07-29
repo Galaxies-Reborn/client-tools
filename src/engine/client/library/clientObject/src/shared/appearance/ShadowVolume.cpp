@@ -185,16 +185,6 @@ public:
 	int                 compactEdgeCount;
 	bool                computedEdgeConnectivity;
 
-	//-- The volume's vertices in world space, near cap then far cap, with the far cap already
-	//   translated along the light. Rebuilt only when the object transform or the light moves: a
-	//   building does not move, and transforming every cap vertex per frame would trade draw calls
-	//   for CPU time, which is the wrong trade when the GPU is idle two thirds of the frame.
-	Vector*             worldVertexArray;
-	int                 worldVertexCount;
-	Transform           worldVertexTransform;
-	Vector              worldVertexLight;
-	bool                worldVertexValid;
-
 	//-- Triangle adjacency, six indices a face, for a geometry shader silhouette pass:
 	//   corner 0, the opposite corner of the neighbour across edge 0-1, corner 1, the neighbour
 	//   across 1-2, corner 2, the neighbour across 2-0. Built once alongside the edge list.
@@ -223,9 +213,6 @@ public:
 		compactEdgeArray (0),
 		compactEdgeCount (0),
 		computedEdgeConnectivity (false),
-		worldVertexArray (0),
-		worldVertexCount (0),
-		worldVertexValid (false),
 		adjacencyIndexArray (0),
 		adjacencyIndexCount (0),
 		shadowVertexBuffer (0),
@@ -433,16 +420,13 @@ void ProxyLocalShaderPrimitive::prepareToDraw () const
 			if (m_shadowVolume.m_primitiveType == ShadowVolume::PT_static)
 				ShadowCostReport::noteStaticScale (m_appearance.getScale ().x);
 
-			//-- Identity. The volume's vertices are written already in world space, so there is no
-			//   object transform left to apply -- and no second frame for the far-cap offset to
-			//   disagree with, which is what broke the previous attempt at this.
-			Graphics::setObjectToWorldTransformAndScale (Transform::identity, Vector::xyz111);
+			Graphics::setObjectToWorldTransformAndScale (m_appearance.getTransform_w (), m_shadowVolume.m_primitiveType == ShadowVolume::PT_static ? m_appearance.getScale () : Vector::xyz111);
 
 			//-- is the object in an interior?
 			static Vector skewedUnitY (0.05f, 0.95f, 0.05f);
 
 			const Vector directionToLight = (ms_viewer || m_isInWorldCell) ? ShadowVolume::getDirectionToLight () : skewedUnitY;
-			m_shadowVolume.extrudeShadowVolume (directionToLight, m_appearance.getTransform_w ());			
+			m_shadowVolume.extrudeShadowVolume(m_object.getTransform_o2c().rotate_p2l(directionToLight));			
 		}
 		break;
 
@@ -1372,12 +1356,6 @@ ShadowVolume::~ShadowVolume ()
 
 		shadowPrimitive.adjacencyIndexCount = 0;
 
-		delete [] shadowPrimitive.worldVertexArray;
-		shadowPrimitive.worldVertexArray = 0;
-
-		shadowPrimitive.worldVertexCount = 0;
-		shadowPrimitive.worldVertexValid = false;
-
 		delete shadowPrimitive.shadowVertexBuffer;
 		shadowPrimitive.shadowVertexBuffer = 0;
 
@@ -1555,15 +1533,17 @@ void ShadowVolume::addPrimitive (const VertexBufferReadIterator& vi, const int n
 				VertexBufferFormat format;
 				format.setPosition ();
 
-				//-- Twice the vertices: near cap then far cap, both world space, filled by
-				//   extrudeShadowVolume once the object transform is known. One draw covers both.
-				shadowPrimitive.shadowVertexBuffer = new SystemVertexBuffer (format, shadowPrimitive.compactVertexCount * 2);
+				shadowPrimitive.shadowVertexBuffer = new SystemVertexBuffer (format, shadowPrimitive.compactVertexCount);
 			}
 
-			//-- Not filled here any more. These vertices are world space and the world transform is
-			//   not known until extrudeShadowVolume runs, which fills both halves there and
-			//   invalidates the cache when the transform or the light moves.
-			shadowPrimitive.worldVertexValid = false;
+			//-- copy compact vertex array
+			VertexBufferWriteIterator sv = shadowPrimitive.shadowVertexBuffer->begin();
+			int i;
+			for (i = 0; i < shadowPrimitive.compactVertexCount; ++i)
+			{
+				sv.setPosition (shadowPrimitive.compactVertexArray [i]);
+				++sv;
+			}
 		}
 
 		if (!shadowPrimitive.shadowFrontIndexBuffer)
@@ -1817,17 +1797,21 @@ void ShadowVolume::render(Object const * const object, const Appearance *const a
 		NOT_NULL (m_localShaderPrimitiveRenderFrontCapsTwoSided);
 		ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderFrontCapsTwoSided);
 
-		//-- Two draw calls: edges, and one cap pass carrying both near and far. The extrude proxy
-		//   submitted alongside them runs the extrusion in prepareToDraw and its draw() is empty, so
-		//   counting it here would overstate the draw cost.
-		ShadowCostReport::noteRendered (2);
+		//-- Three draw calls: edges, front caps, back caps. The two extrude proxies submitted
+		//   alongside them set the transform and run the extrusion in prepareToDraw; their draw() is
+		//   empty, so counting them here would overstate the draw cost by two thirds.
+		ShadowCostReport::noteRendered (3);
 
 #if SHADOW_EXTRUDE_TO_POINT == 0
-		//-- No separate back cap pass. Its geometry is the far half of the same world-space vertex
-		//   buffer and its indices were appended to the front cap's, so the cap draw above delivers
-		//   both. The far-cap transform proxy went with it: the offset is baked into vertices that
-		//   are already in the space it was defined in, so there is nothing left for a transform to
-		//   apply -- which is what made the earlier object-space attempt at this wrong.
+		if (m_localShaderPrimitiveRenderBackCapsTwoSided)
+		{
+			proxyLocalShaderPrimitive = NON_NULL (new ProxyLocalShaderPrimitive (*ms_shadowVolumeTwoSidedShader, *this, *object, *appearance, isInWorldCell, ProxyLocalShaderPrimitive::M_prepareFarCap));
+			ms_proxyLocalShaderPrimitiveList->push_back (proxyLocalShaderPrimitive);
+			ShaderPrimitiveSorter::add (*proxyLocalShaderPrimitive);
+
+			NOT_NULL (m_localShaderPrimitiveRenderBackCapsTwoSided);
+			ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderBackCapsTwoSided);
+		}
 #endif
 	}
 	else
@@ -2038,7 +2022,7 @@ namespace ShadowCostReport
 	};
 }
 
-void ShadowVolume::extrudeShadowVolume (const Vector& directionToLight_w, const Transform& objectToWorld) const
+void ShadowVolume::extrudeShadowVolume (const Vector& directionToLight_o) const
 {
 	ShadowCostReport::Scope const shadowCost;
 
@@ -2057,64 +2041,11 @@ void ShadowVolume::extrudeShadowVolume (const Vector& directionToLight_w, const 
 		if (shadowPrimitive.isEmpty ())
 			continue;
 
-		//-- Which faces look at the light.
-		//
-		//   The face normals are object-space and stay that way, so the light is rotated into that
-		//   space for the test rather than the normals being transformed into world space. Rotation
-		//   only: a direction has no position to translate.
-		const Vector directionToLight_o = objectToWorld.rotate_p2l (directionToLight_w);
-
+		//-- update the face normal array
 		{
 			int j;
 			for (j = 0; j < shadowPrimitive.compactFaceCount; ++j)
 				shadowPrimitive.compactFaceDotTestArray [j] = shadowPrimitive.compactFaceNormalArray [j].dot (directionToLight_o) >= 0.f;
-		}
-
-		//-- The volume's vertices in world space: the near cap, then the far cap already translated
-		//   along the light. Rebuilt only when the transform or the light has moved, so a static
-		//   building pays for this once rather than every frame.
-		{
-			const Vector extrusion_w = -directionToLight_w * ms_shadowVolumeExtrudeDistance;
-
-			const bool stale =
-				   !shadowPrimitive.worldVertexValid
-				|| (shadowPrimitive.worldVertexCount != shadowPrimitive.compactVertexCount)
-				|| (m_primitiveType == PT_animating)
-				|| (memcmp (&shadowPrimitive.worldVertexTransform, &objectToWorld, sizeof (Transform)) != 0)
-				|| (shadowPrimitive.worldVertexLight != directionToLight_w);
-
-			if (stale)
-			{
-				if (!shadowPrimitive.worldVertexArray || shadowPrimitive.worldVertexCount != shadowPrimitive.compactVertexCount)
-				{
-					delete [] shadowPrimitive.worldVertexArray;
-					shadowPrimitive.worldVertexArray = new Vector [static_cast<size_t> (shadowPrimitive.compactVertexCount * 2)];
-					shadowPrimitive.worldVertexCount = shadowPrimitive.compactVertexCount;
-				}
-
-				int v;
-				for (v = 0; v < shadowPrimitive.compactVertexCount; ++v)
-				{
-					const Vector world = objectToWorld.rotateTranslate_l2p (shadowPrimitive.compactVertexArray [v]);
-
-					shadowPrimitive.worldVertexArray [v] = world;
-					shadowPrimitive.worldVertexArray [shadowPrimitive.compactVertexCount + v] = world + extrusion_w;
-				}
-
-				shadowPrimitive.worldVertexTransform = objectToWorld;
-				shadowPrimitive.worldVertexLight = directionToLight_w;
-				shadowPrimitive.worldVertexValid = true;
-
-				//-- Hand both halves to the cap buffer.
-				if (shadowPrimitive.shadowVertexBuffer)
-				{
-					VertexBufferWriteIterator sv = shadowPrimitive.shadowVertexBuffer->begin ();
-
-					int w;
-					for (w = 0; w < shadowPrimitive.compactVertexCount * 2; ++w, ++sv)
-						sv.setPosition (shadowPrimitive.worldVertexArray [w]);
-				}
-			}
 		}
 
 		//-- update the caps
@@ -2146,24 +2077,6 @@ void ShadowVolume::extrudeShadowVolume (const Vector& directionToLight_w, const 
 			}
 		}
 
-		//-- One cap draw, not two. The far cap's vertices are already offset in the same space they
-		//   were defined in, so its indices only need shifting into the buffer's second half. The
-		//   counts always fit: a face is either front-facing or back-facing to the light and never
-		//   both, so they sum to compactIndexCount, which is what this buffer is sized to.
-		if (shadowPrimitive.shadowBackIndexCount)
-		{
-			Index * const combined = shadowPrimitive.shadowFrontIndexBuffer->begin ();
-			const Index * const back = shadowPrimitive.shadowBackIndexBuffer->begin ();
-			const Index offset = static_cast<Index> (shadowPrimitive.compactVertexCount);
-
-			int b;
-			for (b = 0; b < shadowPrimitive.shadowBackIndexCount; ++b)
-				combined [shadowPrimitive.shadowFrontIndexCount + b] = static_cast<Index> (back [b] + offset);
-
-			shadowPrimitive.shadowFrontIndexCount += shadowPrimitive.shadowBackIndexCount;
-			shadowPrimitive.shadowBackIndexCount = 0;
-		}
-
 		{
 			if (ms_numberOfShadowEdgePrimitives >= ms_shadowEdgePrimitiveList.size ())
 			{
@@ -2189,8 +2102,7 @@ void ShadowVolume::extrudeShadowVolume (const Vector& directionToLight_w, const 
 			Vector v2;
 			Vector v3;
 
-			//-- World space now, matching the vertices the quads are built from.
-			const Vector infinity = directionToLight_w * ms_shadowVolumeExtrudeDistance;
+			const Vector infinity = directionToLight_o * ms_shadowVolumeExtrudeDistance;
 
 			int numberOfShadowVolumeQuads = 0;
 
@@ -2240,9 +2152,9 @@ void ShadowVolume::extrudeShadowVolume (const Vector& directionToLight_w, const 
 						}
 					}
 
-					//-- start with the edge, in world space
-					v0 = shadowPrimitive.worldVertexArray [edge.v0];
-					v1 = shadowPrimitive.worldVertexArray [edge.v1];
+					//-- start with the edge
+					v0 = shadowPrimitive.compactVertexArray [edge.v0];
+					v1 = shadowPrimitive.compactVertexArray [edge.v1];
 
 
 					//-- instead of extending to infinity, should we clip against frustum?
