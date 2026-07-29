@@ -84,7 +84,7 @@ namespace ShadowManagerNamespace
 
 	// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-	inline bool shouldRender (Camera const & camera, Vector const & position_w, float const radius, float const maximumDistance, bool const extruded)
+	inline bool shouldRender (Camera const & camera, Vector const & position_w, float const radius, float const maximumDistance)
 	{
 		//-- check maximum distance first: a subtraction and a compare against a squared distance,
 		//   and it rejects far more than the size test does.
@@ -111,23 +111,24 @@ namespace ShadowManagerNamespace
 			const float distance = sqrt (distanceSquared);
 			const float tanHalfFov = tan (0.5f * camera.getHorizontalFieldOfView ());
 
-			//-- Not applied to extruded shadows at all.
+			//-- Only applied past a quarter of the shadow distance.
 			//
-			//   This measures how big the CASTER looks, which says nothing about how big its SHADOW
-			//   looks. A volumetric shadow extends up to ms_shadowVolumeExtrudeDistance from its
-			//   caster, so a distant building that is a few pixels across can lay a shadow right
-			//   over the camera. Culling on caster size removes exactly those -- long shadows from
-			//   far objects, which are the most visible ones there are.
+			//   A caster's own apparent size is a poor proxy for whether its shadow is visible: the
+			//   volume extends up to ms_shadowVolumeExtrudeDistance from the caster, so something
+			//   behind the camera, or small on screen, can still throw a shadow across the view. The
+			//   shipped code got this right by accident -- it only size-culled objects it could
+			//   project, and projection fails outside the near and far planes, so anything behind the
+			//   camera escaped the cull. Making the test unconditional removed shadows that were
+			//   being drawn for good reason, which shows up as shadows vanishing when you turn away
+			//   from what casts them.
 			//
-			//   Restricting it to distant casters, as the previous attempt did, only moved the
-			//   boundary: far buildings are precisely the case it still got wrong.
-			//
-			//   Distance and the fog cutoff remain, and they are the right limiters: both scale with
-			//   how far the shadow itself can reach, and both are on the shadow detail slider. A
-			//   projected blob is different -- it lies on the ground under its caster and has no
-			//   extent beyond it -- so the size test still applies there, where caster size really is
-			//   the shadow's size.
-			if (!extruded && distance > 0.01f && tanHalfFov > 0.f)
+			//   Near casters therefore keep their shadows whatever their screen size or direction.
+			//   The size test still bounds the distant tail, where a shadow genuinely cannot reach
+			//   back into view, and it is still computed from distance and field of view rather than
+			//   by projecting -- so it stays continuous and there is nothing to flicker.
+			const float sizeCullBeyond = 0.25f * maximumDistance;
+
+			if (distance > sizeCullBeyond && distance > 0.01f && tanHalfFov > 0.f)
 			{
 				const float halfWidth = 0.5f * static_cast<float> (Graphics::getCurrentRenderTargetWidth ());
 				const float screenRadius = (radius * halfWidth) / (distance * tanHalfFov);
@@ -395,8 +396,7 @@ float ShadowManager::getSimpleShadowDistance ()
 
 bool ShadowManager::simpleShouldRender (Camera const & camera, Vector const & position_w, float const radius)
 {
-	//-- A blob lies on the ground beneath its caster, so the caster's size is the shadow's size.
-	return ms_enabled && shouldRender (camera, position_w, radius, ShadowManager::getSimpleShadowDistance (), false);
+	return ms_enabled && shouldRender (camera, position_w, radius, ShadowManager::getSimpleShadowDistance ());
 }
 
 // ----------------------------------------------------------------------
@@ -410,8 +410,7 @@ float ShadowManager::getVolumetricShadowDistance ()
 
 bool ShadowManager::volumetricShouldRender (Camera const & camera, Vector const & position_w, float const radius)
 {
-	//-- Extruded: the shadow reaches far beyond the caster, so caster size cannot bound it.
-	return ms_enabled && shouldRender (camera, position_w, radius, ShadowManager::getVolumetricShadowDistance (), true);
+	return ms_enabled && shouldRender (camera, position_w, radius, ShadowManager::getVolumetricShadowDistance ());
 }
 
 // ----------------------------------------------------------------------
