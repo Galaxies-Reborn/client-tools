@@ -29,6 +29,7 @@ BUILD_SCRIPT = REPOSITORY_ROOT / "scripts" / "Build-X64Client.ps1"
 
 EXPECTED_TRE_ORDER = (
     "precu_runtime.tre",
+    "precu_worlds.tre",
     "default_patch.tre",
     "patch_sku1_14_00.tre",
     "patch_14_00.tre",
@@ -118,13 +119,21 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
             r"(?m)^\s*disable\s*=\s*true\s*$",
         )
 
-    def test_live_manifest_is_the_canonical_52_tre_stack(self):
+    def test_live_manifest_is_the_canonical_53_tre_stack(self):
         config = LIVE_CONFIG.read_text(encoding="utf-8")
         trees = tuple(
             re.findall(r"(?m)^\s*searchTree_[^=]+\s*=\s*([^\s#]+)\s*$", config)
         )
         self.assertEqual(trees, EXPECTED_TRE_ORDER)
         self.assertIn("maxSearchPriority=27", config)
+        self.assertRegex(
+            config,
+            r"(?m)^\s*searchTree_00_27=precu_runtime\.tre\s*$",
+        )
+        self.assertRegex(
+            config,
+            r"(?m)^\s*searchTree_00_26=precu_worlds\.tre\s*$",
+        )
         self.assertNotIn("swgsource_3.0.tre", config.lower())
 
     def test_renderer_hard_override_cannot_be_reenabled_by_the_ui(self):
@@ -151,10 +160,15 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
             script,
         )
         self.assertIn('foreach ($relativePath in @("ui\\ui_skill.inc"))', script)
+        self.assertIn(
+            'foreach ($archiveName in @("precu_runtime.tre", "precu_worlds.tre"))',
+            script,
+        )
         self.assertIn("Name='xpbar'", script)
         self.assertIn("@($precuAssetOverrideFiles)", script)
         self.assertIn("runtimeProfile   = $RuntimeProfile", script)
         self.assertIn("precuAssetOverrideCount", script)
+        self.assertIn("precuAssetArchiveCount", script)
 
     def test_client_build_uses_bounded_parallelism(self):
         script = BUILD_SCRIPT.read_text(encoding="utf-8")

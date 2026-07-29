@@ -65,6 +65,7 @@ $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $profileFiles = @()
 $shaderOverrideFiles = @()
 $precuAssetOverrideFiles = @()
+$precuAssetArchiveFiles = @()
 if ($RuntimeProfile -eq "Precu") {
     $profileDirectory = Join-Path $repoRoot "config\precu"
     $profileFiles = @(
@@ -119,6 +120,18 @@ if ($RuntimeProfile -eq "Precu") {
     # Publish 14 layout. In particular, each skill-box wrapper owns an xpbar;
     # leaving this override behind falls back to the retail singleton bar.
     $precuAssetsRoot = Join-Path (Split-Path -Parent $repoRoot) "pre-cu-reborn-assets"
+    foreach ($archiveName in @("precu_runtime.tre", "precu_worlds.tre")) {
+        $sourcePath = Join-Path $precuAssetsRoot $archiveName
+        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+            throw "The generated Pre-CU asset archive is missing: $sourcePath"
+        }
+
+        $precuAssetArchiveFiles += [pscustomobject]@{
+            Source = $sourcePath
+            Name   = $archiveName
+        }
+    }
+
     foreach ($relativePath in @("ui\ui_skill.inc")) {
         $sourcePath = Join-Path $precuAssetsRoot $relativePath
         if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
@@ -246,7 +259,8 @@ if (-not $PSCmdlet.ShouldProcess($clientRootPath, "stage $Configuration x64 game
 }
 
 $stagedSources = @($runtimeFiles) + @($profileFiles) +
-    @($shaderOverrideFiles) + @($precuAssetOverrideFiles)
+    @($shaderOverrideFiles) + @($precuAssetArchiveFiles) +
+    @($precuAssetOverrideFiles)
 
 $backupDirectory = $null
 if (-not $NoBackup) {
@@ -318,9 +332,10 @@ $manifest = [ordered]@{
     sourceBranch     = $gitBranch
     workingTreeDirty = $workingTreeDirty
     clientRoot       = $clientRootPath
-    rootTreCount     = $treFiles.Count
+    rootTreCount     = @(Get-ChildItem -LiteralPath $clientRootPath -Filter "*.tre" -File).Count
     rendererBackend = "Direct3d11 (gl11)"
     shaderOverrideCount = $shaderOverrideFiles.Count
+    precuAssetArchiveCount = $precuAssetArchiveFiles.Count
     precuAssetOverrideCount = $precuAssetOverrideFiles.Count
     inputBackend     = "SDL 3.4.10 multi-device controller input"
     audioBackend     = "JUCE 8.0.14 with WASAPI and WAV/MP3/Ogg decoders"
