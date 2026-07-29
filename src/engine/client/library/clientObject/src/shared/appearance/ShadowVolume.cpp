@@ -43,6 +43,7 @@ namespace ShadowCostReport
 	void noteConstruction();
 	void noteDestruction();
 	void noteRendered(int primitives);
+	void noteStaticScale(float scale);
 }
 #include "sharedObject/Appearance.h"
 #include "sharedMath/Sphere.h"
@@ -416,6 +417,9 @@ void ProxyLocalShaderPrimitive::prepareToDraw () const
 	{
 	case M_extrude:
 		{
+			if (m_shadowVolume.m_primitiveType == ShadowVolume::PT_static)
+				ShadowCostReport::noteStaticScale (m_appearance.getScale ().x);
+
 			Graphics::setObjectToWorldTransformAndScale (m_appearance.getTransform_w (), m_shadowVolume.m_primitiveType == ShadowVolume::PT_static ? m_appearance.getScale () : Vector::xyz111);
 
 			//-- is the object in an interior?
@@ -1891,6 +1895,31 @@ namespace ShadowCostReport
 
 	void noteRendered(int primitives) { ++ms_rendered; ms_submitted += primitives; }
 
+	//-- The scale applied to static shadow primitives.
+	//
+	//   The far cap used to be positioned by translating the world transform, which is unaffected by
+	//   scale. Baking that offset into object-space vertices instead puts it through the scale, so
+	//   the two are only equivalent at scale 1. That is the leading explanation for the doubled
+	//   shadows, and it predicts SOME buildings breaking rather than all of them -- which is not
+	//   what was seen. This says whether the prediction holds before the change is attempted again.
+	int   ms_scaleSamples;
+	int   ms_scaleNonUnit;
+	float ms_scaleMinimum;
+	float ms_scaleMaximum;
+
+	void noteStaticScale(float scale)
+	{
+		if (!ms_scaleSamples || scale < ms_scaleMinimum)
+			ms_scaleMinimum = scale;
+		if (!ms_scaleSamples || scale > ms_scaleMaximum)
+			ms_scaleMaximum = scale;
+
+		++ms_scaleSamples;
+
+		if (scale < 0.999f || scale > 1.001f)
+			++ms_scaleNonUnit;
+	}
+
 	long long nowTicks()
 	{
 		LARGE_INTEGER now;
@@ -1957,6 +1986,12 @@ namespace ShadowCostReport
 			int triangles = 0;
 			int calls = 0;
 			Graphics::getRenderedVerticesPointsLinesTrianglesCalls (vertices, points, lines, triangles, calls);
+
+			WARNING(true, ("ShadowScale: %d of %d static shadow primitive(s) have non-unit scale; range %.3f to %.3f. Non-zero means baking the far-cap offset into object space is wrong for those, which is the doubled-shadow theory.",
+				ms_scaleNonUnit, ms_scaleSamples, ms_scaleMinimum, ms_scaleMaximum));
+
+			ms_scaleSamples = 0;
+			ms_scaleNonUnit = 0;
 
 			WARNING(true, ("ShadowDraws: %.0f volume(s)/s issuing %.0f draw call(s)/s. Frame's total draw calls %d.",
 				static_cast<double>(ms_rendered) / seconds,
