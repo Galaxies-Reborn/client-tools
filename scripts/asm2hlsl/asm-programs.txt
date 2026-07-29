@@ -87,6 +87,7 @@ pixel_program\lerpmask_dirtdodge_mt.psh
 pixel_program\lerpmask_lerp_mt.psh
 pixel_program\lerpmask_lerp_mul_mt.psh
 pixel_program\lerpmask_mt.psh
+pixel_program\membrane.psh
 pixel_program\mt_lerp.psh
 pixel_program\mt_lerp_s.psh
 pixel_program\mt_lerp_tf1.psh

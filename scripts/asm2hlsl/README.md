@@ -23,7 +23,7 @@ python verifyconv.py       # compile every conversion with fxc
 Two of those steps are load-bearing in ways that are easy to get wrong.
 
 **`asm2hlsl_run.py` converts every assembly program, not the reachable subset.** It reads
-`asm-programs.txt` (222 programs), not `asm-reachable.txt` (97). The closure in
+`asm-programs.txt` (224 programs), not `asm-reachable.txt` (97). The closure in
 `reachable2.py` walks the effects a live implementation loads, and five programs the client
 demonstrably asks for are not reachable that way at all: `gradient_sky.vsh` / `.psh`,
 `ui_radar.psh`, `texren_copy_c1a1.psh` and `bad_vertex_shader.psh`. The sky and the texture
@@ -148,21 +148,32 @@ one. The two write disjoint masks, so the pairing carries no semantics worth pre
 
 ## Verification
 
-`verifyconv.py` overlays the conversion on the extracted corpus, applies the same include
-overrides the backend applies, and compiles every output with `fxc` at `vs_4_0` / `ps_4_0`
-with `/Gec` — the exact flags `Direct3d11_ShaderCompiler` uses.
+`verifyconv.py` overlays the conversion on the extracted corpus and compiles every converted
+output with `fxc` at `vs_4_0` / `ps_4_0`. Converted programs carry their generated constant
+and texture-coordinate declarations, so this sweep has no dependency on an untracked helper.
+It uses `/Gec`, the same compatibility flag as `Direct3d11_ShaderCompiler`.
 
-The "all 97 reachable assembly programs compile" result was measured against the
-**pre-`searchTOC`** corpus and has NOT been re-established. The corrected corpus has 99
-reachable assembly programs (37 vertex, 62 pixel), 39 of which are new or changed bytes, and
-`vertex_program/include/functions.inc`, `vertex_shader_constants.inc`, `registers.inc` and
-three `diffuse_specular*.inc` all changed, which affects every compile. Re-run the
-conversion and the compile sweep before trusting any pass rate.
+The full 242-file loose override was compiled on 2026-07-28: all 224 shader programs passed
+(`94` vertex and `130` pixel), alongside 18 generated include/module files. The set contains
+all 223 assembly programs recovered from the clean Publish 14 client plus
+`a_specmap_bump_diffuse.psh` from the clean x64-DX11 base for compatibility with later effect
+references.
 
 Three program names that a live implementation references —
 `pixel_program/lava_ps14.psh`, `vertex_program/lava_ps14.vsh` and
 `vertex_program/lava_static.vsh` — exist in no archive, no `.toc` and no loose file, so they
 cannot be compiled from anything. They are dangling references in the shipped effect data.
 
-Compiling is not the same as being correct. The real gate is a visual comparison against
-`gl05`, which needs the client running.
+Compiling is not the same as being correct. The runtime gate is a live DX11 render with the
+loose override staged above the TRE stack.
+
+The complete Publish 14 set includes three legacy edge cases that the original conversion
+missed: `water_pass2_20.psh` uses `texm3x3vspec`, `water_pass2_25.psh` uses the ps_1_4
+`phase`/`texcrd` sequence, and `membrane.psh` places a descriptive comment before its
+`ps.1.1` marker. The classifier and translator cover all three; generated output must contain
+224 shader programs plus 18 shared include/module files.
+
+The Publish 14 `procedural_clouds.vsh` source also uses the legacy singular
+`cUserConstant` spelling even though `registers.inc` declares the user registers as
+`cUserConstant0` through `cUserConstant7`. The generated constants include aliases that
+singular spelling to slot zero, which is where the cloud opacity is uploaded.

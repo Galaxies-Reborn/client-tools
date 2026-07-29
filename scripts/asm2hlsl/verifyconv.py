@@ -10,22 +10,13 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-
-# fxcsweep rebinds sys.stdout to a UTF-8 wrapper at import, so this file must not wrap it
-# again: the second wrapper would take the first one's buffer, and when the first is
-# collected it closes that buffer out from under the second.
-sys.path.insert(0, HERE)
-import fxcsweep as S  # noqa: E402  (imported for ENGINE_PS_CONSTANTS and split_header)
 
 CORPUS = os.path.join(HERE, "corpus")
 CONVERTED = os.path.join(HERE, "converted")
 WORK = os.path.join(HERE, "convwork")
 FXC = r"C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\fxc.exe"
-
-ENGINE_PS_CONSTANTS_GUARD = "#ifndef D3D11_PIXEL_SHADER_CONSTANTS\n#define D3D11_PIXEL_SHADER_CONSTANTS\n"
 
 
 def psrc(data):
@@ -53,16 +44,6 @@ def main():
             os.makedirs(os.path.dirname(target), exist_ok=True)
             shutil.copyfile(source, target)
 
-    # The same include overrides the backend applies.
-    pinc = os.path.join(root, "pixel_program", "include")
-    open(os.path.join(pinc, "pixel_shader_constants.inc"), "w", encoding="latin-1").write(
-        ENGINE_PS_CONSTANTS_GUARD + S.ENGINE_PS_CONSTANTS + "#endif\n")
-    fpath = os.path.join(pinc, "functions.inc")
-    ftext = open(fpath, encoding="latin-1").read()
-    if "pixel_shader_constants.inc" not in ftext:
-        open(fpath, "w", encoding="latin-1").write(
-            '#include "pixel_program/include/pixel_shader_constants.inc"\n' + ftext)
-
     deep = os.path.join(root, "_c", "_c")
     os.makedirs(deep, exist_ok=True)
 
@@ -83,8 +64,13 @@ def main():
             results["no PSRC"] += 1
             continue
         source = text.decode("latin1", "replace").replace("\x00", "")
+        source = source.replace("\r\n", "\n").replace("\r", "\n")
 
-        lang, _profile, body, tags = S.split_header(source)
+        first, separator, body = source.partition("\n")
+        if not separator or not first.strip().lower().startswith("//hlsl"):
+            results["bad header"] += 1
+            failures.append((rel, "missing //hlsl profile header"))
+            continue
         target = "vs_4_0" if rel.endswith(".vsh") else "ps_4_0"
 
         work = os.path.join(deep, "shader.hlsl")
@@ -93,9 +79,6 @@ def main():
         cmd = [FXC, "/nologo", "/T", target, "/E", "main", "/Gec", "/Zpc", "/O1",
                "/I", root, "/Fo", os.path.join(deep, "out.cso"), "shader.hlsl",
                "/D", "point=_pt_lights"]
-        for name, value in S.texcoord_defines(tags):
-            cmd += ["/D", "%s=%s" % (name, value)]
-
         proc = subprocess.run(cmd, cwd=deep, capture_output=True, text=True, errors="replace")
         if proc.returncode == 0:
             results["compiled"] += 1
@@ -126,6 +109,7 @@ def main():
         with open(os.path.join(HERE, "conv-failures.txt"), "w", encoding="utf-8") as f:
             for rel, message in failures:
                 f.write("%s\t%s\n" % (rel, message))
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

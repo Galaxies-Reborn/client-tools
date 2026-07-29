@@ -25,8 +25,18 @@ def psrc_text(data):
     return data[i + 8:i + 8 + length]
 
 
-def first_line(text):
-    return text.split(b"\n", 1)[0].decode("latin1", "replace").strip()
+def language_line(text):
+    """Return the first language/profile line, allowing old descriptive comments first."""
+    for raw in text.splitlines():
+        line = raw.decode("latin1", "replace").strip()
+        if not line:
+            continue
+        if line.startswith(("//hlsl", "//asm", "ps.", "vs.")):
+            return line
+        if line.startswith("//"):
+            continue
+        return line
+    return ""
 
 
 def main():
@@ -51,7 +61,7 @@ def main():
                         continue
                     text = payload
 
-                line = first_line(text)
+                line = language_line(text)
                 tok = line.split()
                 lang = tok[0] if tok else ""
                 prof = tok[1] if len(tok) > 1 else "?"

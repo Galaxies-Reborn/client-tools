@@ -99,6 +99,11 @@ def build_constants_include():
             T.SCALAR_CONSTANTS.add(name)
         lines.append("#define %-46s %s" % (name, target))
 
+    # Publish 14's procedural_clouds.vsh uses the old singular spelling even though
+    # registers.inc only declares cUserConstant0 through cUserConstant7. The shader uploads
+    # its opacity in user constant slot zero, so preserve the legacy intent explicitly.
+    lines.append("#define %-46s %s" % ("cUserConstant", "cUserConstant0"))
+
     lines.append("")
     lines.append("// The three symbols ILM_visuals.tre's diffuse.inc uses and never defines. They map")
     lines.append("// onto the engine's extendedLightData block at c60..c63, whose HemisphericLightData")
@@ -496,7 +501,7 @@ class Converter(object):
         T.PIXEL_DEFS.clear()
 
         state = {"samplers": set(), "texcoords": set(), "m3x2_u": False,
-                 "cubeStages": self.cube_stages_for(rel)}
+                 "cubeStages": set(self.cube_stages_for(rel))}
         out = []
         nested = []
         if not self.translate_body(rel, text, out, nested, vertex=False, state=state):
@@ -590,7 +595,7 @@ def main():
     # draw. An unconverted vertex program means every draw using it is dropped; an unconverted
     # pixel program means a pass binds no pixel shader at all.
     #
-    # Converting all 222 costs about a minute and cannot be wrong. The reachability analysis is
+    # Converting all 224 costs about a minute and cannot be wrong. The reachability analysis is
     # still worth having -- reachable-programs.txt is how the corpus census is checked -- but it
     # is reporting, not an input to what gets built.
     programs = [l.strip().replace("\\", "/") for l in open(os.path.join(HERE, "asm-programs.txt"), encoding="utf-8") if l.strip()]
@@ -652,6 +657,7 @@ def main():
             seen.setdefault(message.split("[")[0].strip(), []).append(origin)
         for message, origins in sorted(seen.items(), key=lambda kv: -len(kv[1]))[:20]:
             print("   %-70s x%d  e.g. %s" % (message[:70], len(origins), origins[0]))
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

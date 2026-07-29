@@ -433,6 +433,12 @@ def translate_pixel_instruction(op, operands, origin, state):
             op = op[:-len(suffix)]
             break
 
+    if op == "phase":
+        # ps_1_4 used this marker to divide its instruction budget into two phases. HLSL
+        # preserves the instruction order directly. The one program in this corpus that uses
+        # phase does not carry a temporary alpha value across the boundary.
+        return "\t// ps_1_4 phase boundary"
+
     if op == "tex":
         target = operands[0]
         n = int(re.sub(r"\D", "", target.name))
@@ -451,11 +457,33 @@ def translate_pixel_instruction(op, operands, origin, state):
         state["texcoords"].add(n)
         return "\t%s = float4(psInput.texcoord%d.xy, 0.0f, 1.0f);" % (pixel_mapper(target.name, None), n)
 
+    if op == "texcrd":
+        # ps_1_4 copies the source texture-coordinate iterator into a temporary without
+        # sampling. Its fourth component is undefined; use the declared destination mask.
+        target = operands[0]
+        source = operands[1]
+        n = int(re.sub(r"\D", "", source.name))
+        state["texcoords"].add(n)
+        dst, mask = target.destination(pixel_mapper)
+        if mask:
+            mask = PIXEL_MASK_MAP.get(mask, mask)
+        return assign(dst, mask, "psInput.texcoord%d" % n, saturate, scale)
+
     if op == "texld":
         target = operands[0]
         n = int(re.sub(r"\D", "", target.name))
         state["samplers"].add(n)
-        coord = operands[1].value(pixel_mapper)
+        coordinate = operands[1]
+        if re.match(r"^t\d+$", coordinate.name.lower()):
+            coordinateIndex = int(re.sub(r"\D", "", coordinate.name))
+            state["texcoords"].add(coordinateIndex)
+            coord = "psInput.texcoord%d" % coordinateIndex
+            if coordinate.mask:
+                coord += "." + coordinate.mask
+        else:
+            # In ps_1_4 phase two, a texture read may use a temporary populated during phase
+            # one (water_pass2_25 uses r4 for its reflected cube-map direction).
+            coord = coordinate.value(pixel_mapper)
         if n in state.get("cubeStages", ()):
             return "\t%s = texCUBE(pixelSampler%d, (%s).xyz);" % (pixel_mapper(target.name, None), n, coord)
         return "\t%s = tex2D(pixelSampler%d, (%s).xy);" % (pixel_mapper(target.name, None), n, coord)
@@ -484,6 +512,46 @@ def translate_pixel_instruction(op, operands, origin, state):
         return ("\ttexm3x2v = dot(psInput.texcoord%d.xyz, (%s).xyz);\n"
                 "\t%s = tex2D(pixelSampler%d, float2(texm3x2u, texm3x2v));"
                 % (n, operands[1].value(pixel_mapper), pixel_mapper(target.name, None), n))
+
+    if op == "texm3x3pad":
+        # Save one row of the tangent-space normal transform. texm3x3vspec consumes exactly
+        # two pads followed by its own third row.
+        target = operands[0]
+        n = int(re.sub(r"\D", "", target.name))
+        pads = state.setdefault("m3x3Pads", [])
+        if len(pads) >= 2:
+            raise ValueError("texm3x3pad sequence has more than two rows in %s" % origin)
+        axis = "xy"[len(pads)]
+        pads.append(n)
+        state["texcoords"].add(n)
+        declarations = ""
+        if len(pads) == 1:
+            declarations = "\tfloat3 texm3x3Normal = 0.0f;\n\tfloat3 texm3x3Eye = 0.0f;\n"
+        return (declarations +
+                "\ttexm3x3Normal.%s = dot(psInput.texcoord%d.xyz, (%s).xyz);\n"
+                "\ttexm3x3Eye.%s = psInput.texcoord%d.w;"
+                % (axis, n, operands[1].value(pixel_mapper), axis, n))
+
+    if op == "texm3x3vspec":
+        # Microsoft defines the post-transform reflection as
+        # 2 * (dot(N,E) / dot(N,N)) * N - E, with E supplied by the w components of the
+        # three matrix-row texture coordinates. The destination stage is necessarily a cube
+        # or volume lookup; SWG's water effect binds a cube map here.
+        target = operands[0]
+        n = int(re.sub(r"\D", "", target.name))
+        pads = state.get("m3x3Pads", [])
+        if len(pads) != 2:
+            raise ValueError("texm3x3vspec requires two preceding texm3x3pad rows in %s" % origin)
+        state["samplers"].add(n)
+        state["texcoords"].add(n)
+        state["cubeStages"].add(n)
+        return ("\ttexm3x3Normal.z = dot(psInput.texcoord%d.xyz, (%s).xyz);\n"
+                "\ttexm3x3Eye.z = psInput.texcoord%d.w;\n"
+                "\tfloat3 texm3x3Reflection = "
+                "2.0f * (dot(texm3x3Normal, texm3x3Eye) / dot(texm3x3Normal, texm3x3Normal)) "
+                "* texm3x3Normal - texm3x3Eye;\n"
+                "\t%s = texCUBE(pixelSampler%d, texm3x3Reflection);"
+                % (n, operands[1].value(pixel_mapper), n, pixel_mapper(target.name, None), n))
 
     dst, mask = operands[0].destination(pixel_mapper)
     if mask:

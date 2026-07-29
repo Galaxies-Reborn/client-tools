@@ -70,18 +70,11 @@ float4 asmTexcoord(float4 v) { return v; }
 #define cUserConstant5                                 c[57]
 #define cUserConstant6                                 c[58]
 #define cUserConstant7                                 c[59]
-#define cExtLtData_parallelSpec_0_backColor            c[60]
-#define cExtLtData_parallelSpec_0_tangentColor         c[61]
-#define cExtLtData_parallelSpec_0_tangentMinusBack     c[62]
-#define cExtLtData_parallelSpec_0_tangentMinusDiffuse  c[63]
-#define cExtLtData_dot3_0_backColor                    c[64]
-#define cExtLtData_dot3_0_tangentColor                 c[65]
-#define cExtLtData_dot3_0_tangentMinusBack             c[66]
-#define cExtLtData_dot3_0_tangentMinusDiffuse          c[67]
 #define c0_0                                           0.0f
 #define c0_5                                           0.5f
 #define c1_0                                           1.0f
 #define cLog2e                                         1.4426950408889634f
+#define cUserConstant                                  cUserConstant0
 
 // The three symbols ILM_visuals.tre's diffuse.inc uses and never defines. They map
 // onto the engine's extendedLightData block at c60..c63, whose HemisphericLightData

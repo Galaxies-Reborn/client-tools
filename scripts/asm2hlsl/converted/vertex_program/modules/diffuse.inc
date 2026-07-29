@@ -17,11 +17,8 @@
 //  calculate diffuse/specular parallel light 1
 // calculate diffuse and specular lighting
 	r0 = (dot((r10).xyz, (cLightData_parallelSpecular_0_direction).xyz)).xxxx;
-	r7 = cExtLtData_parallelSpec_0_tangentColor + r7;
-	r1 = max(r0, c0_0);
-	r7 = cExtLtData_parallelSpec_0_tangentMinusDiffuse * -(r1.y) + r7;
-	r1 = min(r0, c0_0);
-	r7 = cExtLtData_parallelSpec_0_tangentMinusBack * r1.y + r7;
+	r0 = max(r0, c0_0);
+	r7 = cLightData_parallelSpecular_0_diffuseColor * r0.y + r7;
 // ----------------------------------------------------------------------
 // calculate diffuse parallel light 1
 	r0 = (dot((r10).xyz, (cLightData_parallel_0_direction).xyz)).xxxx;
