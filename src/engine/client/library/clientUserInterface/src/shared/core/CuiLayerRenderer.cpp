@@ -48,6 +48,26 @@ namespace CuiLayerRendereNamespace
 
 	bool                      s_installed;
 	DynamicVertexBuffer *     s_vertexBuffer = 0;
+
+	//-- Why the queue flushed. Each flush is a draw call, and the three reasons need different
+	//   fixes, so counting them decides which fix is worth building.
+	int s_flushShaderChange;
+	int s_flushVertexType;
+	int s_flushBufferFull;
+	int s_flushOther;
+	int s_flushReportFrames;
+
+	void noteFlushReason (bool shaderChange, bool vertexTypeChange, bool bufferFull)
+	{
+		if (bufferFull)
+			++s_flushBufferFull;
+		else if (vertexTypeChange)
+			++s_flushVertexType;
+		else if (shaderChange)
+			++s_flushShaderChange;
+		else
+			++s_flushOther;
+	}
 	VertexBufferWriteIterator s_vertexBufferWriteIterator;
 	int                       s_numberOfVertices;
 	int                       s_maxNumberOfVertices;
@@ -169,8 +189,17 @@ void           CuiLayerRenderer::setZ (real z, real ooz)
 
 void CuiLayerRenderer::render (const Shader * shader, const UIFloatPoint verts [4], const UIFloatPoint UVs [4], const UIColor Colors [4])
 {
-	if (s_vertexType != VIT_quad || (s_curShader && shader != s_curShader || s_numberOfVertices+4 > s_maxNumberOfVertices))
-		flushRenderQueue ();
+	{
+		const bool vertexTypeChange = (s_vertexType != VIT_quad);
+		const bool shaderChange     = (s_curShader && shader != s_curShader);
+		const bool bufferFull       = (s_numberOfVertices + 4 > s_maxNumberOfVertices);
+
+		if (vertexTypeChange || shaderChange || bufferFull)
+		{
+			noteFlushReason (shaderChange, vertexTypeChange, bufferFull);
+			flushRenderQueue ();
+		}
+	}
 
 	if (s_numberOfVertices == 0)
 		lockDynamicVertexBuffer();
@@ -221,8 +250,17 @@ void CuiLayerRenderer::render (const Shader * shader, const UIFloatPoint verts [
 	UNREF (verts);
 	UNREF (UVs);
 
-	if (s_vertexType != VIT_quad || (s_curShader && shader != s_curShader || s_numberOfVertices+4 > s_maxNumberOfVertices))
-		flushRenderQueue ();
+	{
+		const bool vertexTypeChange = (s_vertexType != VIT_quad);
+		const bool shaderChange     = (s_curShader && shader != s_curShader);
+		const bool bufferFull       = (s_numberOfVertices + 4 > s_maxNumberOfVertices);
+
+		if (vertexTypeChange || shaderChange || bufferFull)
+		{
+			noteFlushReason (shaderChange, vertexTypeChange, bufferFull);
+			flushRenderQueue ();
+		}
+	}
 
 	if (s_numberOfVertices == 0)
 		lockDynamicVertexBuffer();
@@ -263,8 +301,17 @@ void CuiLayerRenderer::render (const Shader * shader, const UIFloatPoint verts [
 
 void  CuiLayerRenderer::renderPointsGeneric (int type, const Shader * shader, const int numPoints, const UIFloatPoint * pts,  const UIFloatPoint * uvs, const VectorArgb & color)
 {
-	if (s_vertexType != type || (s_curShader && shader != s_curShader || s_numberOfVertices + numPoints > s_maxNumberOfVertices ))
-		flushRenderQueue ();
+	{
+		const bool vertexTypeChange = (s_vertexType != type);
+		const bool shaderChange     = (s_curShader && shader != s_curShader);
+		const bool bufferFull       = (s_numberOfVertices + numPoints > s_maxNumberOfVertices);
+
+		if (vertexTypeChange || shaderChange || bufferFull)
+		{
+			noteFlushReason (shaderChange, vertexTypeChange, bufferFull);
+			flushRenderQueue ();
+		}
+	}
 
 	if (s_numberOfVertices == 0 && !lockDynamicVertexBuffer(numPoints))
 	{
@@ -540,6 +587,24 @@ void CuiLayerRenderer::flushRenderQueueQuads ()
 {
 	DEBUG_FATAL(!s_vertexBuffer, ("not installed"));
 	DEBUG_FATAL (s_numberOfVertices == 0, ("vertex info is empty\n"));
+
+	//-- Every flush here is a draw call. Report what caused them, because a buffer-full flush is
+	//   fixed by a bigger buffer while a shader-change flush needs an atlas or a draw-order change.
+	if (++s_flushReportFrames >= 600)
+	{
+		const int total = s_flushShaderChange + s_flushVertexType + s_flushBufferFull + s_flushOther;
+
+		WARNING(true, ("UiFlush: %d flush(es) over %d quad flushes; shader change %d, vertex type %d, buffer full %d, other %d. Buffer holds %d vertices.",
+			total, s_flushReportFrames,
+			s_flushShaderChange, s_flushVertexType, s_flushBufferFull, s_flushOther,
+			s_maxNumberOfVertices));
+
+		s_flushShaderChange = 0;
+		s_flushVertexType = 0;
+		s_flushBufferFull = 0;
+		s_flushOther = 0;
+		s_flushReportFrames = 0;
+	}
 
 #if PRODUCTION == 0
 	++s_metrics.quadCallCount;
