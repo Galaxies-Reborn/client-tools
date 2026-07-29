@@ -1793,8 +1793,10 @@ void ShadowVolume::render(Object const * const object, const Appearance *const a
 		NOT_NULL (m_localShaderPrimitiveRenderFrontCapsTwoSided);
 		ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderFrontCapsTwoSided);
 
-		//-- Five primitives on this path, five draw calls.
-		ShadowCostReport::noteRendered (5);
+		//-- Three draw calls: edges, front caps, back caps. The two extrude proxies submitted
+		//   alongside them set the transform and run the extrusion in prepareToDraw; their draw() is
+		//   empty, so counting them here would overstate the draw cost by two thirds.
+		ShadowCostReport::noteRendered (3);
 
 #if SHADOW_EXTRUDE_TO_POINT == 0
 		if (m_localShaderPrimitiveRenderBackCapsTwoSided)
@@ -1826,8 +1828,9 @@ void ShadowVolume::render(Object const * const object, const Appearance *const a
 		NOT_NULL (m_localShaderPrimitiveRenderFrontCapsOneSidedCullCounterClockwise);
 		ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderFrontCapsOneSidedCullCounterClockwise);
 
-		//-- Eight primitives on this path, eight draw calls.
-		ShadowCostReport::noteRendered (8);
+		//-- Six draw calls: two edge passes, two front cap passes, two back cap passes. The two
+		//   extrude proxies draw nothing, as above.
+		ShadowCostReport::noteRendered (6);
 
 #if SHADOW_EXTRUDE_TO_POINT == 0
 		if (m_localShaderPrimitiveRenderBackCapsOneSidedCullClockwise)
@@ -1955,7 +1958,7 @@ namespace ShadowCostReport
 			int calls = 0;
 			Graphics::getRenderedVerticesPointsLinesTrianglesCalls (vertices, points, lines, triangles, calls);
 
-			WARNING(true, ("ShadowDraws: %.0f volume(s)/s submitting %.0f primitive(s)/s. Frame's total draw calls %d.",
+			WARNING(true, ("ShadowDraws: %.0f volume(s)/s issuing %.0f draw call(s)/s. Frame's total draw calls %d.",
 				static_cast<double>(ms_rendered) / seconds,
 				static_cast<double>(ms_submitted) / seconds,
 				calls));
