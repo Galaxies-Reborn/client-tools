@@ -167,7 +167,13 @@ m_serverLoopTimeRequested (false)
 #endif
 
 	if (m_versionText)
-		m_versionText->SetLocalText (Unicode::narrowToWide (version));
+	{
+		//-- The engine version, followed by this fork's build name.
+		char versionBuffer[256];
+		snprintf (versionBuffer, sizeof (versionBuffer), "%s  GalaxiesReborn-V1", version);
+
+		m_versionText->SetLocalText (Unicode::narrowToWide (versionBuffer));
+	}
 
 	//hide server loop time and animtrack stuff in release
 	// NOTE: this Release/x64 build is PRODUCTION==1 (DEBUG_LEVEL=0), so THIS block
