@@ -35,6 +35,14 @@
 #include "sharedObject/ContainedByProperty.h"
 
 #include <map>
+
+// The churn counters are used by the constructor and destructor, which sit above the namespace that
+// defines them.
+namespace ShadowCostReport
+{
+	void noteConstruction();
+	void noteDestruction();
+}
 #include "sharedObject/Appearance.h"
 #include "sharedMath/Sphere.h"
 
@@ -1258,6 +1266,7 @@ ShadowVolume::ShadowVolume (const ShaderType shaderType, const PrimitiveType pri
 	m_shadowPrimitiveList (0),
 	m_metrics ()
 {
+	ShadowCostReport::noteConstruction();
 #ifdef _DEBUG
 	{
 		ms_shadowVolumeList.push_back (this);
@@ -1291,6 +1300,7 @@ ShadowVolume::ShadowVolume (const ShaderType shaderType, const PrimitiveType pri
 
 ShadowVolume::~ShadowVolume ()
 {
+	ShadowCostReport::noteDestruction();
 #ifdef _DEBUG
 
 #if 0
@@ -1853,6 +1863,17 @@ namespace ShadowCostReport
 	int       ms_calls;
 	long long ms_lastReport;
 
+	//-- Churn. A volume built and thrown away as an object crosses in and out of visibility costs
+	//   its whole edge and adjacency build each time, and that cost lands during camera rotation --
+	//   which is exactly when the frame drop was reported. Large and roughly equal counts mean
+	//   churn; near-zero counts with a steady live count mean the flicker is elsewhere.
+	int       ms_constructions;
+	int       ms_destructions;
+	int       ms_live;
+
+	void noteConstruction()  { ++ms_constructions; ++ms_live; }
+	void noteDestruction()   { ++ms_destructions; --ms_live; }
+
 	long long nowTicks()
 	{
 		LARGE_INTEGER now;
@@ -1902,6 +1923,14 @@ namespace ShadowCostReport
 
 		WARNING(true, ("ShadowCost: %.1f ms/s in ShadowVolume::extrudeShadowVolume, %.1f%% of one core; %.0f calls/s.",
 			perSecond, perSecond / 10.0, static_cast<double>(ms_calls) / seconds));
+
+		WARNING(true, ("ShadowChurn: %d live volume(s); %.0f built/s, %.0f destroyed/s. Large and roughly equal means volumes are being rebuilt as objects cross visibility, which is what makes rotation expensive.",
+			ms_live,
+			static_cast<double>(ms_constructions) / seconds,
+			static_cast<double>(ms_destructions) / seconds));
+
+		ms_constructions = 0;
+		ms_destructions = 0;
 
 		ms_ticks = 0;
 		ms_calls = 0;
