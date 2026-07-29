@@ -108,7 +108,10 @@ public:
 	//
 	// applyEpilogue only applies to the pixel side, and exists so the alpha test and fog blend land
 	// in the wrapper rather than being injected into the original body.
-	static char *wrapVertexProgram(char const *name, char const *source, int length, int &resultLength);
+	// skinned injects a skinning prologue ahead of the shipped program and adds BLENDINDICES0 and
+	// BLENDWEIGHT0 parameters to the generated entry point. A program is compiled both ways: doing
+	// it unconditionally would oblige every vertex buffer in the game to carry bone data.
+	static char *wrapVertexProgram(char const *name, char const *source, int length, int &resultLength, bool skinned = false);
 	static char *wrapPixelProgram(char const *name, char const *source, int length, int &resultLength);
 
 private:

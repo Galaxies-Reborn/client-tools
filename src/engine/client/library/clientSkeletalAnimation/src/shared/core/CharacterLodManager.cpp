@@ -17,6 +17,7 @@
 #include "sharedObject/ObjectWatcherList.h"
 #include "sharedUtility/LocalMachineOptionManager.h"
 
+#include <algorithm>
 #include <map>
 
 // ======================================================================
@@ -204,6 +205,17 @@ void CharacterLodManager::planNextFrame(Vector const &cameraPosition_w)
 	s_characters.removeAll(false);
 
 	//-- Assign SkeletalAppearance2 LOD indices by proximity to camera.
+	//
+	//   Scaled by the character detail slider. These are rank budgets, not distances: with the
+	//   shipped firstLodCount of 2.5 the two nearest characters get LOD 0 and the third is forced
+	//   down however close it is, so in a crowd this decides the result no matter what the
+	//   screen-fraction thresholds say. Without scaling it here, raising the slider would visibly do
+	//   nothing in exactly the places it matters most.
+	float const detailBias = std::max(1.0f, SkeletalAppearance2::getDetailLevelBias());
+
+	int const everyOtherFrameCount = static_cast<int>(static_cast<float>(s_everyOtherFrameSkinningCharacterCount) * detailBias);
+	int const hardSkinningCount    = static_cast<int>(static_cast<float>(s_hardSkinningCharacterCount) * detailBias);
+
 	int  currentAssignedLodIndex = s_firstAssignableLodIndex;
 	int  assignedCount           = 0;
 
@@ -221,11 +233,11 @@ void CharacterLodManager::planNextFrame(Vector const &cameraPosition_w)
 
 			//-- Assign the lod index for this appearance.
 			appearance->setPlannedLodIndex(std::min(currentAssignedLodIndex, appearance->getDetailLevelCount() - 1));
-			appearance->setEveryOtherFrameSkinningEnabled(assignedCount >= s_everyOtherFrameSkinningCharacterCount);
-			appearance->setForceHardSkinningEnabled(assignedCount >= s_hardSkinningCharacterCount);
+			appearance->setEveryOtherFrameSkinningEnabled(assignedCount >= everyOtherFrameCount);
+			appearance->setForceHardSkinningEnabled(assignedCount >= hardSkinningCount);
 
 			//-- Transition to next lod index assignment as necessary.
-			if ((currentAssignedLodIndex < cs_characterLodSumEntryCount) && (assignedCount >= s_characterLodSumTable[currentAssignedLodIndex]))
+			if ((currentAssignedLodIndex < cs_characterLodSumEntryCount) && (static_cast<float>(assignedCount) >= (s_characterLodSumTable[currentAssignedLodIndex] * detailBias)))
 				++currentAssignedLodIndex;
 		}
 	}

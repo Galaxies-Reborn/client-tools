@@ -62,7 +62,11 @@ public:
 		VERTEX_GLOBALS_SLOT   = 0,
 		PIXEL_GLOBALS_SLOT    = 0,
 		PIXEL_EPILOGUE_SLOT   = 1,
-		PER_OBJECT_SLOT       = 3
+		PER_OBJECT_SLOT       = 3,
+
+		// b4 rather than the free-looking b2: the note above records b2 as a prior effort's
+		// convention, and stepping around it costs nothing.
+		SKINNING_BONES_SLOT   = 4
 	};
 
 public:
@@ -107,6 +111,21 @@ public:
 	// multiplies by one; without them every blended layer fogs with the scene colour and those
 	// contributions stack, which is what made distant multi-pass terrain patchy.
 	static void  setFogColorMode(int fogMode);
+
+	// A skinned primitive's bone matrices, as 3x4 rows -- the fourth row of an affine transform is
+	// constant and the shader reconstructs it. Its own buffer rather than the shared register file,
+	// which is 96 rows and shared with DX9 while 59 bones needs 177.
+	static void  setBoneMatrices(float const *rows, int boneCount);
+
+	// The per-vertex bone stream for the next skinned draw: four indices then four normalised
+	// weights, eight bytes a vertex, in this backend's own layout rather than one the engine
+	// describes. Returns the input slot it was bound to, or -1.
+	//
+	// Uploaded per draw rather than held static per mesh. That is still a large reduction -- eight
+	// bytes a vertex against the thirty-plus of skinned position and normal it replaces -- and it
+	// avoids caching GPU buffers against engine pointers that can be freed and reused. Making it
+	// static is a later refinement, not a correctness question.
+	static int   setBoneStream(void const *data, int vertexCount);
 	static void  setCurrentTime(float currentTime);
 
 	// The alpha test, which D3D11 has no state for at all. The code injected into every

@@ -44,6 +44,13 @@ public:
 	// clears the shadow unconditionally, which is what a device ClearState needs.
 	static void forgetIndexBuffer(void *buffer);
 
+	// GPU skinning. armBoneStream records the input slot a bone stream was uploaded to for the
+	// coming draw, or -1 to disarm; the material asks isBoneStreamArmed before binding a skinned
+	// program, and reports back through setCurrentDrawSkinned so the input layout matches.
+	static void armBoneStream(int stream);
+	static bool isBoneStreamArmed();
+	static void setCurrentDrawSkinned(bool skinned);
+
 	// Recorded by the static shader data when it binds a vertex shader, and
 	// consumed at draw time to resolve an input layout. DX9 could pick its vertex
 	// declaration when the buffer was bound, because a declaration depends only on

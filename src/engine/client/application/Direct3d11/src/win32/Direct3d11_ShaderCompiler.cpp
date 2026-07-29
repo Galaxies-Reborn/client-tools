@@ -58,9 +58,12 @@ namespace Direct3d11_ShaderCompilerNamespace
 
 	IncludeHandler  ms_includeHandler;
 
-	ID3DBlob       *compile(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target);
+	// mayFail marks a compile whose failure is a fallback rather than an error: the skinned
+	// variant. Without it a program the skinning injection cannot handle takes the client down
+	// instead of quietly skinning on the CPU.
+	ID3DBlob       *compile(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool mayFail = false);
 	bool            refuseIfNotHlsl(char const *source, int sourceLength, char const *name);
-	ID3DBlob       *compilePatched(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool isVertexProgram);
+	ID3DBlob       *compilePatched(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool isVertexProgram, bool skinned = false);
 	void            reportCompilerVersion();
 }
 using namespace Direct3d11_ShaderCompilerNamespace;
@@ -321,7 +324,7 @@ void Direct3d11_ShaderCompiler::flushIncludeCache()
  * reading it.
  */
 
-ID3DBlob *Direct3d11_ShaderCompilerNamespace::compile(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target)
+ID3DBlob *Direct3d11_ShaderCompilerNamespace::compile(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool mayFail)
 {
 	NOT_NULL(source);
 	NOT_NULL(name);
@@ -410,11 +413,18 @@ ID3DBlob *Direct3d11_ShaderCompilerNamespace::compile(char const *source, int so
 			}
 		}
 
+		if (mayFail)
+		{
+			WARNING(true, ("Direct3d11: the optional variant of '%s' failed to compile as %s (%s). That material will skin on the CPU. %s", name, target, Direct3d11_Device::describeHresult(hresult), detail));
+		}
+		else
+		{
 #if PRODUCTION == 0
-		FATAL(true, ("Direct3d11: '%s' failed to compile as %s (%s):\n%s", name, target, Direct3d11_Device::describeHresult(hresult), detail));
+			FATAL(true, ("Direct3d11: '%s' failed to compile as %s (%s):\n%s", name, target, Direct3d11_Device::describeHresult(hresult), detail));
 #else
-		WARNING(true, ("Direct3d11: '%s' failed to compile as %s (%s): %s", name, target, Direct3d11_Device::describeHresult(hresult), detail));
+			WARNING(true, ("Direct3d11: '%s' failed to compile as %s (%s): %s", name, target, Direct3d11_Device::describeHresult(hresult), detail));
 #endif
+		}
 
 		if (errors)
 			errors->Release();
@@ -463,7 +473,7 @@ bool Direct3d11_ShaderCompilerNamespace::refuseIfNotHlsl(char const *source, int
 
 // ----------------------------------------------------------------------
 
-ID3DBlob *Direct3d11_ShaderCompilerNamespace::compilePatched(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool isVertexProgram)
+ID3DBlob *Direct3d11_ShaderCompilerNamespace::compilePatched(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, char const *target, bool isVertexProgram, bool skinned)
 {
 	NOT_NULL(source);
 
@@ -486,10 +496,17 @@ ID3DBlob *Direct3d11_ShaderCompilerNamespace::compilePatched(char const *source,
 	// validates below on the untouched PSRC chunk.
 
 	int patchedLength = 0;
-	char * const patched = Direct3d11_ShaderSource::patchProgramSource(name, source, sourceLength, isVertexProgram, patchedLength);
+	char * const patched = Direct3d11_ShaderSource::patchProgramSource(name, source, sourceLength, isVertexProgram, patchedLength, skinned);
+
+	//-- A failed patch must not fall through to the original text when a skinned variant was asked
+	//   for. That would hand back a program with no bone inputs which the draw path then treats as
+	//   skinned, binding bone data and a skinned input layout against a program declaring neither --
+	//   silently wrong geometry rather than a fallback.
+	if (skinned && !patched)
+		return NULL;
 
 	ID3DBlob * const bytecode = patched
-		? compile(patched, patchedLength, name, macros, target)
+		? compile(patched, patchedLength, name, macros, target, skinned)
 		: compile(source, sourceLength, name, macros, target);
 
 	delete [] patched;
@@ -498,11 +515,11 @@ ID3DBlob *Direct3d11_ShaderCompilerNamespace::compilePatched(char const *source,
 
 // ----------------------------------------------------------------------
 
-ID3DBlob *Direct3d11_ShaderCompiler::compileVertexShader(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros)
+ID3DBlob *Direct3d11_ShaderCompiler::compileVertexShader(char const *source, int sourceLength, char const *name, D3D_SHADER_MACRO const *macros, bool skinned)
 {
 	// No language check: the text has already had its marker stripped by parseHeader, which is
 	// also what validated it. Testing here would reject every vertex program. See compilePatched.
-	return compilePatched(source, sourceLength, name, macros, cms_vertexShaderTarget, true);
+	return compilePatched(source, sourceLength, name, macros, cms_vertexShaderTarget, true, skinned);
 }
 
 // ----------------------------------------------------------------------

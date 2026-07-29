@@ -96,6 +96,20 @@ void ConfigClientGraphics::install (const Defaults &defaults)
 
 	KEY_BOOL(validateShaderImplementations,       true);
 	KEY_BOOL(screenShotBackBuffer,                false);
+	// Multi-stream skinned vertex buffers. Off, as shipped.
+	//
+	// Turning this on is what unblocks GPU skinning -- every primitive is otherwise rejected as
+	// single-stream, which held that path at exactly zero -- and it would also stop the whole vertex
+	// being copied into the dynamic ring every frame when only position and normal change.
+	//
+	// But enabling it produced severe geometry corruption: distorted objects, bouncing terrain,
+	// wobbling buildings. That is scene-wide, and skeletal meshes are the only thing this flag is
+	// supposed to reach, so switching it on disturbs something shared rather than only the skinned
+	// path. Whatever that is has to be found before the flag is worth anything.
+	//
+	// Not a regression of a working feature: multi-stream has never run in this client. The DX11
+	// backend reports stream offsets supported and more than one stream, so the capability is
+	// claimed -- and the corruption says the claim is not matched by the code behind it somewhere.
 	KEY_BOOL(disableMultiStreamVertexBuffers,     true);
 	KEY_BOOL(nPatchTest,                          false);
 	KEY_BOOL(disableOcclusionCulling,             false);

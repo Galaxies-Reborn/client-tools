@@ -64,7 +64,14 @@ public:
 	// repeat per draw. The result is what getInputLayout wants as signatureHash.
 	static uint32              hashVertexShaderSignature(void const *vertexShaderBytecode, unsigned int vertexShaderBytecodeSize);
 
-	static ID3D11InputLayout  *getInputLayout(uint32 const *formatFlags, int streamCount, void const *vertexShaderBytecode, unsigned int vertexShaderBytecodeSize, uint32 signatureHash, int const *textureCoordinateSetMapping, int mappingCount);
+	// boneStream is the input slot carrying GPU skinning data, or -1 for an unskinned draw. That
+	// stream is this backend's own layout rather than one the engine describes: BLENDINDICES0 as
+	// four bytes then BLENDWEIGHT0 as four normalised bytes, eight bytes a vertex. Weights at
+	// 1/255 are far finer than skinning needs, and the whole stream stays inside one cache line
+	// pair for four vertices.
+	enum { BONE_STREAM_STRIDE = 8, BONE_INDICES_OFFSET = 0, BONE_WEIGHTS_OFFSET = 4 };
+
+	static ID3D11InputLayout  *getInputLayout(uint32 const *formatFlags, int streamCount, void const *vertexShaderBytecode, unsigned int vertexShaderBytecodeSize, uint32 signatureHash, int const *textureCoordinateSetMapping, int mappingCount, int boneStream = -1);
 
 	static int                 getLayoutCount();
 

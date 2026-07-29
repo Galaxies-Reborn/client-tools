@@ -1200,7 +1200,7 @@ char *Direct3d11_ShaderSource::patchIncludeContents(char const *path, char const
  * searches: the diffuse floor, then the vertex register strip.
  */
 
-char *Direct3d11_ShaderSource::patchProgramSource(char const *name, char const *source, int length, bool isVertexProgram, int &patchedLength)
+char *Direct3d11_ShaderSource::patchProgramSource(char const *name, char const *source, int length, bool isVertexProgram, int &patchedLength, bool skinned)
 {
 	NOT_NULL(source);
 
@@ -1364,7 +1364,7 @@ char *Direct3d11_ShaderSource::patchProgramSource(char const *name, char const *
 
 		if (isVertexProgram)
 		{
-			wrapped = Direct3d11_ShaderSignature::wrapVertexProgram(name, scanSource, currentLength, wrappedLength);
+			wrapped = Direct3d11_ShaderSignature::wrapVertexProgram(name, scanSource, currentLength, wrappedLength, skinned);
 		}
 		else
 		{

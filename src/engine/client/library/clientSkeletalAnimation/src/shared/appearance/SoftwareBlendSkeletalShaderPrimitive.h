@@ -148,6 +148,35 @@ private:
 	SourceVertex           *m_sourceVectors;
 	Dot3Vector             *m_sourceDot3Vectors;
 	TransformData          *m_transformData;
+
+	// GPU skinning, built once per primitive rather than per frame.
+	//
+	// Four influences a vertex: indices then weights, one byte each, eight bytes a vertex. The
+	// engine allows six and measurement put five or six on 0.44% of vertices, so this keeps the four
+	// largest and renormalises. 59 bones is the measured worst case, which fits a byte with room.
+	//
+	// Null until built, and only built when GPU skinning is asked for.
+	mutable uint8          *m_gpuBoneData;
+
+	// Built once, on first use, when GPU skinning is enabled.
+	void                    buildGpuBoneData() const;
+
+	// Push the bones and bind the bind-pose geometry, so the vertex program blends rather than the
+	// CPU. False means this primitive is not eligible or the backend would not take it, and the
+	// caller must skin on the CPU.
+	bool                    tryGpuSkin(int transformCount, const PoseModelTransform *transformArray) const;
+
+	// The bind pose, uploaded once rather than rewritten every frame. Built on the first draw that
+	// takes the GPU path, because most primitives never take it and this would otherwise cost VRAM
+	// on every character in the world.
+	//
+	// Kept alongside the CPU path's buffers rather than replacing them: whether a primitive is GPU
+	// skinned is decided per frame, so a character that starts casting a shadow returns to the CPU
+	// path mid-flight and both have to stay valid.
+	mutable StaticVertexBuffer *m_bindPoseStream;
+	mutable VertexBufferVector *m_gpuVertexBufferVector;
+
+	bool                    buildBindPoseStream() const;
 	//-----------------------------------------------
 
 	mutable ShadowVolume   *m_shadowVolume;

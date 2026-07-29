@@ -519,7 +519,10 @@ void GroundScene::setCameraFarPlane (const float farPlane)
 	if (Game::isSpace())
 		return;
 
-	ShadowManager::setVolumetricShadowDistanceLevel ((farPlane - 512.f) / (2048.f - 512.f));
+	// Mapped across the terrain draw distance slider's actual range of 1024 to 4096. The 512 to
+	// 2048 it was written against is not that range, so every far plane at or above 2048 clamped
+	// to the same ceiling and the top three quarters of the slider did nothing here.
+	ShadowManager::setVolumetricShadowDistanceLevel ((farPlane - 1024.f) / (4096.f - 1024.f));
 
 	GroundScene* const groundScene = dynamic_cast<GroundScene*> (Game::getScene ());
 	if (groundScene)
@@ -540,7 +543,10 @@ void GroundScene::setCameraFarPlaneSpace(const float farPlane)
 	if (!Game::isSpace())
 		return;
 
-	ShadowManager::setVolumetricShadowDistanceLevel ((farPlane - 512.f) / (2048.f - 512.f));
+	// Mapped across the terrain draw distance slider's actual range of 1024 to 4096. The 512 to
+	// 2048 it was written against is not that range, so every far plane at or above 2048 clamped
+	// to the same ceiling and the top three quarters of the slider did nothing here.
+	ShadowManager::setVolumetricShadowDistanceLevel ((farPlane - 1024.f) / (4096.f - 1024.f));
 
 	GroundScene* const groundScene = dynamic_cast<GroundScene*> (Game::getScene ());
 	if (groundScene)

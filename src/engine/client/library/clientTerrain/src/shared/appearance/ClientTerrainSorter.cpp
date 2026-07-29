@@ -33,7 +33,21 @@
 
 //===================================================================
 
-static const int MAXIMUM_VERTEXBUFFER_SIZE = 256 * 1024;
+// Terrain batches split when the accumulated vertex data would exceed this. At 256 KB the sorter
+// produced around 24 draws a frame for a single terrain material, and draw attribution put terrain
+// at roughly 9% of the frame -- so the cap, not the geometry, was deciding the draw count.
+//
+// One megabyte, which is four times the batches and roughly a quarter of the draws.
+static const int MAXIMUM_VERTEXBUFFER_SIZE = 1024 * 1024;
+
+// The limit that actually matters, and which nothing enforced. Index is unsigned short, so a batch
+// cannot address more than 65536 vertices -- and the byte cap alone does not bound the vertex count,
+// it bounds bytes. At a small enough vertex size 256 KB sat exactly on that boundary and the
+// indices written in prepareToDraw would have wrapped silently.
+//
+// 32768 keeps a full factor of two in hand against the index type, and stays well inside what a
+// dynamic vertex buffer will lock in one call.
+static const int MAXIMUM_VERTEXBUFFER_VERTICES = 32768;
 static const int s_maximumNumberOfTextureCoordinates = 4 + 1;
 
 //===================================================================
@@ -607,7 +621,8 @@ void ClientTerrainSorter::queue (const Shader* shader, const ClientProceduralTer
 	{
 		PrimitiveNode* const primitiveNode = (*primitiveNodeList) [i];
 
-		if (primitiveNode->vertexBufferSize + vertexBufferSize < MAXIMUM_VERTEXBUFFER_SIZE)
+		if (primitiveNode->vertexBufferSize + vertexBufferSize < MAXIMUM_VERTEXBUFFER_SIZE
+			&& primitiveNode->numberOfVertices + numberOfVertices < MAXIMUM_VERTEXBUFFER_VERTICES)
 		{
 			primitiveNode->primitiveList->push_back (primitive);
 			primitiveNode->vertexBufferSize += vertexBufferSize;

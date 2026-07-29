@@ -38,6 +38,255 @@
 #include "sharedDebug/Profiler.h"
 #include "sharedFoundation/ExitChain.h"
 #include "sharedFoundation/MemoryBlockManager.h"
+#include "sharedFoundation/ConfigFile.h"
+
+// ======================================================================
+// Graphics Reborn step 1: what does software skinning actually cost?
+//
+// Measured around prepareToDraw, which runs per primitive per frame and builds the skinned
+// vertex data. Not calculateSkinnedGeometryNow: that is a virtual on ShaderPrimitive with no
+// caller on the normal path -- only TextureRendererShaderPrimitive forwards to it -- so timing
+// it reported nothing at all.
+//
+// 6.4 MB a frame through the dynamic vertex ring says a lot of geometry is CPU-built. It does not
+// say how many milliseconds that costs, and milliseconds decide whether GPU skinning is worth its
+// risk. So measure before moving anything.
+//
+// Reported as a rate rather than per frame: the scene that matters is a crowded one, and the
+// question is what share of a second's CPU budget this takes. Milliseconds per second and vertices
+// per second together give a per-vertex cost that extrapolates.
+//
+// Gated behind ClientGame/reportGpuOffloadCandidates, default false.
+// ======================================================================
+
+namespace GpuSkinning
+{
+	bool ms_enabled;
+	bool ms_checkedConfig;
+
+	// Off until asked for. Turning it off is also how a regression gets bisected in a running
+	// client rather than by rebuilding.
+	bool enabled()
+	{
+		if (!ms_checkedConfig)
+		{
+			ms_checkedConfig = true;
+			ms_enabled = ConfigFile::getKeyBool("ClientSkeletalAnimation", "gpuSkinning", false);
+		}
+
+		return ms_enabled;
+	}
+
+	int const cms_maximumBones = 64;    // matches the backend's bone constant buffer
+	int const cms_influencesPerVertex = 4;
+	int const cms_bytesPerVertex = 8;   // four indices then four weights, a byte each
+}
+
+namespace SkinningCostReport
+{
+	bool      ms_enabled;
+	bool      ms_checkedConfig;
+	long long ms_ticks;
+	long long ms_vertices;
+	int       ms_calls;
+	long long ms_lastReport;
+
+	long long nowTicks()
+	{
+		LARGE_INTEGER now;
+		return QueryPerformanceCounter(&now) ? now.QuadPart : 0;
+	}
+
+	long long frequency()
+	{
+		LARGE_INTEGER f;
+		return QueryPerformanceFrequency(&f) ? f.QuadPart : 0;
+	}
+
+	bool enabled()
+	{
+		if (!ms_checkedConfig)
+		{
+			ms_checkedConfig = true;
+			ms_enabled = ConfigFile::getKeyBool("ClientGame", "reportGpuOffloadCandidates", false);
+		}
+
+		return ms_enabled;
+	}
+
+	// The two numbers that decide a GPU skinning vertex format: how many bones influence a single
+	// vertex, and how many bones a skeleton has. SWG stores influences as one plus a variable
+	// count, so a fixed four is an assumption until the shipped data is checked. Weights beyond the
+	// fourth are usually negligible and clamping is standard practice -- but "usually" is not a
+	// measurement, and the histogram says whether clamping to four would touch anything real.
+	int  ms_influenceHistogram[9];   // 1..8 influences, index 0 unused, last bucket is "8 or more"
+	int  ms_maximumInfluences;
+	int  ms_maximumSkeletonTransforms;
+
+	// How much of the skinning cost GPU skinning can actually recover.
+	//
+	// Skeletal shadow volumes are fed m_systemStream, which is the CPU-skinned buffer, so a
+	// character that casts a volumetric shadow needs its skinned positions in CPU memory whatever
+	// the GPU does. For those, GPU skinning removes only the copy to the dynamic buffer. Only
+	// primitives that skip the shadow path can drop the transform entirely.
+	int  ms_shadowCastingPrimitives;
+	int  ms_totalPrimitives;
+
+	void noteShadowPath(bool castsShadow)
+	{
+		++ms_totalPrimitives;
+		if (castsShadow)
+			++ms_shadowCastingPrimitives;
+	}
+
+	int ms_gpuSkinnedPrimitives;
+
+	// Why the GPU path declined. An aggregate "0%" cannot be acted on: it reads the same whether the
+	// switch is off, the vertex buffers are single-stream, or the backend refused.
+	enum GpuReject
+	{
+		GR_switchOff,
+		GR_shadowed,
+		GR_singleStream,
+		GR_dot3,
+		GR_notSoftSkinning,
+		GR_tooManyBones,
+		GR_noSourceData,
+		GR_backendRefused,
+		GR_count
+	};
+
+	int ms_gpuRejects[GR_count];
+
+	char const *rejectName(int reason)
+	{
+		switch (reason)
+		{
+			case GR_switchOff:       return "switch off";
+			case GR_shadowed:        return "casts a shadow";
+			case GR_singleStream:    return "single-stream";
+			case GR_dot3:            return "dot3";
+			case GR_notSoftSkinning: return "hard/no skinning";
+			case GR_tooManyBones:    return "too many bones";
+			case GR_noSourceData:    return "no source data";
+			case GR_backendRefused:  return "backend refused";
+			default:                 return "?";
+		}
+	}
+
+	void noteGpuReject(int reason)
+	{
+		if (reason >= 0 && reason < GR_count)
+			++ms_gpuRejects[reason];
+	}
+
+	void noteGpuPath(bool gpuSkinned)
+	{
+		if (gpuSkinned)
+			++ms_gpuSkinnedPrimitives;
+	}
+
+	void noteVertexFormat(int influences, int skeletonTransforms)
+	{
+		if (influences > ms_maximumInfluences)
+			ms_maximumInfluences = influences;
+
+		if (skeletonTransforms > ms_maximumSkeletonTransforms)
+			ms_maximumSkeletonTransforms = skeletonTransforms;
+
+		int const bucket = (influences < 1) ? 1 : ((influences > 8) ? 8 : influences);
+		++ms_influenceHistogram[bucket];
+	}
+
+	void report(long long ticks, int vertices)
+	{
+		ms_ticks += ticks;
+		ms_vertices += vertices;
+		++ms_calls;
+
+		long long const f = frequency();
+		long long const now = nowTicks();
+		if (!f || !now)
+			return;
+
+		if (!ms_lastReport)
+		{
+			ms_lastReport = now;
+			return;
+		}
+
+		long long const sinceReport = now - ms_lastReport;
+		if (sinceReport < f * 5)
+			return;
+
+		double const seconds = static_cast<double>(sinceReport) / static_cast<double>(f);
+		double const milliseconds = static_cast<double>(ms_ticks) * 1000.0 / static_cast<double>(f);
+		double const perSecond = milliseconds / seconds;
+
+		WARNING(true, ("SkinningCost: %.1f ms/s in SoftwareBlendSkeletalShaderPrimitive::prepareToDraw, %.1f%% of one core; %.0f vertices/s over %.0f calls/s.",
+			perSecond, perSecond / 10.0,
+			static_cast<double>(ms_vertices) / seconds,
+			static_cast<double>(ms_calls) / seconds));
+
+		WARNING(true, ("SkinningRecoverable: %d of %d skinned primitive(s) cast a volumetric shadow and so still need CPU-skinned positions; %.0f%% could drop the CPU transform entirely.",
+			ms_shadowCastingPrimitives, ms_totalPrimitives,
+			ms_totalPrimitives ? (100.0 * static_cast<double>(ms_totalPrimitives - ms_shadowCastingPrimitives) / static_cast<double>(ms_totalPrimitives)) : 0.0));
+
+		// Without this the ms/s above cannot be attributed: a small improvement looks identical
+		// whether the GPU path ran on most primitives or hardly engaged.
+		WARNING(true, ("SkinningGpu: %d of %d skinned primitive(s) blended on the GPU (%.0f%%).",
+			ms_gpuSkinnedPrimitives, ms_totalPrimitives,
+			ms_totalPrimitives ? (100.0 * static_cast<double>(ms_gpuSkinnedPrimitives) / static_cast<double>(ms_totalPrimitives)) : 0.0));
+
+		//-- Which test did the rejecting. Without this a zero share names no suspect.
+		{
+			char reasons[512];
+			reasons[0] = '\0';
+
+			for (int r = 0; r < GR_count; ++r)
+			{
+				if (!ms_gpuRejects[r])
+					continue;
+
+				char one[96];
+				snprintf(one, sizeof(one), "%s%s %d", reasons[0] ? ", " : "", rejectName(r), ms_gpuRejects[r]);
+				strncat(reasons, one, sizeof(reasons) - strlen(reasons) - 1);
+
+				ms_gpuRejects[r] = 0;
+			}
+
+			WARNING(true, ("SkinningGpuRejects: %s.", reasons[0] ? reasons : "none"));
+		}
+
+		ms_shadowCastingPrimitives = 0;
+		ms_totalPrimitives = 0;
+		ms_gpuSkinnedPrimitives = 0;
+
+		WARNING(true, ("SkinningFormat: at most %d influence(s) on a vertex and %d transform(s) in a skeleton. Influence histogram 1..8+: %d %d %d %d %d %d %d %d.",
+			ms_maximumInfluences, ms_maximumSkeletonTransforms,
+			ms_influenceHistogram[1], ms_influenceHistogram[2], ms_influenceHistogram[3], ms_influenceHistogram[4],
+			ms_influenceHistogram[5], ms_influenceHistogram[6], ms_influenceHistogram[7], ms_influenceHistogram[8]));
+
+		ms_ticks = 0;
+		ms_vertices = 0;
+		ms_calls = 0;
+		ms_lastReport = now;
+	}
+
+	// Scope guard, so the measurement cannot be left unclosed by an early return.
+	class Scope
+	{
+	public:
+		explicit Scope(int vertices) : m_vertices(vertices), m_start(enabled() ? nowTicks() : 0) {}
+		~Scope() { if (m_start) report(nowTicks() - m_start, m_vertices); }
+	private:
+		Scope(Scope const &);
+		Scope &operator =(Scope const &);
+		int       m_vertices;
+		long long m_start;
+	};
+}
+
 #include "sharedFoundation/Os.h"
 #include "sharedFoundation/PointerDeleter.h"
 #include "sharedFoundation/VoidMemberFunction.h"
@@ -375,6 +624,9 @@ SoftwareBlendSkeletalShaderPrimitive::SoftwareBlendSkeletalShaderPrimitive(class
 	m_sourceVectors(0),
 	m_sourceDot3Vectors(0),
 	m_transformData(0),
+	m_gpuBoneData(0),
+	m_bindPoseStream(0),
+	m_gpuVertexBufferVector(0),
 	m_shadowVolume(0),
 	m_skinningMode(SM_softSkinning),
 	m_hasBeenSkinned(false),
@@ -415,6 +667,16 @@ SoftwareBlendSkeletalShaderPrimitive::~SoftwareBlendSkeletalShaderPrimitive()
 
 	std::for_each(m_renderCommands->begin(), m_renderCommands->end(), PointerDeleter());
 	delete m_renderCommands;
+
+	delete [] m_gpuBoneData;
+	m_gpuBoneData = 0;
+
+	//-- The vector first: it refers to the buffer.
+	delete m_gpuVertexBufferVector;
+	m_gpuVertexBufferVector = 0;
+
+	delete m_bindPoseStream;
+	m_bindPoseStream = 0;
 
 	delete m_shadowVolume;
 	m_shadowVolume = 0;
@@ -457,9 +719,260 @@ const StaticShader &SoftwareBlendSkeletalShaderPrimitive::prepareToView() const
 
 // ----------------------------------------------------------------------
 
+// ======================================================================
+/**
+ * Build the per-vertex bone data GPU skinning needs, once.
+ *
+ * The engine stores influences as a first transform plus a variable number of extras, and the GPU
+ * format carries four. Measurement over about 218 million vertices put five or six influences on
+ * 0.44% of them and none above six, so this keeps the four largest and renormalises: the dropped
+ * weight is small but not always zero, and without renormalising those vertices would be pulled
+ * toward the origin instead of staying on the surface.
+ *
+ * Indices and weights are a byte each. The largest skeleton measured is 59 transforms, which fits a
+ * byte with room, and 1/255 on a weight is far finer than skinning needs.
+ */
+
+void SoftwareBlendSkeletalShaderPrimitive::buildGpuBoneData() const
+{
+	if (m_gpuBoneData || !m_sourceVectors || m_vertexCount <= 0)
+		return;
+
+	m_gpuBoneData = new uint8[static_cast<size_t>(m_vertexCount) * GpuSkinning::cms_bytesPerVertex];
+
+	TransformData const *extra = m_transformData;
+
+	for (int i = 0; i < m_vertexCount; ++i)
+	{
+		SourceVertex const &sourceVertex = m_sourceVectors[i];
+
+		int indices[8];
+		float weights[8];
+		int count = 0;
+
+		indices[count] = sourceVertex.m_firstTransformData.m_transformIndex;
+		weights[count] = static_cast<float>(sourceVertex.m_firstTransformData.m_transformWeight);
+		++count;
+
+		for (int j = 0; j < sourceVertex.m_extraTransformDataCount && count < 8; ++j)
+		{
+			indices[count] = extra[j].m_transformIndex;
+			weights[count] = static_cast<float>(extra[j].m_transformWeight);
+			++count;
+		}
+
+		extra += sourceVertex.m_extraTransformDataCount;
+
+		// Keep the four largest by weight: a partial selection sort over at most eight entries,
+		// which runs once per vertex for the life of the primitive.
+		for (int slot = 0; slot < GpuSkinning::cms_influencesPerVertex && slot < count; ++slot)
+		{
+			int best = slot;
+			for (int j = slot + 1; j < count; ++j)
+				if (weights[j] > weights[best])
+					best = j;
+
+			if (best != slot)
+			{
+				float const weight = weights[slot];
+				int const index = indices[slot];
+				weights[slot] = weights[best];
+				indices[slot] = indices[best];
+				weights[best] = weight;
+				indices[best] = index;
+			}
+		}
+
+		int const kept = (count < GpuSkinning::cms_influencesPerVertex) ? count : GpuSkinning::cms_influencesPerVertex;
+
+		float total = 0.f;
+		for (int j = 0; j < kept; ++j)
+			total += weights[j];
+
+		uint8 * const destination = m_gpuBoneData + static_cast<size_t>(i) * GpuSkinning::cms_bytesPerVertex;
+
+		for (int j = 0; j < GpuSkinning::cms_influencesPerVertex; ++j)
+		{
+			bool const present = (j < kept) && (total > 0.f);
+
+			// An absent influence points at bone 0 with weight 0, so the shader's unrolled loop runs
+			// all four without a branch and the empty ones contribute nothing.
+			destination[j] = present ? static_cast<uint8>(indices[j]) : static_cast<uint8>(0);
+
+			float const normalised = present ? (weights[j] / total) : 0.f;
+			int const quantised = static_cast<int>((normalised * 255.f) + 0.5f);
+			destination[GpuSkinning::cms_influencesPerVertex + j] = static_cast<uint8>((quantised < 0) ? 0 : ((quantised > 255) ? 255 : quantised));
+		}
+	}
+}
+
+// ----------------------------------------------------------------------
+
+/**
+ * Skin on the GPU if this primitive can be, leaving the dynamic stream holding the bind pose.
+ *
+ * Bone rows are 3x4 and row-major. PoseModelTransform stores column-major, so writing them out is a
+ * transpose; the fourth row of an affine transform is constant and the shader supplies it rather
+ * than the buffer carrying it.
+ *
+ * Every rejection here is a fallback to the CPU path, not a failure. Whether that path still runs is
+ * the caller's decision, so this must not leave the stream half written -- which is why the backend
+ * is asked for the bones before the stream is touched.
+ */
+
+/**
+ * Upload the bind pose once, and build the vertex buffer vector that draws it.
+ *
+ * The pose does not change for the life of the primitive, so writing it into the dynamic ring every
+ * frame was 24 bytes a vertex of pointless memcpy. Lazy because most primitives fall back to the CPU
+ * path and never need this at all.
+ */
+
+bool SoftwareBlendSkeletalShaderPrimitive::buildBindPoseStream() const
+{
+	if (m_gpuVertexBufferVector)
+		return true;
+
+	if (!m_staticStream || !m_dynamicStream || !m_sourceVectors || (m_vertexCount <= 0))
+		return false;
+
+	//-- Same format as the dynamic stream it replaces, so the input layout is unchanged.
+	m_bindPoseStream = new StaticVertexBuffer(m_dynamicStream->getFormat(), m_vertexCount);
+
+	m_bindPoseStream->lock();
+	{
+		VertexBufferWriteIterator iterator = m_bindPoseStream->begin();
+
+		for (int i = 0; i < m_vertexCount; ++i, ++iterator)
+		{
+			const SourceVertex &sourceVertex = m_sourceVectors[i];
+
+			iterator.setPosition(sourceVertex.m_position);
+			iterator.setNormal(sourceVertex.m_normal);
+		}
+	}
+	m_bindPoseStream->unlock();
+
+	m_gpuVertexBufferVector = new VertexBufferVector(*m_staticStream, *m_bindPoseStream);
+
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
+bool SoftwareBlendSkeletalShaderPrimitive::tryGpuSkin(int transformCount, const PoseModelTransform *transformArray) const
+{
+	if (!GpuSkinning::enabled())
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_switchOff);
+		return false;
+	}
+
+	// Multi-stream only. Otherwise the dynamic stream also carries the colour and texture coordinates
+	// that the system stream holds, and rewriting it with bind pose alone would drop them.
+	if (!ms_useMultiStreamVertexBuffers)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_singleStream);
+		return false;
+	}
+
+	// A dot3 tangent frame is skinned alongside position and normal, and the injected prologue does
+	// not carry a tangent yet.
+	if (m_hasDot3Vector)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_dot3);
+		return false;
+	}
+
+	if (m_skinningMode != SM_softSkinning)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_notSoftSkinning);
+		return false;
+	}
+
+	if (transformCount > GpuSkinning::cms_maximumBones)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_tooManyBones);
+		return false;
+	}
+
+	if (!m_sourceVectors || (m_vertexCount <= 0) || !transformArray || (transformCount <= 0))
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_noSourceData);
+		return false;
+	}
+
+	buildGpuBoneData();
+	if (!m_gpuBoneData)
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_noSourceData);
+		return false;
+	}
+
+	if (!buildBindPoseStream())
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_noSourceData);
+		return false;
+	}
+
+	float rows[GpuSkinning::cms_maximumBones * 3 * 4];
+	{
+		float *destination = rows;
+
+		for (int bone = 0; bone < transformCount; ++bone)
+		{
+			const PoseModelTransform &transform = transformArray[bone];
+
+			for (int row = 0; row < 3; ++row)
+			{
+				*destination++ = transform.matrix[0][row];
+				*destination++ = transform.matrix[1][row];
+				*destination++ = transform.matrix[2][row];
+				*destination++ = transform.matrix[3][row];
+			}
+		}
+	}
+
+	//-- Ask the backend before writing anything, so a refusal leaves the stream untouched for the
+	//   CPU path to fill.
+	if (!Graphics::setBoneMatrices(rows, transformCount))
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_backendRefused);
+		return false;
+	}
+
+	if (!Graphics::setBoneVertexData(m_gpuBoneData, m_vertexCount))
+	{
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_backendRefused);
+		return false;
+	}
+
+	//-- Nothing else to write. The bind pose is already on the card and the vertex program blends
+	//   it, so this path touches no per-frame geometry at all.
+	m_hasBeenSkinned = true;
+
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
 void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 {
 	NOT_NULL(m_dynamicStream);
+
+	SkinningCostReport::Scope const skinningCost(m_vertexCount);
+
+	// Sample the vertex influence counts once per call rather than per vertex: this walks the source
+	// vertices only to characterise the data for a GPU vertex format, and doing it per vertex on
+	// every primitive every frame would cost more than the thing being measured.
+	if (SkinningCostReport::enabled() && m_sourceVectors && m_vertexCount > 0)
+	{
+		int const skeletonTransforms = m_appearance.getSkeleton(m_lodIndex).getTransformCount();
+		int const sampleStride = (m_vertexCount > 64) ? (m_vertexCount / 64) : 1;
+
+		for (int i = 0; i < m_vertexCount; i += sampleStride)
+			SkinningCostReport::noteVertexFormat(1 + m_sourceVectors[i].m_extraTransformDataCount, skeletonTransforms);
+	}
 
 	NP_PROFILER_AUTO_BLOCK_DEFINE("SoftwareBlendSkeletalShaderPrimitive::prepareToDraw");
 
@@ -474,9 +987,38 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 	const int                 transformCount = skeleton.getTransformCount();
 	const PoseModelTransform *transformArray = skeleton.getBindPoseModelToRootTransforms();
 
+	//-- Does this primitive cast a volumetric shadow this frame? Decided before skinning rather than
+	//   after, because the shadow volume is handed m_systemStream and only the CPU path fills it: a
+	//   shadowed character has to skin on the CPU whatever the GPU could do.
+	const bool castsVolumetricShadow =
+		   ShadowManager::getEnabled()
+		&& ShadowManager::getAllowed()
+		&& ShadowManager::getSkeletalShadowsVolumetric()
+		&& ShadowVolume::getEnabled()
+		&& m_shader->getShaderTemplate().castsShadows()
+		&& (m_appearance.getFadeState() == SkeletalAppearance2::FS_notFading)
+		&& (m_appearance.getHologramType() == SkeletalAppearance2::HT_none)
+		&& !m_appearance.getIsBlueGlowie()
+		&& !m_appearance.getIsHolonet();
+
+	bool gpuSkinned = false;
+	if (castsVolumetricShadow)
+		SkinningCostReport::noteGpuReject(SkinningCostReport::GR_shadowed);
+	else
+		gpuSkinned = tryGpuSkin(transformCount, transformArray);
+
+	SkinningCostReport::noteGpuPath(gpuSkinned);
+
 	//-- Setup which vertex buffers will be used for rendering and compute vertex buffer data.
-	if (ms_useMultiStreamVertexBuffers)
+	if (gpuSkinned)
 	{
+		// Nothing to do: tryGpuSkin filled the dynamic stream and armed the bone data.
+	}
+	else if (ms_useMultiStreamVertexBuffers)
+	{
+		//-- Disarm, so this draw cannot pick up whatever the last skinned primitive left behind.
+		IGNORE_RETURN(Graphics::setBoneVertexData(NULL, 0));
+
 		// STATE: Using multi streaming.
 
 		// Perform skinning on the system vertex buffer.  Collision and shadows require CPU
@@ -494,6 +1036,8 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 	else
 	{
 		// STATE: Not using multi streaming.
+		IGNORE_RETURN(Graphics::setBoneVertexData(NULL, 0));
+
 		// @todo -TRF- look at this: the following code path should not be legal.
 		if (!m_systemStream)
 		{
@@ -533,17 +1077,10 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 	}
 
 	//-- set the vb and ib to the shadow system
-	if (ShadowManager::getEnabled() 
-		&& ShadowManager::getAllowed() 
-		&& ShadowManager::getSkeletalShadowsVolumetric() 
-		&& ShadowVolume::getEnabled() 
-		&& m_shader->getShaderTemplate().castsShadows() 
-		&& (m_appearance.getFadeState() == SkeletalAppearance2::FS_notFading)
-		&& (m_appearance.getHologramType() == SkeletalAppearance2::HT_none)
-		&& !m_appearance.getIsBlueGlowie()
-		&& !m_appearance.getIsHolonet()
-		)
+	if (castsVolumetricShadow)
 	{
+		SkinningCostReport::noteShadowPath(true);
+
 		//-- Create shadow volume.
 		if (!m_shadowVolume)
 			m_shadowVolume = new ShadowVolume(m_shader->usesVertexShader () ? ShadowVolume::ST_vertexShader : ShadowVolume::ST_fixedFunction, ShadowVolume::PT_animating, m_appearance.getAppearanceTemplate()->getName());
@@ -553,6 +1090,8 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 	}
 	else
 	{
+		SkinningCostReport::noteShadowPath(false);
+
 		if (m_shadowVolume)
 		{
 			delete m_shadowVolume;
@@ -560,8 +1099,9 @@ void SoftwareBlendSkeletalShaderPrimitive::prepareToDraw() const
 		}
 	}
 
-	// Set the vertex buffer(s).
-	Graphics::setVertexBuffer(*m_vertexBufferVector);
+	// Set the vertex buffer(s). The GPU path draws the static bind pose; the CPU path draws the
+	// dynamic stream it just filled.
+	Graphics::setVertexBuffer(gpuSkinned ? *m_gpuVertexBufferVector : *m_vertexBufferVector);
 
 	// Set the index buffer.
 	NOT_NULL(m_indexBuffer);
