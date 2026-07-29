@@ -89,6 +89,7 @@ private:
 	CuiWidget3dObjectListViewer * m_paperDollViewer;
 	CreatureObject * m_paperDoll;
 	UITextbox * m_costTextBox;
+	UICheckbox * m_doStatMigration;
 	UIText * m_offeredMoney;
 	UICheckbox * m_holoEmoteBeehiveCheck;
 	UICheckbox * m_holoEmoteBrainstormCheck;

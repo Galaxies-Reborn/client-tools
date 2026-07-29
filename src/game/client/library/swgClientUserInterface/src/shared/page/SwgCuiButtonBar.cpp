@@ -18,13 +18,11 @@
 #include "UIPage.h"
 #include "UIPopupMenu.h"
 #include "clientGame/ClientCommandQueue.h"
-#include "clientGame/ClientExpertiseManager.h"
 #include "clientGame/ConfigClientGame.h"
 #include "clientGame/ContainerInterface.h"
 #include "clientGame/CreatureObject.h"
 #include "clientGame/Game.h"
 #include "clientGame/PlayerObject.h"
-#include "clientGame/RoadmapManager.h"
 #include "clientGraphics/ConfigClientGraphics.h"
 #include "clientUserInterface/CuiManager.h"
 #include "clientUserInterface/CuiMessageBox.h"
@@ -59,6 +57,22 @@ namespace SwgCuiButtonBarNamespace
 	// also for some reason these numbers need to be 2 less than the actual number of menu items, thanks SOE
 	const int NORMAL_NUMBER_BUTTONS_SPACE = 16;
 	const int NORMAL_NUMBER_BUTTONS_GROUND = 14;
+
+	void hideNgeProgressionButton(UIButton * const button)
+	{
+		if (!button)
+			return;
+
+		button->SetEnabled(false);
+		button->SetVisible(false);
+
+		UIWidget * const parent = button->GetParentWidget();
+		if (parent)
+		{
+			parent->SetEnabled(false);
+			parent->SetVisible(false);
+		}
+	}
 
 	void onConfirmGoHomeClosed(const CuiMessageBox & box);
 
@@ -176,11 +190,9 @@ m_opacityCallback      (0)
 	getCodeDataObject (TUIPage,       m_menuButtonPage,          "bigMenuPage");
 	getCodeDataObject (TUIPage,       m_mouseoverPage,           "mouseover");
 
-	// Null-guard every registerMediatorObject - the NGE-retail ButtonBar
-	// page omits many of these post-NGE additions (Community/Mail/Journal/
-	// Map/Datapad/Character/Expertise/Options/Commands/Submenu/
-	// MyCollections/Appearance/QuestBuilder/GCW etc.); without guards
-	// the constructor AVs in registerMediatorObject's first member access.
+	// Publish 14 exposes only its effect-managed buttons through CodeData.
+	// Its other command buttons remain direct cmdname children under vs, while
+	// the later flyout fields are absent.  Guard every optional mediator object.
 	if (m_communityButton)      registerMediatorObject (*m_communityButton,      true);
 	if (m_mailButton)           registerMediatorObject (*m_mailButton,           true);
 	if (m_inventoryButton)      registerMediatorObject (*m_inventoryButton,      true);
@@ -265,6 +277,12 @@ SwgCuiButtonBar::~SwgCuiButtonBar                ()
 
 void  SwgCuiButtonBar::performActivate()
 {
+	// Publish 14 uses the Skills window and four-by-four profession trees.
+	// Keep the later XML objects as CodeData compatibility anchors, but never
+	// expose or enable their Roadmap/Expertise affordances.
+	hideNgeProgressionButton(m_roadmapButton);
+	hideNgeProgressionButton(m_expertiseButton);
+
 	if (m_menuButtonPage)
 		m_menuButtonPage->SetOpacity(CuiPreferences::getCommandButtonOpacity());
 	if (m_opacityCallback)
@@ -319,9 +337,6 @@ void SwgCuiButtonBar::update (float deltaTimeSecs)
 {
 	CuiMediator::update (deltaTimeSecs);
 
-	if (!m_menuButtonPage || !m_buttonsComposite)
-		return;
-
 	updateExpertiseEffector();
 
 	updateJournalEffector();
@@ -339,7 +354,7 @@ void SwgCuiButtonBar::update (float deltaTimeSecs)
 			m_menuButton->Press();
 	}
 
-	if (m_buttonsComposite->IsVisible())
+	if (m_buttonsComposite && m_buttonsComposite->IsVisible())
 	{
 		UIPage * const parent = dynamic_cast<UIPage *>(getPage ().GetParent ());
 
@@ -582,7 +597,7 @@ bool SwgCuiButtonBar::OnMessage (UIWidget * context, const UIMessage & msg)
 			{
 				return true;
 			}
-			if(!m_buttonsComposite->IsVisible())
+			if(!m_buttonsComposite || !m_buttonsComposite->IsVisible())
 				return true;
 			if (msg.Type == UIMessage::LeftMouseDown)
 				return false;
@@ -619,8 +634,7 @@ bool SwgCuiButtonBar::OnMessage (UIWidget * context, const UIMessage & msg)
 
 void SwgCuiButtonBar::toggleMenu()
 {
-	// Bail out entirely if the post-NGE-retail UI doesn't have the
-	// composite/page widgets the SOE menu expects.
+	// Bail out when the Publish 14 direct command bar has no later flyout.
 	if (!m_buttonsComposite || !m_menuButtonPage || !m_mouseoverPage || !m_menuButton)
 		return;
 
@@ -641,43 +655,11 @@ void SwgCuiButtonBar::toggleMenu()
 		m_buttonsComposite->SetVisible(true);
 		m_mouseoverPage->SetVisible(true);
 
-		//Only show the roadmap and expertise options if the correct conditions are met.
+		// Roadmap and Expertise are NGE presentation. Keep their inherited
+		// objects hidden even when a later-era profile or stale keymap remains.
 		m_numberButtons = Game::isHudSceneTypeSpace() ? NORMAL_NUMBER_BUTTONS_SPACE : NORMAL_NUMBER_BUTTONS_GROUND;
-
-		if(RoadmapManager::playerIsNewCharacter())
-		{
-			if (m_expertiseButton && m_expertiseButton->GetParentWidget())
-				m_expertiseButton->GetParentWidget()->SetVisible(false);
-			if (m_roadmapButton && m_roadmapButton->GetParentWidget())
-				m_roadmapButton->GetParentWidget()->SetVisible(false);
-		}
-		else
-		{
-			if(m_roadmapButton && m_roadmapButton->GetParentWidget())
-			{
-				if (RoadmapManager::playerIsOnRoadmap())
-				{
-					m_roadmapButton->GetParentWidget()->SetVisible(true);
-					++m_numberButtons;
-				}
-				else
-				{
-					m_roadmapButton->GetParentWidget()->SetVisible(false);
-				}
-			}
-			if(m_expertiseButton && m_expertiseButton->GetParentWidget())
-			{
-				if (ClientExpertiseManager::hasExpertiseTrees() && ClientExpertiseManager::getExpertisePointsTotalForPlayer() > 0)
-				{
-					m_expertiseButton->GetParentWidget()->SetVisible(true);
-					++m_numberButtons;
-				}
-				else
-				{
-					m_expertiseButton->GetParentWidget()->SetVisible(false);
-				}
-			}
-		}
+		hideNgeProgressionButton(m_roadmapButton);
+		hideNgeProgressionButton(m_expertiseButton);
 
 		m_buttonsComposite->Pack();
 		m_buttonsComposite->Pack();
@@ -827,28 +809,11 @@ void SwgCuiButtonBar::updateJournalEffector()
 
 void SwgCuiButtonBar::updateExpertiseEffector()
 {
-	if (!m_buttonsComposite || !m_expertiseButton || !m_effectorExpertise)
-		return;
-	if(!m_buttonsComposite->IsVisible())
-		return;
+	if (m_effectingExpertise && m_expertiseButton && m_effectorExpertise)
+		m_expertiseButton->CancelEffector(*m_effectorExpertise);
 
-	// @todo: connect to onSkillsChanged and onLevelChanged callbacks in order to set this on demand (as in SwgCuiExpertise)
-	if (ClientExpertiseManager::getExpertisePointsRemainingForPlayer() > 0)
-	{
-		if(!m_effectingExpertise)
-		{
-			m_effectingExpertise = true;
-			m_expertiseButton->ExecuteEffector(*m_effectorExpertise);
-		}
-	}
-	else
-	{
-		if(m_effectingExpertise)
-		{
-			m_effectingExpertise = false;
-			m_expertiseButton->CancelEffector(*m_effectorExpertise);
-		}
-	}
+	m_effectingExpertise = false;
+	hideNgeProgressionButton(m_expertiseButton);
 }
 
 //----------------------------------------------------------------------
@@ -910,7 +875,8 @@ void SwgCuiButtonBarNamespace::onConfirmGoHomeClosed(const CuiMessageBox & box)
 
 void SwgCuiButtonBar::onOpacityCallback()
 {
-	m_menuButtonPage->SetOpacity(CuiPreferences::getCommandButtonOpacity());
+	if (m_menuButtonPage)
+		m_menuButtonPage->SetOpacity(CuiPreferences::getCommandButtonOpacity());
 }
 
 //======================================================================

@@ -443,6 +443,14 @@ bool ClientCommandChecks::doesWeaponInvalidateCommand(Command const * command, C
 
 // ----------------------------------------------------------------------
 
+int ClientCommandChecks::getCurrentWeaponTypeForDiagnostics(CreatureObject const * creature)
+{
+	WeaponObject const * const weapon = creature ? creature->getCurrentWeapon() : 0;
+	return weapon ? static_cast<int>(weapon->getWeaponType()) : -1;
+}
+
+// ----------------------------------------------------------------------
+
 bool ClientCommandChecks::canDoBeneficialCommandOnTarget(CreatureObject const * const targetCreature)
 {
 	if (targetCreature && !targetCreature->isAttackable() && targetCreature->canHelp())

@@ -1147,8 +1147,20 @@ void Game::runGameLoopOnce(bool presentToWindow, HWND hwnd, int width, int heigh
 		// never matches Os::getWindow(). Bypass the foreground check when the
 		// config sets ClientGame::runWithoutFocus (which the headless agent
 		// pins in its client.cfg). The real client still gates on focus.
+		bool const runWithoutFocus =
+			ConfigFile::getKeyBool("ClientGame", "runWithoutFocus", false);
+		bool const backgroundInputBridge =
+			ConfigFile::getKeyBool("SwgClient", "enableBackgroundInputBridge", false);
+		static bool loggedBackgroundSchedulerState = false;
+		if (!loggedBackgroundSchedulerState && backgroundInputBridge)
+		{
+			loggedBackgroundSchedulerState = true;
+			REPORT_LOG(true, ("Pre-CU background scheduler enabled (runWithoutFocus=%d)\n",
+				runWithoutFocus ? 1 : 0));
+		}
 		if (GetActiveWindow() == Os::getWindow() ||
-		    ConfigFile::getKeyBool("ClientGame", "runWithoutFocus", false))
+		    runWithoutFocus ||
+		    backgroundInputBridge)
 		{
 			NP_PROFILER_NAMED_AUTO_BLOCK_TRANSFER(profilerMainLoop, "GameScheduler update");
 			GameScheduler::alter(elapsedTime);

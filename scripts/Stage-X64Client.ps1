@@ -6,6 +6,9 @@ param(
     [ValidateSet("Release", "Optimized", "Debug")]
     [string]$Configuration = "Release",
 
+    [ValidateSet("None", "Precu")]
+    [string]$RuntimeProfile = "None",
+
     [switch]$NoBackup
 )
 
@@ -44,7 +47,29 @@ if (-not (Test-Path -LiteralPath $ClientRoot -PathType Container)) {
 $clientRootPath = (Resolve-Path -LiteralPath $ClientRoot).Path
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 
-if (-not (Test-Path -LiteralPath (Join-Path $clientRootPath "client.cfg") -PathType Leaf)) {
+$profileFiles = @()
+if ($RuntimeProfile -eq "Precu") {
+    $profileDirectory = Join-Path $repoRoot "config\precu"
+    $profileFiles = @(
+        "client.cfg",
+        "precu_login.cfg",
+        "precu_live.cfg",
+        "precu_preload.cfg",
+        "options.cfg"
+    ) | ForEach-Object {
+        [pscustomobject]@{
+            Source = Join-Path $profileDirectory $_
+            Name   = $_
+        }
+    }
+
+    foreach ($file in $profileFiles) {
+        if (-not (Test-Path -LiteralPath $file.Source -PathType Leaf)) {
+            throw "Pre-CU runtime profile file is missing: $($file.Source)"
+        }
+    }
+}
+elseif (-not (Test-Path -LiteralPath (Join-Path $clientRootPath "client.cfg") -PathType Leaf)) {
     throw "ClientRoot does not contain client.cfg: $clientRootPath"
 }
 
@@ -159,10 +184,12 @@ if (-not $PSCmdlet.ShouldProcess($clientRootPath, "stage $Configuration x64 game
     return
 }
 
+$stagedSources = @($runtimeFiles) + @($profileFiles)
+
 $backupDirectory = $null
 if (-not $NoBackup) {
     $existingTargets = @(
-        $runtimeFiles |
+        $stagedSources |
             ForEach-Object { Join-Path $clientRootPath $_.Name } |
             Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
     )
@@ -196,12 +223,16 @@ foreach ($file in $runtimeFiles) {
     Copy-Item -LiteralPath $file.Source -Destination (Join-Path $clientRootPath $file.Name) -Force
 }
 
+foreach ($file in $profileFiles) {
+    Copy-Item -LiteralPath $file.Source -Destination (Join-Path $clientRootPath $file.Name) -Force
+}
+
 $gitCommit = (& git -C $repoRoot rev-parse HEAD).Trim()
 $gitBranch = (& git -C $repoRoot branch --show-current).Trim()
 $workingTreeDirty = @(& git -C $repoRoot status --porcelain).Count -gt 0
 
 $stagedFiles = @(
-    $runtimeFiles | ForEach-Object {
+    $stagedSources | ForEach-Object {
         $destination = Join-Path $clientRootPath $_.Name
         [ordered]@{
             name   = $_.Name
@@ -216,6 +247,7 @@ $manifest = [ordered]@{
     generatedAtUtc   = [DateTime]::UtcNow.ToString("o")
     configuration    = $Configuration
     platform         = "x64"
+    runtimeProfile   = $RuntimeProfile
     sourceRepository = $repoRoot
     sourceCommit     = $gitCommit
     sourceBranch     = $gitBranch
@@ -234,7 +266,7 @@ $json = $manifest | ConvertTo-Json -Depth 5
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
 [IO.File]::WriteAllText((Join-Path $clientRootPath "x64-runtime-manifest.json"), $json + [Environment]::NewLine, $utf8NoBom)
 
-Write-Host "Staged $($runtimeFiles.Count) x64 runtime files to $clientRootPath"
+Write-Host "Staged $($stagedSources.Count) x64 runtime/profile files to $clientRootPath"
 if ($backupDirectory) {
     Write-Host "Previous runtime files were backed up to $backupDirectory"
 }

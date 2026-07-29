@@ -14,6 +14,7 @@
 #include "sharedCompression/SetupSharedCompression.h"
 #include "sharedCompression/Compressor.h"
 #include "sharedCompression/Lz77.h"
+#include "sharedCompression/ZlibCompressor.h"
 #include "sharedFile/TreeFile_SearchNode.h"
 #include "sharedFoundation/CommandLine.h"
 #include "sharedFoundation/Crc.h"
@@ -36,6 +37,11 @@ const Tag TAG_TREE = TAG(T,R,E,E);
 extern int main(int argc, char **argv);
 static void run(void);
 static void usage(void);
+#if defined(_WIN64)
+static bool parseWin64Options(const char *&responseFileName, const char *&outputFileName, bool &showHelp);
+static int applicationArgc;
+static char **applicationArgv;
+#endif
 
 // ======================================================================
 // command line stuff
@@ -101,6 +107,11 @@ static std::vector<std::string> warnings;
 
 int main(int argc, char **argv)
 {
+#if defined(_WIN64)
+	applicationArgc = argc;
+	applicationArgv = argv;
+#endif
+
 	//-- thread
 	SetupSharedThread::install();
 
@@ -150,6 +161,20 @@ public:
 
 static void run(void)
 {
+#if defined(_WIN64)
+	const char *responseFileName = NULL;
+	const char *outputFileName = NULL;
+	bool showHelp = false;
+	if (!parseWin64Options(responseFileName, outputFileName, showHelp))
+	{
+		if (!showHelp)
+			printf("Invalid command line specified.  Printing usage...\n");
+		usage();
+		if (!showHelp)
+			++errors;
+		return;
+	}
+#else
 	// handle options
 	const CommandLine::MatchCode mc = CommandLine::parseOptions(optionSpecArray, optionSpecCount);
 
@@ -177,14 +202,23 @@ static void run(void)
 		disableCreation = true;
 
 	quiet = CommandLine::getOccurrenceCount(SNAME_QUIET);
+#endif
 
 	// a valid set of command line options has been specified
+#if defined(_WIN64)
+	TreeFileBuilder t(outputFileName);
+#else
 	TreeFileBuilder t(CommandLine::getUntaggedString(0));
+#endif
 
 	if (errors)
 		return;
 
+#if defined(_WIN64)
+	t.addResponseFile(responseFileName);
+#else
 	t.addResponseFile(CommandLine::getOptionString(SNAME_RSP_FILE));
+#endif
 
 	if (errors)
 		return;
@@ -211,6 +245,71 @@ static void run(void)
 			printf ("  %s", warnings [i].c_str ());
 	}
 }
+
+// ----------------------------------------------------------------------
+
+#if defined(_WIN64)
+static bool parseWin64Options(const char *&responseFileName, const char *&outputFileName, bool &showHelp)
+{
+	for (int i = 1; i < applicationArgc; ++i)
+	{
+		const char *argument = applicationArgv[i];
+
+		if (!strcmp(argument, "-h") || !strcmp(argument, "--help"))
+		{
+			showHelp = true;
+			return false;
+		}
+		else if (!strcmp(argument, "-q") || !strcmp(argument, "--quiet"))
+			++quiet;
+		else if (!strcmp(argument, "-t") || !strcmp(argument, "--noTOCCompression"))
+			disableTOCCompression = true;
+		else if (!strcmp(argument, "-f") || !strcmp(argument, "--noFileCompression"))
+			disableFileCompression = true;
+		else if (!strcmp(argument, "-c") || !strcmp(argument, "--noCreate"))
+			disableCreation = true;
+		else if (!strncmp(argument, "-r=", 3))
+			responseFileName = argument + 3;
+		else if (!strncmp(argument, "--responseFile=", 15))
+			responseFileName = argument + 15;
+		else if (!strcmp(argument, "-r") || !strcmp(argument, "--responseFile"))
+		{
+			if (++i >= applicationArgc)
+			{
+				fprintf(stderr, "Missing response-file argument after %s\n", argument);
+				return false;
+			}
+			responseFileName = applicationArgv[i];
+		}
+		else if (argument[0] == '-')
+		{
+			fprintf(stderr, "Unknown option %s\n", argument);
+			return false;
+		}
+		else if (!outputFileName)
+			outputFileName = argument;
+		else
+		{
+			fprintf(stderr, "Multiple output tree files specified\n");
+			return false;
+		}
+	}
+
+	if (!responseFileName || !*responseFileName)
+	{
+		fprintf(stderr, "A response file is required\n");
+		return false;
+	}
+
+	if (!outputFileName || !*outputFileName)
+	{
+		fprintf(stderr, "An output tree file is required\n");
+		return false;
+	}
+
+	return true;
+}
+#endif
 
 // ----------------------------------------------------------------------
 
@@ -697,10 +796,14 @@ void TreeFileBuilder::compressAndWrite(const byte *uncompressed, int &sizeOfData
 			byte *newBuffer = new byte[newBufferLength];
 
 			// try the compressor on this data
-			Compressor *compressor = TreeFile::SearchTree::borrowCompressor(compressorType);
-			int size = compressor->compress(uncompressed, uncompressedSize, newBuffer, newBufferLength);
-			TreeFile::SearchTree::returnCompressor(compressorType, compressor);
-			compressor = NULL;
+			Compressor *compressorInstance = new ZlibCompressor();
+			int size = compressorInstance->compress(
+				uncompressed,
+				uncompressedSize,
+				newBuffer,
+				newBufferLength);
+			delete compressorInstance;
+			compressorInstance = NULL;
 
 			if (size < smallestSize)
 			{

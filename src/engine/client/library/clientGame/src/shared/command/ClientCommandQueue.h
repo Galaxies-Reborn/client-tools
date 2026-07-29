@@ -75,9 +75,12 @@ public:
 	static uint32           enqueueCommand (Command const &command, NetworkId const &targetId, Unicode::String const &params);
 	static uint32           enqueueCommand (uint32 commandHash, NetworkId const &targetId, Unicode::String const &params);
 	static uint32           enqueueCommand (std::string const &commandName, NetworkId const &targetId, Unicode::String const &params);
+	static bool             removeCommand  (uint32 sequenceId);
 	static void             clear          ();
 	static EntryMap const & get            ();
 	static const Entry *    findEntry      (uint32 sequenceId);
+	static void             clearLastCommandRemoval();
+	static bool             getLastCommandRemoval(uint32 &sequenceId, Command::ErrorCode &status, int &statusDetail);
 	static void             handleCommandRemoved (uint32 sequenceId, float waitTime, Command::ErrorCode status = Command::CEC_Success, int statusDetail = 0);
 	static void             generateCommandRemovedMessage (Unicode::String & result, const Command & cmd, Command::ErrorCode status, int statusDetail);
 	static void             executeClientCommands();

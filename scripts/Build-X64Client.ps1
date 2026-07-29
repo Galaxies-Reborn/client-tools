@@ -7,7 +7,13 @@ param(
 
     [string]$VisualStudioRoot,
 
-    [string]$StagePath
+    [string]$StagePath,
+
+    [ValidateSet("None", "Precu")]
+    [string]$RuntimeProfile = "None",
+
+    [ValidateRange(1, 64)]
+    [int]$MaxCpuCount = 4
 )
 
 Set-StrictMode -Version Latest
@@ -75,7 +81,7 @@ $arguments = @(
     "/p:Configuration=$Configuration",
     "/p:Platform=x64",
     "/p:PlatformToolset=$PlatformToolset",
-    "/m",
+    "/m:$MaxCpuCount",
     "/nr:false",
     "/v:minimal"
 )
@@ -124,5 +130,6 @@ foreach ($relativePath in $artifacts) {
 if ($StagePath) {
     & (Join-Path $PSScriptRoot "Stage-X64Client.ps1") `
         -ClientRoot $StagePath `
-        -Configuration $Configuration
+        -Configuration $Configuration `
+        -RuntimeProfile $RuntimeProfile
 }

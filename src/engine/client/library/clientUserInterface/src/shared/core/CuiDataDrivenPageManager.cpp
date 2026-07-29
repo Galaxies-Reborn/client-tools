@@ -25,8 +25,11 @@
 #include "UIBaseObject.h"
 #include "UIData.h"
 #include "UIDataSource.h"
+#include "UIButton.h"
+#include "UIList.h"
 #include "UIManager.h"
 #include "UiPage.h"
+#include "UIText.h"
 #include "Unicode.h"
 #include "UnicodeUtils.h"
 
@@ -196,6 +199,196 @@ void CuiDataDrivenPageManager::removePage(CuiDataDrivenPage* page, bool alreadyC
 		page->closeThroughWorkspace();
 	}
 	page->release();
+}
+
+//-----------------------------------------------------------------
+
+int CuiDataDrivenPageManager::selectOrConfirmSingleListRow(
+	int const row, bool const confirm)
+{
+	if (row < 0)
+		return 0x10000;
+
+	CuiDataDrivenPage * candidate = 0;
+	UIList * candidateList = 0;
+	UIButton * candidateOk = 0;
+	bool candidatePromptUpdated = false;
+	int observations = 0;
+	for (PageMap::iterator iterator = ms_pages.begin(); iterator != ms_pages.end(); ++iterator)
+	{
+		CuiDataDrivenPage * const page = iterator->second;
+		if (!page || !page->isActive() || page->isClosed())
+			continue;
+		observations |= 0x001;
+
+		UIList * const list = dynamic_cast<UIList *>(
+			page->getPage().GetObjectFromPath("List.lstList", TUIList));
+		if (list)
+			observations |= 0x002;
+		UIButton * const ok = dynamic_cast<UIButton *>(
+			page->getPage().GetObjectFromPath("btnOk", TUIButton));
+		if (ok)
+			observations |= 0x004;
+		if (ok && ok->IsEnabled())
+			observations |= 0x008;
+		UIText const * const prompt = dynamic_cast<UIText const *>(
+			page->getPage().GetObjectFromPath("Prompt.lblPrompt", TUIText));
+		if (prompt)
+			observations |= 0x010;
+		UIString promptText;
+		UIString promptLocalText;
+		std::string const clonePromptPrefix("@base_player:clone_prompt_header");
+		bool const hasPromptText =
+			prompt &&
+			prompt->GetProperty(UIText::PropertyName::Text, promptText);
+		bool const hasPromptLocalText =
+			prompt &&
+			prompt->GetProperty(UIText::PropertyName::LocalText, promptLocalText);
+		if (hasPromptText)
+			observations |= 0x020;
+		if (hasPromptLocalText)
+			observations |= 0x040;
+		bool const isClonePrompt =
+			(hasPromptText &&
+				Unicode::wideToNarrow(promptText).compare(
+					0, clonePromptPrefix.size(), clonePromptPrefix) == 0) ||
+			(hasPromptLocalText &&
+				Unicode::wideToNarrow(promptLocalText).find(
+					"base_player:clone_prompt_header") != std::string::npos);
+		if (isClonePrompt)
+			observations |= 0x080;
+		bool const hasClonePromptData =
+			(hasPromptText &&
+				Unicode::wideToNarrow(promptText).find(
+					"base_player:clone_prompt_data") != std::string::npos) ||
+			(hasPromptLocalText &&
+				Unicode::wideToNarrow(promptLocalText).find(
+					"base_player:clone_prompt_data") != std::string::npos);
+		if (hasClonePromptData)
+			observations |= 0x400;
+		if (!list || !ok || !ok->IsEnabled() || !prompt ||
+			!isClonePrompt)
+			continue;
+
+		UIDataSource const * const dataSource = list->GetDataSource();
+		if (dataSource)
+			observations |= 0x100;
+		if (dataSource && row < static_cast<int>(dataSource->GetChildCount()))
+			observations |= 0x200;
+		if (!dataSource || row >= static_cast<int>(dataSource->GetChildCount()))
+			continue;
+
+		// Refuse an ambiguous generic-listbox state instead of choosing a
+		// potentially unrelated SUI page.
+		if (candidate)
+			return 0x20000 | observations;
+		candidate = page;
+		candidateList = list;
+		candidateOk = ok;
+		candidatePromptUpdated = hasClonePromptData;
+	}
+
+	if (!candidate || !candidateList || !candidateOk)
+		return 0x10000 | observations;
+
+	if (!confirm)
+	{
+		// SelectRow emits the normal OnListSelectionChanged callback, which
+		// sends the subscribed SelectedRow property to the server. A generic
+		// list can arrive with row zero already selected; clear that default
+		// locally without a callback so selecting row zero still emits the
+		// one authoritative selection event a physical click would produce.
+		if (candidateList->IsRowSelected(row))
+			candidateList->SelectRow(-1, false);
+		candidateList->SelectRow(row);
+		if (!candidateList->IsRowSelected(row) ||
+			!candidateList->GetDataAtRow(row))
+			return 0x30000 | observations;
+		return 1;
+	}
+
+	// Confirm only the same still-selected row after the server-authored
+	// prompt update has had time to round-trip. Press() follows the same
+	// listener path as a physical OK click.
+	if (!candidatePromptUpdated)
+		return 0x50000 | observations;
+	if (!candidateList->IsRowSelected(row) ||
+		!candidateList->GetDataAtRow(row))
+		return 0x40000 | observations;
+	candidateOk->Press();
+	return 1;
+}
+
+//-----------------------------------------------------------------
+
+int CuiDataDrivenPageManager::selectAndConfirmSingleAreaTrackRow(
+	int const row)
+{
+	if (row < 0 || row > 2)
+		return 0x10000;
+
+	UIList * candidateList = 0;
+	UIButton * candidateOk = 0;
+	int observations = 0;
+	for (PageMap::iterator iterator = ms_pages.begin();
+		iterator != ms_pages.end(); ++iterator)
+	{
+		CuiDataDrivenPage * const page = iterator->second;
+		if (!page || !page->isActive() || page->isClosed())
+			continue;
+		observations |= 0x001;
+
+		UIList * const list = dynamic_cast<UIList *>(
+			page->getPage().GetObjectFromPath("List.lstList", TUIList));
+		UIButton * const ok = dynamic_cast<UIButton *>(
+			page->getPage().GetObjectFromPath("btnOk", TUIButton));
+		UIText const * const prompt = dynamic_cast<UIText const *>(
+			page->getPage().GetObjectFromPath("Prompt.lblPrompt", TUIText));
+		if (list) observations |= 0x002;
+		if (ok) observations |= 0x004;
+		if (ok && ok->IsEnabled()) observations |= 0x008;
+		if (prompt) observations |= 0x010;
+
+		UIString promptText;
+		UIString promptLocalText;
+		bool const hasPromptText = prompt &&
+			prompt->GetProperty(UIText::PropertyName::Text, promptText);
+		bool const hasPromptLocalText = prompt &&
+			prompt->GetProperty(UIText::PropertyName::LocalText,
+				promptLocalText);
+		if (hasPromptText) observations |= 0x020;
+		if (hasPromptLocalText) observations |= 0x040;
+		bool const isAreaTrackPrompt =
+			(hasPromptText && Unicode::wideToNarrow(promptText).find(
+				"skl_use:scan_type_d") != std::string::npos) ||
+			(hasPromptLocalText && Unicode::wideToNarrow(promptLocalText).find(
+				"skl_use:scan_type_d") != std::string::npos);
+		if (isAreaTrackPrompt) observations |= 0x080;
+		if (!list || !ok || !ok->IsEnabled() || !isAreaTrackPrompt)
+			continue;
+
+		UIDataSource const * const dataSource = list->GetDataSource();
+		if (dataSource) observations |= 0x100;
+		if (dataSource && row < static_cast<int>(dataSource->GetChildCount()))
+			observations |= 0x200;
+		if (!dataSource || row >= static_cast<int>(dataSource->GetChildCount()))
+			continue;
+		if (candidateList)
+			return 0x20000 | observations;
+		candidateList = list;
+		candidateOk = ok;
+	}
+
+	if (!candidateList || !candidateOk)
+		return 0x10000 | observations;
+	if (candidateList->IsRowSelected(row))
+		candidateList->SelectRow(-1, false);
+	candidateList->SelectRow(row);
+	if (!candidateList->IsRowSelected(row) ||
+		!candidateList->GetDataAtRow(row))
+		return 0x30000 | observations;
+	candidateOk->Press();
+	return 1;
 }
 
 //-----------------------------------------------------------------

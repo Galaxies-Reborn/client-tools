@@ -1755,6 +1755,7 @@ void Direct3d9Namespace::updateWindowSettings()
 	{
 		DWORD const windowStyleWindowed    = WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_BORDER | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 		DWORD const windowStyleFullscreen  = WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
+		UINT const windowActivationFlag = ConfigDirect3d9::getDoNotActivateWindow() ? SWP_NOACTIVATE : 0;
 
 		if (ms_windowed)
 		{
@@ -1792,7 +1793,7 @@ void Direct3d9Namespace::updateWindowSettings()
 				}
 
 			// reposition and resize the window
-			const BOOL result2 = SetWindowPos(ms_window, HWND_NOTOPMOST, ms_windowX, ms_windowY, rect.right - rect.left, rect.bottom - rect.top, SWP_NOCOPYBITS |  SWP_SHOWWINDOW);
+			const BOOL result2 = SetWindowPos(ms_window, HWND_NOTOPMOST, ms_windowX, ms_windowY, rect.right - rect.left, rect.bottom - rect.top, SWP_NOCOPYBITS | SWP_SHOWWINDOW | windowActivationFlag);
 			FATAL(!result2, ("SetWindowPos failed"));
 		}
 		else
@@ -1806,7 +1807,7 @@ void Direct3d9Namespace::updateWindowSettings()
 			GetMonitorInfo(monitor, &monitorInfo);
 			RECT const & r = monitorInfo.rcMonitor;
 
-			const BOOL result2 = SetWindowPos(ms_window, HWND_TOPMOST, r.left, r.top, ms_width, ms_height, SWP_NOCOPYBITS |  SWP_SHOWWINDOW);
+			const BOOL result2 = SetWindowPos(ms_window, HWND_TOPMOST, r.left, r.top, ms_width, ms_height, SWP_NOCOPYBITS | SWP_SHOWWINDOW | windowActivationFlag);
 			FATAL(!result2, ("SetWindowPos failed"));
 		}
 	}

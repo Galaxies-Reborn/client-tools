@@ -75,6 +75,10 @@ namespace
 	const double       TOO_MANY_CMDS_NOTIFICATION_FREQUENCY = 5; //seconds
 
 	char               ms_removingCommandBuffer[256];
+	bool               ms_lastCommandRemovalValid = false;
+	uint32             ms_lastCommandRemovalSequenceId = 0;
+	Command::ErrorCode ms_lastCommandRemovalStatus = Command::CEC_Success;
+	int                ms_lastCommandRemovalStatusDetail = 0;
 
 #ifdef _DEBUG
 	const bool         cms_debug = false; // set to true to enable debug logging
@@ -200,6 +204,7 @@ void ClientCommandQueue::install()
 	CrashReportInformation::addDynamicText(ms_removingCommandBuffer);
 
 	ms_cutoffTime = 0.0f;
+	clearLastCommandRemoval();
 	ms_installed = true;
 }
 
@@ -210,6 +215,7 @@ void ClientCommandQueue::remove()
 	DEBUG_FATAL(!ms_installed, ("not installed\n"));
 
 	CrashReportInformation::removeDynamicText(ms_removingCommandBuffer);
+	clearLastCommandRemoval();
 
 	ms_installed = false;
 }
@@ -714,11 +720,25 @@ uint32 ClientCommandQueue::enqueueCommand(Command const &command, NetworkId cons
 			return 0;
 	}
 
+	static uint32 const hash_coupDeGrace =
+		Crc::normalizeAndCalculate("coupDeGrace");
+	static uint32 const hash_deathBlow =
+		Crc::normalizeAndCalculate("deathBlow");
+	bool const trackPrecuDeathBlow =
+		command.m_addToCombatQueue &&
+		(command.m_commandHash == hash_coupDeGrace ||
+		 command.m_commandHash == hash_deathBlow);
+
 	uint32 sequenceId = ms_nextSequenceId;
 	if (!command.isNull())
 	{
 		// Assign next sequenceId for client-visible commands.
-		if (command.m_visibleToClients)
+		// Publish 14.1 marks its two death-blow aliases invisible even though
+		// they are queued combat actions. The later client otherwise reuses
+		// sequence zero, which is its queue-clear sentinel. Track only these
+		// pinned retail aliases so they enter the stock queue with a valid
+		// sequence without changing the authentic command table.
+		if (command.m_visibleToClients || trackPrecuDeathBlow)
 		{
 			sequenceId = nextSequenceId();
 			if (command.m_defaultPriority == Command::CP_Normal)
@@ -773,6 +793,27 @@ uint32 ClientCommandQueue::enqueueCommand(std::string const &commandName, Networ
 
 // ----------------------------------------------------------------------
 
+bool ClientCommandQueue::removeCommand(uint32 sequenceId)
+{
+	// Sequence 0 is the server protocol sentinel for clearing the entire queue.
+	if (sequenceId == 0 || ms_commandQueue.find(sequenceId) == ms_commandQueue.end())
+		return false;
+
+	Object * const player = Game::getPlayer();
+	PlayerCreatureController * const playerController = player ? dynamic_cast<PlayerCreatureController *>(player->getController()) : 0;
+	if (!playerController)
+		return false;
+
+	// The authoritative queue replies with CM_commandQueueRemove for commands
+	// it can cancel.  That existing receive path carries the real wait/status
+	// payload into handleCommandRemoved() and deliberately leaves an executing
+	// front command intact until its normal completion reply.
+	playerController->sendCommandQueueRemove(sequenceId);
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
 void ClientCommandQueue::clear()
 {
 	DEBUG_REPORT_LOG(cms_debug, ("ClientCommandQueue::clear()\n"));
@@ -814,6 +855,29 @@ ClientCommandQueue::EntryMap const &ClientCommandQueue::get()
 
 // ----------------------------------------------------------------------
 
+void ClientCommandQueue::clearLastCommandRemoval()
+{
+	ms_lastCommandRemovalValid = false;
+	ms_lastCommandRemovalSequenceId = 0;
+	ms_lastCommandRemovalStatus = Command::CEC_Success;
+	ms_lastCommandRemovalStatusDetail = 0;
+}
+
+// ----------------------------------------------------------------------
+
+bool ClientCommandQueue::getLastCommandRemoval(uint32 &sequenceId, Command::ErrorCode &status, int &statusDetail)
+{
+	if (!ms_lastCommandRemovalValid)
+		return false;
+
+	sequenceId = ms_lastCommandRemovalSequenceId;
+	status = ms_lastCommandRemovalStatus;
+	statusDetail = ms_lastCommandRemovalStatusDetail;
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
 void ClientCommandQueue::handleCommandRemoved(uint32 sequenceId, float waitTime, Command::ErrorCode status, int statusDetail)
 {
 	DEBUG_REPORT_LOG(cms_debug, ("ClientCommandQueue::handleCommandRemoved(%d, %f, %d, %d)\n", static_cast<int>(sequenceId), waitTime, status, statusDetail));
@@ -824,6 +888,10 @@ void ClientCommandQueue::handleCommandRemoved(uint32 sequenceId, float waitTime,
 	if (i != ms_commandQueue.end())
 	{
 		const Entry & entry = (*i).second;
+		ms_lastCommandRemovalValid = true;
+		ms_lastCommandRemovalSequenceId = sequenceId;
+		ms_lastCommandRemovalStatus = status;
+		ms_lastCommandRemovalStatusDetail = statusDetail;
 
 		sprintf(ms_removingCommandBuffer, "RemovingCommand: name=[%s] status=[%d] statusDetail=[%d]\n", 
 			entry.m_command ? entry.m_command->m_commandName.c_str() : "???",

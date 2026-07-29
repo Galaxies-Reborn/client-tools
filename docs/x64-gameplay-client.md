@@ -29,7 +29,7 @@ From the repository root:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-X64Client.ps1
 ```
 
-The script validates the complete `x64-dx9-vanilla` build profile, locates MSBuild 18 with v145, builds `SwgClient` as `Release|x64`, and verifies that the client and all three D3D9 raster DLLs have the x64 PE machine type.
+The script validates the complete x64 build profile, locates MSBuild 18 with v145, builds `SwgClient` as `Release|x64`, and verifies that the client and configured raster DLLs have the x64 PE machine type. It defaults to four MSBuild nodes to avoid exhausting memory while linking the legacy solution; use `-MaxCpuCount` to select another bounded value.
 
 To select a Visual Studio installation or toolset explicitly:
 
@@ -56,14 +56,29 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Stage-X64Clien
   -ClientRoot "E:\SWG\SWGSource\SWGSource Client v3.0"
 ```
 
+For the dedicated Publish 14.1 client, stage the tracked Pre-CU configuration
+profile with the x64 runtime:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Stage-X64Client.ps1 `
+  -ClientRoot "E:\SWG\SWGSource\PreCU-Client" `
+  -RuntimeProfile Precu
+```
+
+The profile owns the canonical 51-TRE archive order, login/preload defaults,
+1024x768 windowed settings, the legacy-interior Bloom compatibility lock, and
+non-activating D3D9 window transitions for background automation. It preserves
+`user.cfg`.
+
 Or build and stage in one command:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-X64Client.ps1 `
-  -StagePath "E:\SWG\SWGSource\SWGSource Client v3.0"
+  -StagePath "E:\SWG\SWGSource\PreCU-Client" `
+  -RuntimeProfile Precu
 ```
 
-Staging validates every copied PE as x64, backs up only replaced runtime files under `.x64-backups`, and writes `x64-runtime-manifest.json`. It also backs up and removes incompatible local x86 copies of system DLLs such as `dbghelp.dll`, allowing the x64 process to use `System32`. It does not change client configuration, login settings, TOCs, or TRE files.
+Staging validates every copied PE as x64, backs up only replaced runtime/profile files under `.x64-backups`, and writes `x64-runtime-manifest.json`. It also backs up and removes incompatible local x86 copies of system DLLs such as `dbghelp.dll`, allowing the x64 process to use `System32`. The default `None` profile does not change client configuration, login settings, TOCs, or TRE files; `-RuntimeProfile Precu` installs the tracked dedicated configuration but never changes TRE files or `user.cfg`.
 
 SDL3 provides native input from as many as eight independent joysticks, throttles, rudder pedals, and gamepads. Existing keymaps continue to load; newly saved keymaps record stable device GUIDs so bindings can be restored after reconnecting or reordering controllers. See [the multi-controller input guide](inputreborn.md) for configuration and compatibility details.
 

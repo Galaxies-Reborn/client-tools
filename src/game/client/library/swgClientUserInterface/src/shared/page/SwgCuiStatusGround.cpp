@@ -233,7 +233,7 @@ namespace SwgCuiStatusGroundNamespace
 	{
 		Attributes::Health,
 		Attributes::Action,
-		Attributes::Mind,    // Note: this is unused -- ARH
+		Attributes::Mind,
 		ForceAttribute,
 		Attributes::Health,
 		Attributes::Health,
@@ -244,7 +244,7 @@ namespace SwgCuiStatusGroundNamespace
 	{
 		"pageH",
 		"pageA",
-		"",                  // This was mind "pageM" but is now unused -- ARH
+		"pageM",
 		"pageF",
 		"pagecreaturehealth", // H only page.
 		"pagegreyhealth"
@@ -266,8 +266,8 @@ namespace SwgCuiStatusGroundNamespace
 	{
 		{0, 0, 0, 0, 0, 0},
 		{0, 0, 0, 0, 1, 0},
-		{1, 1, 0, 0, 0, 0},
-		{1, 1, 0, 1, 0, 0},
+		{1, 1, 1, 0, 0, 0},
+		{1, 1, 1, 1, 0, 0},
 		{0, 0, 0, 0, 0, 1},
 	};
 
