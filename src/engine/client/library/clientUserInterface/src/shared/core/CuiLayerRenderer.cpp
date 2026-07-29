@@ -57,6 +57,35 @@ namespace CuiLayerRendereNamespace
 	int s_flushOther;
 	int s_flushReportFrames;
 
+	//-- How many DISTINCT shaders the shader-change flushes are actually cycling between.
+	//
+	//   584 changes a frame is far more than a HUD has textures, so the question is whether a small
+	//   set is being interleaved -- in which case grouping by shader collapses most of them -- or
+	//   whether there really are that many distinct materials, in which case only an atlas helps.
+	enum { FLUSH_SHADER_SLOTS = 128 };
+
+	void const *s_flushShaders[FLUSH_SHADER_SLOTS];
+	int         s_flushShaderCount;
+	int         s_flushShaderOverflow;
+
+	void noteFlushShader (void const *shader)
+	{
+		if (!shader)
+			return;
+
+		for (int i = 0; i < s_flushShaderCount; ++i)
+			if (s_flushShaders[i] == shader)
+				return;
+
+		if (s_flushShaderCount >= FLUSH_SHADER_SLOTS)
+		{
+			++s_flushShaderOverflow;
+			return;
+		}
+
+		s_flushShaders[s_flushShaderCount++] = shader;
+	}
+
 	void noteFlushReason (bool shaderChange, bool vertexTypeChange, bool bufferFull)
 	{
 		if (bufferFull)
@@ -197,6 +226,7 @@ void CuiLayerRenderer::render (const Shader * shader, const UIFloatPoint verts [
 		if (vertexTypeChange || shaderChange || bufferFull)
 		{
 			noteFlushReason (shaderChange, vertexTypeChange, bufferFull);
+			noteFlushShader (shader);
 			flushRenderQueue ();
 		}
 	}
@@ -258,6 +288,7 @@ void CuiLayerRenderer::render (const Shader * shader, const UIFloatPoint verts [
 		if (vertexTypeChange || shaderChange || bufferFull)
 		{
 			noteFlushReason (shaderChange, vertexTypeChange, bufferFull);
+			noteFlushShader (shader);
 			flushRenderQueue ();
 		}
 	}
@@ -309,6 +340,7 @@ void  CuiLayerRenderer::renderPointsGeneric (int type, const Shader * shader, co
 		if (vertexTypeChange || shaderChange || bufferFull)
 		{
 			noteFlushReason (shaderChange, vertexTypeChange, bufferFull);
+			noteFlushShader (shader);
 			flushRenderQueue ();
 		}
 	}
@@ -598,6 +630,12 @@ void CuiLayerRenderer::flushRenderQueueQuads ()
 			total, s_flushReportFrames,
 			s_flushShaderChange, s_flushVertexType, s_flushBufferFull, s_flushOther,
 			s_maxNumberOfVertices));
+
+		WARNING(true, ("UiFlushShaders: %d distinct shader(s) involved%s. Far fewer than the change count means a small set is interleaving and grouping by shader would collapse most of the draws.",
+			s_flushShaderCount, s_flushShaderOverflow ? " (table full)" : ""));
+
+		s_flushShaderCount = 0;
+		s_flushShaderOverflow = 0;
 
 		s_flushShaderChange = 0;
 		s_flushVertexType = 0;
