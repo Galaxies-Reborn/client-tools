@@ -42,6 +42,7 @@ namespace ShadowCostReport
 {
 	void noteConstruction();
 	void noteDestruction();
+	void noteRendered(int primitives);
 }
 #include "sharedObject/Appearance.h"
 #include "sharedMath/Sphere.h"
@@ -1792,6 +1793,9 @@ void ShadowVolume::render(Object const * const object, const Appearance *const a
 		NOT_NULL (m_localShaderPrimitiveRenderFrontCapsTwoSided);
 		ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderFrontCapsTwoSided);
 
+		//-- Five primitives on this path, five draw calls.
+		ShadowCostReport::noteRendered (5);
+
 #if SHADOW_EXTRUDE_TO_POINT == 0
 		if (m_localShaderPrimitiveRenderBackCapsTwoSided)
 		{
@@ -1821,6 +1825,9 @@ void ShadowVolume::render(Object const * const object, const Appearance *const a
 
 		NOT_NULL (m_localShaderPrimitiveRenderFrontCapsOneSidedCullCounterClockwise);
 		ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderFrontCapsOneSidedCullCounterClockwise);
+
+		//-- Eight primitives on this path, eight draw calls.
+		ShadowCostReport::noteRendered (8);
 
 #if SHADOW_EXTRUDE_TO_POINT == 0
 		if (m_localShaderPrimitiveRenderBackCapsOneSidedCullClockwise)
@@ -1873,6 +1880,13 @@ namespace ShadowCostReport
 
 	void noteConstruction()  { ++ms_constructions; ++ms_live; }
 	void noteDestruction()   { ++ms_destructions; --ms_live; }
+
+	//-- Volumes that got past every cull and actually submitted primitives, and how many primitives
+	//   that came to. Each is a separate draw call.
+	int ms_rendered;
+	int ms_submitted;
+
+	void noteRendered(int primitives) { ++ms_rendered; ms_submitted += primitives; }
 
 	long long nowTicks()
 	{
@@ -1928,6 +1942,27 @@ namespace ShadowCostReport
 			ms_live,
 			static_cast<double>(ms_constructions) / seconds,
 			static_cast<double>(ms_destructions) / seconds));
+
+		//-- Shadow draw calls against the frame's total. Each rendered volume submits five primitives
+		//   on the two-sided stencil path and eight on the one-sided one, and every one of those is a
+		//   draw call. With the GPU idle two thirds of the frame and 1600 draws being submitted, the
+		//   share here decides whether shadows are the thing to attack next.
+		{
+			int vertices = 0;
+			int points = 0;
+			int lines = 0;
+			int triangles = 0;
+			int calls = 0;
+			Graphics::getRenderedVerticesPointsLinesTrianglesCalls (vertices, points, lines, triangles, calls);
+
+			WARNING(true, ("ShadowDraws: %.0f volume(s)/s submitting %.0f primitive(s)/s. Frame's total draw calls %d.",
+				static_cast<double>(ms_rendered) / seconds,
+				static_cast<double>(ms_submitted) / seconds,
+				calls));
+		}
+
+		ms_rendered = 0;
+		ms_submitted = 0;
 
 		ms_constructions = 0;
 		ms_destructions = 0;
