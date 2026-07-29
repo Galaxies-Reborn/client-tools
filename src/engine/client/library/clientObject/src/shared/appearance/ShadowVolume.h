@@ -18,6 +18,7 @@
 
 class Camera;
 class Object;
+class Transform;
 class Appearance;
 class Shader;
 class StaticIndexBuffer;
@@ -208,7 +209,10 @@ private:
 
 	void addPrimitive (const VertexBufferReadIterator& vertexBufferReadIterator, int numberOfVertices, const Index* indexArray, int numberOfIndices);
 
-	void extrudeShadowVolume (const Vector& lightDirection_o) const;
+	// objectToWorld transforms the volume's vertices as they are written, so the geometry lands
+	// in world space and renders under an identity transform. lightDirection_w is the light in
+	// that same space, so the far-cap offset is applied in the frame it is defined in.
+	void extrudeShadowVolume (const Vector& lightDirection_w, const Transform& objectToWorld) const;
 	void renderShadowVolumeEdges () const;
 	void renderShadowVolumeCaps (const CapMode capMode) const;
 
