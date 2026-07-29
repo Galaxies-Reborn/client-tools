@@ -33,18 +33,6 @@
 #include "sharedFoundation/PointerDeleter.h"
 #include "sharedObject/CellProperty.h"
 #include "sharedObject/ContainedByProperty.h"
-
-#include <map>
-
-// The churn counters are used by the constructor and destructor, which sit above the namespace that
-// defines them.
-namespace ShadowCostReport
-{
-	void noteConstruction();
-	void noteDestruction();
-	void noteRendered(int primitives);
-	void noteStaticScale(float scale);
-}
 #include "sharedObject/Appearance.h"
 #include "sharedMath/Sphere.h"
 
@@ -185,14 +173,6 @@ public:
 	int                 compactEdgeCount;
 	bool                computedEdgeConnectivity;
 
-	//-- Triangle adjacency, six indices a face, for a geometry shader silhouette pass:
-	//   corner 0, the opposite corner of the neighbour across edge 0-1, corner 1, the neighbour
-	//   across 1-2, corner 2, the neighbour across 2-0. Built once alongside the edge list.
-	//
-	//   Nothing reads it yet.
-	Index*              adjacencyIndexArray;
-	int                 adjacencyIndexCount;
-
 	SystemVertexBuffer* shadowVertexBuffer;
 	SystemIndexBuffer*  shadowFrontIndexBuffer;
 	int                 shadowFrontIndexCount;
@@ -213,8 +193,6 @@ public:
 		compactEdgeArray (0),
 		compactEdgeCount (0),
 		computedEdgeConnectivity (false),
-		adjacencyIndexArray (0),
-		adjacencyIndexCount (0),
 		shadowVertexBuffer (0),
 		shadowFrontIndexBuffer (0),
 		shadowFrontIndexCount (0),
@@ -417,9 +395,6 @@ void ProxyLocalShaderPrimitive::prepareToDraw () const
 	{
 	case M_extrude:
 		{
-			if (m_shadowVolume.m_primitiveType == ShadowVolume::PT_static)
-				ShadowCostReport::noteStaticScale (m_appearance.getScale ().x);
-
 			Graphics::setObjectToWorldTransformAndScale (m_appearance.getTransform_w (), m_shadowVolume.m_primitiveType == ShadowVolume::PT_static ? m_appearance.getScale () : Vector::xyz111);
 
 			//-- is the object in an interior?
@@ -1100,73 +1075,6 @@ void ShadowVolume::clearProxyLocalShaderPrimitiveList ()
 
 //-------------------------------------------------------------------
 
-//-------------------------------------------------------------------
-
-/**
- * An edge key that does not care which way the edge is walked.
- *
- * Adjacent faces traverse a shared edge in opposite directions, so the pair is ordered before it is
- * packed. Vertex indices here are Index, which is 16 bit, so both fit a uint32 with nothing lost.
- */
-
-uint32 ShadowVolume::makeEdgeKey (const int v0, const int v1)
-{
-	const uint32 low  = static_cast<uint32> ((v0 < v1) ? v0 : v1);
-	const uint32 high = static_cast<uint32> ((v0 < v1) ? v1 : v0);
-
-	return (low << 16) | high;
-}
-
-//-------------------------------------------------------------------
-
-/**
- * addEdge without the linear scan.
- *
- * The original walked every edge found so far looking for a match, which makes building the edge
- * list quadratic in face count. The map does the same lookup in log time and produces the same
- * array: the same edges carrying the same face links, differing only in the order they appear,
- * which nothing downstream depends on.
- */
-
-void ShadowVolume::addEdgeFast (std::map<uint32, int>& edgeMap, ShadowVolume::Edge* const edgeList, int& numberOfEdges, const int v0, const int v1, const int face)
-{
-	NOT_NULL (edgeList);
-
-	const uint32 key = makeEdgeKey (v0, v1);
-
-	const std::map<uint32, int>::iterator it = edgeMap.find (key);
-
-	//-- The original scan SKIPPED entries that already held two faces rather than matching them, so
-	//   a third face sharing an edge produced a second entry for the same edge instead of being
-	//   dropped. That is not incidental: an entry holding one face is treated as a boundary and
-	//   always silhouettes, and discarding the extra faces instead changes which edges extrude --
-	//   which shows up as streamers and spikes coming off objects.
-	//
-	//   The map therefore holds the most recent entry for a key, and a full one is passed over in
-	//   favour of a new entry, exactly as the scan did: the scan matched the first non-full entry,
-	//   and entries for a key fill in creation order, so the first non-full one is the newest.
-	int index;
-	if (it != edgeMap.end () && edgeList [it->second].numberOfFaces < 2)
-	{
-		index = it->second;
-	}
-	else
-	{
-		index = numberOfEdges++;
-
-		edgeList [index].v0 = v0;
-		edgeList [index].v1 = v1;
-		edgeList [index].numberOfFaces = 0;
-#ifdef _DEBUG
-		edgeList [index].isNonManifold = (it != edgeMap.end ());
-#endif
-
-		edgeMap [key] = index;
-	}
-
-	edgeList [index].face [edgeList [index].numberOfFaces++] = face;
-}
-
 void ShadowVolume::addEdge (ShadowVolume::Edge* const edgeList, int& numberOfEdges, const int v0, const int v1, const int face)
 {
 	NOT_NULL (edgeList);
@@ -1271,7 +1179,6 @@ ShadowVolume::ShadowVolume (const ShaderType shaderType, const PrimitiveType pri
 	m_shadowPrimitiveList (0),
 	m_metrics ()
 {
-	ShadowCostReport::noteConstruction();
 #ifdef _DEBUG
 	{
 		ms_shadowVolumeList.push_back (this);
@@ -1305,7 +1212,6 @@ ShadowVolume::ShadowVolume (const ShaderType shaderType, const PrimitiveType pri
 
 ShadowVolume::~ShadowVolume ()
 {
-	ShadowCostReport::noteDestruction();
 #ifdef _DEBUG
 
 #if 0
@@ -1350,11 +1256,6 @@ ShadowVolume::~ShadowVolume ()
 		shadowPrimitive.compactEdgeArray = 0;
 
 		shadowPrimitive.compactEdgeCount = 0;
-
-		delete [] shadowPrimitive.adjacencyIndexArray;
-		shadowPrimitive.adjacencyIndexArray = 0;
-
-		shadowPrimitive.adjacencyIndexCount = 0;
 
 		delete shadowPrimitive.shadowVertexBuffer;
 		shadowPrimitive.shadowVertexBuffer = 0;
@@ -1496,10 +1397,6 @@ void ShadowVolume::addPrimitive (const VertexBufferReadIterator& vi, const int n
 		shadowPrimitive.compactEdgeArray = 0;
 		shadowPrimitive.compactEdgeCount = 0;
 
-		delete [] shadowPrimitive.adjacencyIndexArray;
-		shadowPrimitive.adjacencyIndexArray = 0;
-		shadowPrimitive.adjacencyIndexCount = 0;
-
 		delete [] shadowPrimitive.compactIndexArrayToIndexArrayMap;
 		shadowPrimitive.compactIndexArrayToIndexArrayMap = 0;
 	}
@@ -1555,14 +1452,6 @@ void ShadowVolume::addPrimitive (const VertexBufferReadIterator& vi, const int n
 		//-- compute edge connectivity
 		if (!shadowPrimitive.computedEdgeConnectivity)
 		{
-			//-- Keyed on the vertex pair, smaller index first so an edge is found whichever way round
-			//   it is walked. This replaces a linear scan of every edge found so far, which made the
-			//   build quadratic in face count -- about 50 million comparisons for a 5000 triangle
-			//   character. It runs once per shadow primitive, but that is once per character coming
-			//   into shadow range, and shadow range just went from roughly 6m to past 100m.
-			typedef std::map<uint32, int> EdgeMap;
-			EdgeMap edgeMap;
-
 			int i;
 			for (i = 0; i < shadowPrimitive.compactFaceCount; ++i)
 			{
@@ -1590,67 +1479,9 @@ void ShadowVolume::addPrimitive (const VertexBufferReadIterator& vi, const int n
 #endif
 
 				//-- compute edge array (only needs to be done once)
-				addEdgeFast (edgeMap, shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i0, i1, i);
-				addEdgeFast (edgeMap, shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i1, i2, i);
-				addEdgeFast (edgeMap, shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i2, i0, i);
-			}
-
-			//-- Triangle adjacency for a geometry shader silhouette pass. Six indices a face: each
-			//   corner followed by the opposite corner of the face sharing the edge that leaves it.
-			//   An edge with one face has no neighbour, and repeating this face's own opposite corner
-			//   makes the GS see a degenerate neighbour and treat the edge as a silhouette -- which
-			//   for an open mesh is the answer that closes the volume rather than leaving a hole.
-			{
-				shadowPrimitive.adjacencyIndexCount = shadowPrimitive.compactFaceCount * 6;
-				shadowPrimitive.adjacencyIndexArray = new Index [static_cast<size_t> (shadowPrimitive.adjacencyIndexCount)];
-
-				for (i = 0; i < shadowPrimitive.compactFaceCount; ++i)
-				{
-					const Index corner [3] =
-					{
-						shadowPrimitive.compactIndexArray [3 * i + 0],
-						shadowPrimitive.compactIndexArray [3 * i + 1],
-						shadowPrimitive.compactIndexArray [3 * i + 2]
-					};
-
-					Index * const destination = shadowPrimitive.adjacencyIndexArray + (6 * i);
-
-					int corn;
-					for (corn = 0; corn < 3; ++corn)
-					{
-						const Index v0 = corner [corn];
-						const Index v1 = corner [(corn + 1) % 3];
-
-						//-- This face's own corner opposite the edge, which is also the fallback.
-						Index opposite = corner [(corn + 2) % 3];
-
-						const EdgeMap::const_iterator it = edgeMap.find (makeEdgeKey (v0, v1));
-						if (it != edgeMap.end ())
-						{
-							const Edge& edge = shadowPrimitive.compactEdgeArray [it->second];
-
-							if (edge.numberOfFaces == 2)
-							{
-								const int neighbourFace = (edge.face [0] == i) ? edge.face [1] : edge.face [0];
-
-								//-- The neighbour's corner that is not on this edge.
-								int k;
-								for (k = 0; k < 3; ++k)
-								{
-									const Index candidate = shadowPrimitive.compactIndexArray [3 * neighbourFace + k];
-									if (candidate != v0 && candidate != v1)
-									{
-										opposite = candidate;
-										break;
-									}
-								}
-							}
-						}
-
-						destination [2 * corn + 0] = v0;
-						destination [2 * corn + 1] = opposite;
-					}
-				}
+				addEdge (shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i0, i1, i);
+				addEdge (shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i1, i2, i);
+				addEdge (shadowPrimitive.compactEdgeArray, shadowPrimitive.compactEdgeCount, i2, i0, i);
 			}
 
 			shadowPrimitive.computedEdgeConnectivity = true;
@@ -1797,11 +1628,6 @@ void ShadowVolume::render(Object const * const object, const Appearance *const a
 		NOT_NULL (m_localShaderPrimitiveRenderFrontCapsTwoSided);
 		ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderFrontCapsTwoSided);
 
-		//-- Three draw calls: edges, front caps, back caps. The two extrude proxies submitted
-		//   alongside them set the transform and run the extrusion in prepareToDraw; their draw() is
-		//   empty, so counting them here would overstate the draw cost by two thirds.
-		ShadowCostReport::noteRendered (3);
-
 #if SHADOW_EXTRUDE_TO_POINT == 0
 		if (m_localShaderPrimitiveRenderBackCapsTwoSided)
 		{
@@ -1831,10 +1657,6 @@ void ShadowVolume::render(Object const * const object, const Appearance *const a
 
 		NOT_NULL (m_localShaderPrimitiveRenderFrontCapsOneSidedCullCounterClockwise);
 		ShaderPrimitiveSorter::add (*m_localShaderPrimitiveRenderFrontCapsOneSidedCullCounterClockwise);
-
-		//-- Six draw calls: two edge passes, two front cap passes, two back cap passes. The two
-		//   extrude proxies draw nothing, as above.
-		ShadowCostReport::noteRendered (6);
 
 #if SHADOW_EXTRUDE_TO_POINT == 0
 		if (m_localShaderPrimitiveRenderBackCapsOneSidedCullClockwise)
@@ -1876,49 +1698,6 @@ namespace ShadowCostReport
 	long long ms_ticks;
 	int       ms_calls;
 	long long ms_lastReport;
-
-	//-- Churn. A volume built and thrown away as an object crosses in and out of visibility costs
-	//   its whole edge and adjacency build each time, and that cost lands during camera rotation --
-	//   which is exactly when the frame drop was reported. Large and roughly equal counts mean
-	//   churn; near-zero counts with a steady live count mean the flicker is elsewhere.
-	int       ms_constructions;
-	int       ms_destructions;
-	int       ms_live;
-
-	void noteConstruction()  { ++ms_constructions; ++ms_live; }
-	void noteDestruction()   { ++ms_destructions; --ms_live; }
-
-	//-- Volumes that got past every cull and actually submitted primitives, and how many primitives
-	//   that came to. Each is a separate draw call.
-	int ms_rendered;
-	int ms_submitted;
-
-	void noteRendered(int primitives) { ++ms_rendered; ms_submitted += primitives; }
-
-	//-- The scale applied to static shadow primitives.
-	//
-	//   The far cap used to be positioned by translating the world transform, which is unaffected by
-	//   scale. Baking that offset into object-space vertices instead puts it through the scale, so
-	//   the two are only equivalent at scale 1. That is the leading explanation for the doubled
-	//   shadows, and it predicts SOME buildings breaking rather than all of them -- which is not
-	//   what was seen. This says whether the prediction holds before the change is attempted again.
-	int   ms_scaleSamples;
-	int   ms_scaleNonUnit;
-	float ms_scaleMinimum;
-	float ms_scaleMaximum;
-
-	void noteStaticScale(float scale)
-	{
-		if (!ms_scaleSamples || scale < ms_scaleMinimum)
-			ms_scaleMinimum = scale;
-		if (!ms_scaleSamples || scale > ms_scaleMaximum)
-			ms_scaleMaximum = scale;
-
-		++ms_scaleSamples;
-
-		if (scale < 0.999f || scale > 1.001f)
-			++ms_scaleNonUnit;
-	}
 
 	long long nowTicks()
 	{
@@ -1969,41 +1748,6 @@ namespace ShadowCostReport
 
 		WARNING(true, ("ShadowCost: %.1f ms/s in ShadowVolume::extrudeShadowVolume, %.1f%% of one core; %.0f calls/s.",
 			perSecond, perSecond / 10.0, static_cast<double>(ms_calls) / seconds));
-
-		WARNING(true, ("ShadowChurn: %d live volume(s); %.0f built/s, %.0f destroyed/s. Large and roughly equal means volumes are being rebuilt as objects cross visibility, which is what makes rotation expensive.",
-			ms_live,
-			static_cast<double>(ms_constructions) / seconds,
-			static_cast<double>(ms_destructions) / seconds));
-
-		//-- Shadow draw calls against the frame's total. Each rendered volume submits five primitives
-		//   on the two-sided stencil path and eight on the one-sided one, and every one of those is a
-		//   draw call. With the GPU idle two thirds of the frame and 1600 draws being submitted, the
-		//   share here decides whether shadows are the thing to attack next.
-		{
-			int vertices = 0;
-			int points = 0;
-			int lines = 0;
-			int triangles = 0;
-			int calls = 0;
-			Graphics::getRenderedVerticesPointsLinesTrianglesCalls (vertices, points, lines, triangles, calls);
-
-			WARNING(true, ("ShadowScale: %d of %d static shadow primitive(s) have non-unit scale; range %.3f to %.3f. Non-zero means baking the far-cap offset into object space is wrong for those, which is the doubled-shadow theory.",
-				ms_scaleNonUnit, ms_scaleSamples, ms_scaleMinimum, ms_scaleMaximum));
-
-			ms_scaleSamples = 0;
-			ms_scaleNonUnit = 0;
-
-			WARNING(true, ("ShadowDraws: %.0f volume(s)/s issuing %.0f draw call(s)/s. Frame's total draw calls %d.",
-				static_cast<double>(ms_rendered) / seconds,
-				static_cast<double>(ms_submitted) / seconds,
-				calls));
-		}
-
-		ms_rendered = 0;
-		ms_submitted = 0;
-
-		ms_constructions = 0;
-		ms_destructions = 0;
 
 		ms_ticks = 0;
 		ms_calls = 0;

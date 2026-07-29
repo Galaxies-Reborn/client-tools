@@ -14,8 +14,6 @@
 
 #include "clientGraphics/Graphics.def"
 
-#include <map>
-
 class Camera;
 class Object;
 class Appearance;
@@ -169,11 +167,6 @@ private:
 
 	static void  clearProxyLocalShaderPrimitiveList ();
 	static void  addEdge (ShadowVolume::Edge* const edgeList, int& numberOfEdges, const int v0, const int v1, const int face);
-
-	// Edge lookup keyed on the vertex pair, order independent, so building the edge list is not
-	// quadratic in face count. addEdgeFast produces the same array as addEdge, in a different order.
-	static uint32 makeEdgeKey (const int v0, const int v1);
-	static void  addEdgeFast (std::map<uint32, int>& edgeMap, ShadowVolume::Edge* const edgeList, int& numberOfEdges, const int v0, const int v1, const int face);
 
 	static void  debugDump ();
 
