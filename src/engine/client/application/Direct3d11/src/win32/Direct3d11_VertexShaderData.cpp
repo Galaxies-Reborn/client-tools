@@ -63,6 +63,9 @@ Direct3d11_VertexShaderData::Direct3d11_VertexShaderData(ShaderImplementationPas
 	m_sourceLength(0),
 	m_textureCoordinateSetTags(NULL),
 	m_bytecode(NULL),
+	m_skinnedBytecode(NULL),
+	m_skinnedSignatureHash(0),
+	m_skinnedShader(NULL),
 	m_shader(NULL)
 {
 	++ms_liveInstanceCount;
@@ -81,6 +84,18 @@ Direct3d11_VertexShaderData::~Direct3d11_VertexShaderData()
 	{
 		m_shader->Release();
 		m_shader = NULL;
+	}
+
+	if (m_skinnedShader)
+	{
+		m_skinnedShader->Release();
+		m_skinnedShader = NULL;
+	}
+
+	if (m_skinnedBytecode)
+	{
+		m_skinnedBytecode->Release();
+		m_skinnedBytecode = NULL;
 	}
 
 	if (m_bytecode)
@@ -210,6 +225,28 @@ void Direct3d11_VertexShaderData::compile()
 	{
 		WARNING(true, ("Direct3d11: vertex program '%s' compiled but the shader object could not be created (%s).", m_vertexShader.getFilename(), Direct3d11_Device::describeHresult(hresult)));
 		m_shader = NULL;
+	}
+
+	// The GPU skinning variant: the same source with a skinning prologue injected ahead of it.
+	//
+	// Allowed to fail on its own. A null skinned shader means that material draws through the CPU
+	// path, which is the same fallback the runtime switch provides, so a program the injection
+	// cannot handle degrades instead of disappearing. That is why none of this returns early or
+	// disturbs m_shader.
+	m_skinnedBytecode = Direct3d11_ShaderCompiler::compileVertexShader(m_source, m_sourceLength, m_vertexShader.getFilename(), macros.get(), true);
+
+	if (m_skinnedBytecode)
+	{
+		m_skinnedSignatureHash = Direct3d11_InputLayoutCache::hashVertexShaderSignature(m_skinnedBytecode->GetBufferPointer(), static_cast<unsigned int>(m_skinnedBytecode->GetBufferSize()));
+
+		HRESULT const skinnedResult = device->CreateVertexShader(m_skinnedBytecode->GetBufferPointer(), m_skinnedBytecode->GetBufferSize(), NULL, &m_skinnedShader);
+
+		Direct3d11_Device::setDebugName(m_skinnedShader, m_vertexShader.getFilename());
+		if (FAILED(skinnedResult) || !m_skinnedShader)
+		{
+			WARNING(true, ("Direct3d11: the skinned variant of vertex program '%s' compiled but its shader object could not be created (%s). That material will skin on the CPU.", m_vertexShader.getFilename(), Direct3d11_Device::describeHresult(skinnedResult)));
+			m_skinnedShader = NULL;
+		}
 	}
 }
 

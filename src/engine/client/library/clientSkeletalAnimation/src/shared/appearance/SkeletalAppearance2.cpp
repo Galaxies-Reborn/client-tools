@@ -947,6 +947,26 @@ float SkeletalAppearance2::getDetailLevelBias()
 
 // ----------------------------------------------------------------------
 
+/**
+ * Apply the character detail slider to a raw screen fraction.
+ *
+ * calculateDisplayLodIndex already scaled its own copy by ms_lodBias, but nothing else did: the
+ * no-render, skinning-mode and batching thresholds all compared against the raw fraction. Raising
+ * the slider therefore bought a high-detail mesh that was still skinned one bone per vertex past
+ * about 7m, and batched as static geometry past about 15m -- which shows the extra vertices off at
+ * their worst rather than hiding the difference.
+ *
+ * A bias below one is left alone. It is there to spend less, and stretching the thresholds outward
+ * for it would be the opposite of what was asked.
+ */
+
+float SkeletalAppearance2::applyDetailLevelBias(float screenFraction)
+{
+	return (ms_lodBias > 1.0f) ? (screenFraction * ms_lodBias) : screenFraction;
+}
+
+// ----------------------------------------------------------------------
+
 void SkeletalAppearance2::setShowSkeleton(bool showSkeleton)
 {
 #if PRODUCTION == 0
@@ -1539,7 +1559,12 @@ void SkeletalAppearance2::render() const
 	bool projectionSuccess       = camera->computeRadiusInScreenSpace(camera->rotateTranslate_w2o(object->getAppearanceSphereCenter_w()), getSphere().getRadius(), screenRadiusInPixels);
 	float screenDiameterFraction = (projectionSuccess ? (s_twoOverScreenLength * screenRadiusInPixels) : FLT_MIN);
 	
-	bool skipRender = (screenDiameterFraction <= ConfigClientSkeletalAnimation::getNoRenderScreenFraction());
+	//-- The detail slider applies to every apparent-size threshold below, not only to the LOD
+	//   choice. calculateDisplayLodIndex scales its own copy, so the raw fraction is what gets
+	//   passed to it.
+	float const biasedScreenDiameterFraction = applyDetailLevelBias(screenDiameterFraction);
+
+	bool skipRender = (biasedScreenDiameterFraction <= ConfigClientSkeletalAnimation::getNoRenderScreenFraction());
 
 	/*if(s_maximumDesiredDetailLevelEnabled)
 	{
@@ -1702,12 +1727,12 @@ void SkeletalAppearance2::render() const
 					if (m_mostRecentRenderUsedBatch || s_uiContextEnabled)
 					{
 						// Rendered with batcher last frame.  Keep it turned on if screen fraction is smaller than near screen fraction.
-						useBatcher = (screenDiameterFraction < s_batchRendererStartNearFraction);
+						useBatcher = (biasedScreenDiameterFraction < s_batchRendererStartNearFraction);
 					}
 					else
 					{
 						// Did not render with batcher last frame.  Only turn on if screen fraction is smaller than far screen fraction.
-						useBatcher = (screenDiameterFraction <= s_batchRendererStartFarFraction);
+						useBatcher = (biasedScreenDiameterFraction <= s_batchRendererStartFarFraction);
 					}
 				}
 
@@ -1723,9 +1748,9 @@ void SkeletalAppearance2::render() const
 
 				bool const mustUseSoftSkinning = appearanceTemplate.mustUseSoftSkinning();
 
-				if (screenDiameterFraction <= ConfigClientSkeletalAnimation::getNoSkinningScreenFraction())
+				if (biasedScreenDiameterFraction <= ConfigClientSkeletalAnimation::getNoSkinningScreenFraction())
 					skinningMode = ShaderPrimitive::SM_noSkinning;
-				else if (!mustUseSoftSkinning && (m_forceHardSkinningEnabled || (screenDiameterFraction <= ConfigClientSkeletalAnimation::getHardSkinningScreenFraction())))
+				else if (!mustUseSoftSkinning && (m_forceHardSkinningEnabled || (biasedScreenDiameterFraction <= ConfigClientSkeletalAnimation::getHardSkinningScreenFraction())))
 					skinningMode = ShaderPrimitive::SM_hardSkinning;
 				else
 					skinningMode = ShaderPrimitive::SM_softSkinning;

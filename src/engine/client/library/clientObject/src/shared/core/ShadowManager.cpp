@@ -34,12 +34,24 @@ namespace ShadowManagerNamespace
 	// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 	const float cms_minimumVolumetricShadowDistance = 128.f;
-	const float cms_maximumVolumetricShadowDistance = 512.f;
+	const float cms_maximumVolumetricShadowDistance = 2048.f;
 	const float cms_minimumSimpleShadowDistance     = 32.f;
-	const float cms_maximumSimpleShadowDistance     = 256.f;
-	const float cms_ignoreRatio                     = 10.f / 800.f;
+	const float cms_maximumSimpleShadowDistance     = 1024.f;
+
+	// The "too small to bother with" cull, as a fraction of render target width. At the shipped
+	// 10/800 that is a 24 pixel radius at 1920, and a 1m radius character at 100m projects to about
+	// 17 -- so shadows were being dropped by apparent size long before any distance limit applied,
+	// and nothing exposed it. Now it moves with the shadow detail slider, whose bottom end is the
+	// value that shipped.
+	const float cms_maximumIgnoreRatio              = 10.f / 800.f;
+	const float cms_minimumIgnoreRatio              =  1.f / 800.f;
+
 	const float cms_fogNaturalBase					= 2.71828f;
-	const float cms_fogCutOff						= 0.20f;
+
+	// Fog also cuts shadows off, at 80% obscured. That is a reasonable place to stop when the draw
+	// distance is short and a visible one when it is not, so it moves with the same slider.
+	const float cms_maximumFogCutOff				= 0.20f;
+	const float cms_minimumFogCutOff				= 0.02f;
 
 	// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -74,7 +86,8 @@ namespace ShadowManagerNamespace
 
 	inline bool shouldRender (Camera const & camera, Vector const & position_w, float const radius, float const maximumDistance)
 	{
-		const int ignoreSize = static_cast<int> (cms_ignoreRatio * Graphics::getCurrentRenderTargetWidth ());
+		const float ignoreRatio = linearInterpolate (cms_maximumIgnoreRatio, cms_minimumIgnoreRatio, ms_shadowDetailLevel);
+		const int ignoreSize = static_cast<int> (ignoreRatio * Graphics::getCurrentRenderTargetWidth ());
 
 		//-- check minimum screen size
 		float screenRadius = 0.f;
@@ -98,7 +111,9 @@ namespace ShadowManagerNamespace
 			float baseDistanceDensity = pow(cms_fogNaturalBase, distanceDensitySqrd);
 			float finalFogValue = 1.0f / baseDistanceDensity;
 
-			if(finalFogValue < cms_fogCutOff)
+			const float fogCutOff = linearInterpolate (cms_maximumFogCutOff, cms_minimumFogCutOff, ms_shadowDetailLevel);
+
+			if(finalFogValue < fogCutOff)
 				return false;
 		}
 

@@ -48,6 +48,55 @@ namespace CuiLayerRendereNamespace
 
 	bool                      s_installed;
 	DynamicVertexBuffer *     s_vertexBuffer = 0;
+
+	//-- Why the queue flushed. Each flush is a draw call, and the three reasons need different
+	//   fixes, so counting them decides which fix is worth building.
+	int s_flushShaderChange;
+	int s_flushVertexType;
+	int s_flushBufferFull;
+	int s_flushOther;
+	int s_flushReportFrames;
+
+	//-- How many DISTINCT shaders the shader-change flushes are actually cycling between.
+	//
+	//   584 changes a frame is far more than a HUD has textures, so the question is whether a small
+	//   set is being interleaved -- in which case grouping by shader collapses most of them -- or
+	//   whether there really are that many distinct materials, in which case only an atlas helps.
+	enum { FLUSH_SHADER_SLOTS = 128 };
+
+	void const *s_flushShaders[FLUSH_SHADER_SLOTS];
+	int         s_flushShaderCount;
+	int         s_flushShaderOverflow;
+
+	void noteFlushShader (void const *shader)
+	{
+		if (!shader)
+			return;
+
+		for (int i = 0; i < s_flushShaderCount; ++i)
+			if (s_flushShaders[i] == shader)
+				return;
+
+		if (s_flushShaderCount >= FLUSH_SHADER_SLOTS)
+		{
+			++s_flushShaderOverflow;
+			return;
+		}
+
+		s_flushShaders[s_flushShaderCount++] = shader;
+	}
+
+	void noteFlushReason (bool shaderChange, bool vertexTypeChange, bool bufferFull)
+	{
+		if (bufferFull)
+			++s_flushBufferFull;
+		else if (vertexTypeChange)
+			++s_flushVertexType;
+		else if (shaderChange)
+			++s_flushShaderChange;
+		else
+			++s_flushOther;
+	}
 	VertexBufferWriteIterator s_vertexBufferWriteIterator;
 	int                       s_numberOfVertices;
 	int                       s_maxNumberOfVertices;
@@ -169,8 +218,18 @@ void           CuiLayerRenderer::setZ (real z, real ooz)
 
 void CuiLayerRenderer::render (const Shader * shader, const UIFloatPoint verts [4], const UIFloatPoint UVs [4], const UIColor Colors [4])
 {
-	if (s_vertexType != VIT_quad || (s_curShader && shader != s_curShader || s_numberOfVertices+4 > s_maxNumberOfVertices))
-		flushRenderQueue ();
+	{
+		const bool vertexTypeChange = (s_vertexType != VIT_quad);
+		const bool shaderChange     = (s_curShader && shader != s_curShader);
+		const bool bufferFull       = (s_numberOfVertices + 4 > s_maxNumberOfVertices);
+
+		if (vertexTypeChange || shaderChange || bufferFull)
+		{
+			noteFlushReason (shaderChange, vertexTypeChange, bufferFull);
+			noteFlushShader (shader);
+			flushRenderQueue ();
+		}
+	}
 
 	if (s_numberOfVertices == 0)
 		lockDynamicVertexBuffer();
@@ -221,8 +280,18 @@ void CuiLayerRenderer::render (const Shader * shader, const UIFloatPoint verts [
 	UNREF (verts);
 	UNREF (UVs);
 
-	if (s_vertexType != VIT_quad || (s_curShader && shader != s_curShader || s_numberOfVertices+4 > s_maxNumberOfVertices))
-		flushRenderQueue ();
+	{
+		const bool vertexTypeChange = (s_vertexType != VIT_quad);
+		const bool shaderChange     = (s_curShader && shader != s_curShader);
+		const bool bufferFull       = (s_numberOfVertices + 4 > s_maxNumberOfVertices);
+
+		if (vertexTypeChange || shaderChange || bufferFull)
+		{
+			noteFlushReason (shaderChange, vertexTypeChange, bufferFull);
+			noteFlushShader (shader);
+			flushRenderQueue ();
+		}
+	}
 
 	if (s_numberOfVertices == 0)
 		lockDynamicVertexBuffer();
@@ -263,8 +332,18 @@ void CuiLayerRenderer::render (const Shader * shader, const UIFloatPoint verts [
 
 void  CuiLayerRenderer::renderPointsGeneric (int type, const Shader * shader, const int numPoints, const UIFloatPoint * pts,  const UIFloatPoint * uvs, const VectorArgb & color)
 {
-	if (s_vertexType != type || (s_curShader && shader != s_curShader || s_numberOfVertices + numPoints > s_maxNumberOfVertices ))
-		flushRenderQueue ();
+	{
+		const bool vertexTypeChange = (s_vertexType != type);
+		const bool shaderChange     = (s_curShader && shader != s_curShader);
+		const bool bufferFull       = (s_numberOfVertices + numPoints > s_maxNumberOfVertices);
+
+		if (vertexTypeChange || shaderChange || bufferFull)
+		{
+			noteFlushReason (shaderChange, vertexTypeChange, bufferFull);
+			noteFlushShader (shader);
+			flushRenderQueue ();
+		}
+	}
 
 	if (s_numberOfVertices == 0 && !lockDynamicVertexBuffer(numPoints))
 	{
@@ -315,10 +394,17 @@ void CuiLayerRenderer::renderLineStrip  (const Shader * shader, const int numPoi
 
 //----------------------------------------------------------------------
 
+// The 500-vertex flush cap that used to sit beside the capacity check on the line paths is gone.
+//
+// The capacity term on the same condition already prevents overflow, so 500 was a second and far
+// tighter limit that forced a draw call every 250 lines for no reason the buffer needed. UI line
+// work is a measurable share of the frame's draw calls and this cost draws without bounding
+// anything.
+
 void CuiLayerRenderer::renderLines     (const Shader * shader, const int numLines,  const UILine       * lines,  const UILine * uvs, const VectorArgb & color)
 {
 	int const requiredVertices = numLines * 2;
-	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices > 500 || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
+	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
 		flushRenderQueue ();
 
 	if (s_numberOfVertices == 0 && !lockDynamicVertexBuffer(requiredVertices))
@@ -368,7 +454,7 @@ void CuiLayerRenderer::renderLines     (const Shader * shader, const int numLine
 void CuiLayerRenderer::renderLines(const Shader * shader, const int numLines, const UILine * lines, const UILine * uvs, const VectorArgb * colors)
 {
 	int const requiredVertices = numLines * 2;
-	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices > 500 || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
+	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
 		flushRenderQueue ();
 
 	if (s_numberOfVertices == 0 && !lockDynamicVertexBuffer(requiredVertices))
@@ -421,7 +507,7 @@ void CuiLayerRenderer::renderTriangles (const Shader * shader, int numTris, cons
 	DEBUG_FATAL(numTris == 0, ("numTris is 0"));
 
 	int const requiredVertices = numTris * 3;
-	if (s_vertexType != VIT_triangleList || (s_curShader && shader != s_curShader || s_numberOfVertices > 500 || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
+	if (s_vertexType != VIT_triangleList || (s_curShader && shader != s_curShader || s_numberOfVertices + requiredVertices > s_maxNumberOfVertices ))
 		flushRenderQueue ();
 
 	if (s_numberOfVertices == 0 && !lockDynamicVertexBuffer(requiredVertices))
@@ -480,7 +566,10 @@ void CuiLayerRenderer::renderTriangles (const Shader * shader, int numTris, cons
 
 void CuiLayerRenderer::renderLine (const Shader * shader, const UILine & verts, const UILine & UVs, const VectorArgb & color)
 {
-	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices > 500))
+	//-- Bounded by the buffer rather than by an arbitrary 500. This site had no capacity term beside
+	//   the cap, so the cap was the only thing preventing overflow and could not simply be dropped
+	//   the way the other two were; renderLine contributes two vertices.
+	if (s_vertexType != VIT_line || (s_curShader && shader != s_curShader || s_numberOfVertices + 2 > s_maxNumberOfVertices))
 		flushRenderQueue ();
 
 	if (s_numberOfVertices == 0)
@@ -530,6 +619,30 @@ void CuiLayerRenderer::flushRenderQueueQuads ()
 {
 	DEBUG_FATAL(!s_vertexBuffer, ("not installed"));
 	DEBUG_FATAL (s_numberOfVertices == 0, ("vertex info is empty\n"));
+
+	//-- Every flush here is a draw call. Report what caused them, because a buffer-full flush is
+	//   fixed by a bigger buffer while a shader-change flush needs an atlas or a draw-order change.
+	if (++s_flushReportFrames >= 600)
+	{
+		const int total = s_flushShaderChange + s_flushVertexType + s_flushBufferFull + s_flushOther;
+
+		WARNING(true, ("UiFlush: %d flush(es) over %d quad flushes; shader change %d, vertex type %d, buffer full %d, other %d. Buffer holds %d vertices.",
+			total, s_flushReportFrames,
+			s_flushShaderChange, s_flushVertexType, s_flushBufferFull, s_flushOther,
+			s_maxNumberOfVertices));
+
+		WARNING(true, ("UiFlushShaders: %d distinct shader(s) involved%s. Far fewer than the change count means a small set is interleaving and grouping by shader would collapse most of the draws.",
+			s_flushShaderCount, s_flushShaderOverflow ? " (table full)" : ""));
+
+		s_flushShaderCount = 0;
+		s_flushShaderOverflow = 0;
+
+		s_flushShaderChange = 0;
+		s_flushVertexType = 0;
+		s_flushBufferFull = 0;
+		s_flushOther = 0;
+		s_flushReportFrames = 0;
+	}
 
 #if PRODUCTION == 0
 	++s_metrics.quadCallCount;

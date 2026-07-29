@@ -167,7 +167,13 @@ m_serverLoopTimeRequested (false)
 #endif
 
 	if (m_versionText)
-		m_versionText->SetLocalText (Unicode::narrowToWide (version));
+	{
+		//-- The engine version, followed by this fork's build name.
+		char versionBuffer[256];
+		snprintf (versionBuffer, sizeof (versionBuffer), "%s  GalaxiesReborn-V1", version);
+
+		m_versionText->SetLocalText (Unicode::narrowToWide (versionBuffer));
+	}
 
 	//hide server loop time and animtrack stuff in release
 	// NOTE: this Release/x64 build is PRODUCTION==1 (DEBUG_LEVEL=0), so THIS block
@@ -496,28 +502,46 @@ void SwgCuiDebugInfoPage::updateFps ()
 		{
 			m_lastFps = fps;
 
-			const int numberOfMegabytesAllocated = MemoryManager::getCurrentNumberOfBytesAllocated () / (1024 * 1024);
-			const int limit = MemoryManager::getLimit ();
-
-			//-- LEAK INSTRUMENT (2026-06-01): the SWG MemoryManager number above only
-			// counts MM-tracked allocations; it resets in bulk on cache cycles. The real
-			// leak is in UNTRACKED native/D3D memory = process working set minus the
-			// tracked total. Surface both live so the overlay is a real-time leak gauge.
+			//-- Host memory. Working set is what is resident right now and moves with paging
+			//   pressure; private commit is what this process has actually asked for, and is the
+			//   one that grows when something leaks. Different questions, so both are shown.
+			//
+			//   What used to be here was MemoryManager's tracked total against its configured
+			//   limit, plus working set minus that total labelled "untracked". All three were
+			//   dead: MemoryManager::allocate bypasses its own pool and delegates to CRT malloc,
+			//   so the tracked counter is never incremented -- it is structurally zero, which made
+			//   the limit meaningless and made "untracked" equal working set by construction. Two
+			//   labels for one number and two zeroes is worse than no line at all.
 			int workingSetMB = 0;
-			int untrackedMB  = 0;
+			int privateMB    = 0;
 			{
-				PROCESS_MEMORY_COUNTERS pmc;
+				PROCESS_MEMORY_COUNTERS_EX pmc;
 				memset (&pmc, 0, sizeof (pmc));
 				pmc.cb = sizeof (pmc);
-				if (GetProcessMemoryInfo (GetCurrentProcess (), &pmc, sizeof (pmc)))
+				if (GetProcessMemoryInfo (GetCurrentProcess (), reinterpret_cast<PROCESS_MEMORY_COUNTERS *> (&pmc), sizeof (pmc)))
 				{
 					workingSetMB = static_cast<int> (pmc.WorkingSetSize / (1024 * 1024));
-					untrackedMB  = workingSetMB - numberOfMegabytesAllocated;
+					privateMB    = static_cast<int> (pmc.PrivateUsage / (1024 * 1024));
 				}
 			}
 
-			char buf[160];
-			sprintf (buf, "%5.2f  %iMB/%iMB  WS:%iMB  Untrk:%iMB", fps, numberOfMegabytesAllocated, limit, workingSetMB, untrackedMB);
+			//-- Video memory, when the backend can report it. Omitted rather than zeroed when it
+			//   cannot: a zero reads as "none in use", which is the mistake the old line made.
+			int videoUsedMB   = 0;
+			int videoBudgetMB = 0;
+			const bool haveVideoMemory = Graphics::getVideoMemory (videoUsedMB, videoBudgetMB);
+
+			char buf[192];
+			if (haveVideoMemory)
+			{
+				sprintf (buf, "%5.1f fps   GPU %i/%i MB   RAM %i MB (commit %i)",
+					fps, videoUsedMB, videoBudgetMB, workingSetMB, privateMB);
+			}
+			else
+			{
+				sprintf (buf, "%5.1f fps   RAM %i MB (commit %i)", fps, workingSetMB, privateMB);
+			}
+
 			UINarrowString str (buf);
 
 			if (m_fpsText)
@@ -537,7 +561,16 @@ void SwgCuiDebugInfoPage::updateTerrain ()
 		TerrainObject::getInstance ()->getTime (hour, minute);
 
 		char buffer [64];
-		_snprintf (buffer, sizeof(buffer), "Time: %02i:%02i     T=%i TNT=%i I=%i C=%i S=%i P=%i", hour, minute, ClientWorld::getNumberOfObjects (WOL_Tangible), ClientWorld::getNumberOfObjects (WOL_TangibleNotTargetable), ClientWorld::getNumberOfObjects (WOL_Intangible), CreatureObject::getNumberOfInstances (), ShipObject::getNumberOfInstances(), ShipProjectile::getNumberOfInstances());
+		//-- Spelled out. These are read while something is going wrong, not at leisure, and
+		//   "T=812 TNT=143 I=22 C=61 S=0 P=0" needed the source open to decode.
+		_snprintf (buffer, sizeof(buffer), "%02i:%02i   tangible %i   untargetable %i   intangible %i   creatures %i   ships %i   shots %i",
+			hour, minute,
+			ClientWorld::getNumberOfObjects (WOL_Tangible),
+			ClientWorld::getNumberOfObjects (WOL_TangibleNotTargetable),
+			ClientWorld::getNumberOfObjects (WOL_Intangible),
+			CreatureObject::getNumberOfInstances (),
+			ShipObject::getNumberOfInstances(),
+			ShipProjectile::getNumberOfInstances());
 		if (m_terrainText)
 			m_terrainText->SetLocalText (Unicode::narrowToWide (buffer));
 	}
@@ -547,8 +580,20 @@ void SwgCuiDebugInfoPage::updateTerrain ()
 
 void SwgCuiDebugInfoPage::updateBandwidth ()
 {
-	char buffer [64];
-	snprintf (buffer, sizeof(buffer), "R: %i  S: %i", Game::getReceivedCompressedBytesPerSecond(), Game::getSentCompressedBytesPerSecond());
+	//-- Render stats share this line. This is a rendering project and triangles and draw calls per
+	//   frame are what say whether a change moved work off the CPU or only moved it around; the
+	//   engine already counted them and nothing was showing them.
+	int vertices = 0;
+	int points = 0;
+	int lines = 0;
+	int triangles = 0;
+	int calls = 0;
+	Graphics::getRenderedVerticesPointsLinesTrianglesCalls (vertices, points, lines, triangles, calls);
+
+	char buffer [160];
+	snprintf (buffer, sizeof(buffer), "net down %i B/s  up %i B/s   |   %i tris  %i draws",
+		Game::getReceivedCompressedBytesPerSecond(), Game::getSentCompressedBytesPerSecond(),
+		triangles, calls);
 	if (m_bandwidthText)
 		m_bandwidthText->SetLocalText (Unicode::narrowToWide (buffer));
 }

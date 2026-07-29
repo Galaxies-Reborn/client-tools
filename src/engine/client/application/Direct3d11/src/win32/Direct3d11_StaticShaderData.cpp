@@ -223,6 +223,9 @@ void Direct3d11_StaticShaderData::update(StaticShader const &shader)
 
 void Direct3d11_StaticShaderData::construct(StaticShader const &shader)
 {
+	//-- Held for draw attribution. The template outlives this object, so the pointer is stable.
+	m_shaderTemplateName = shader.getShaderTemplate().getName().getString();
+
 	// StaticShader has no accessor for this; the engine names this class a friend of both
 	// StaticShaderTemplate and ShaderEffect so it can be reached, exactly as DX9 does.
 	ShaderEffect const * const effect = shader.getStaticShaderTemplate().m_effect;
@@ -538,6 +541,9 @@ int Direct3d11_StaticShaderData::getTextureSortKey() const
 
 bool Direct3d11_StaticShaderData::apply(int passNumber) const
 {
+	//-- Whatever draws next belongs to this material.
+	Direct3d11_Metrics::drawAttributionCurrent = m_shaderTemplateName;
+
 	// Every bind this backend performs is downstream of here: vertex and pixel shaders, the
 	// four state objects, samplers and shader resource views.
 	Direct3d11_Metrics::ScopedTimer timer(Direct3d11_Metrics::shaderApplyTicks);
@@ -583,12 +589,35 @@ bool Direct3d11_StaticShaderData::apply(int passNumber) const
 			vertexShader = vertexData->getVertexShader();
 	}
 
+	// GPU skinning: when a bone stream is armed for this draw and this program has a skinned variant,
+	// bind that variant instead. Both halves have to hold -- an armed stream with no skinned variant
+	// would feed bone data to a program that does not declare it, and a skinned variant with no
+	// stream would read bone inputs nothing supplies.
+	//
+	// Checked here rather than inside prepareToDraw: this runs once per material, and prepareToDraw
+	// runs once per draw. The previous cost of putting work on that path was 9.5 microseconds a draw.
+	bool skinned = false;
+
+	if (vertexData && Direct3d11::isBoneStreamArmed())
+	{
+		ID3D11VertexShader * const skinnedShader = vertexData->getSkinnedVertexShader();
+		if (skinnedShader)
+		{
+			vertexShader = skinnedShader;
+			skinned = true;
+		}
+	}
+
 	Direct3d11_StateCache::setVertexShader(vertexShader);
 
-	if (vertexData)
+	if (vertexData && skinned)
+		Direct3d11::setCurrentVertexShaderBytecode(vertexData->getSkinnedBytecode(), vertexData->getSkinnedBytecodeSize(), vertexData->getSkinnedSignatureHash());
+	else if (vertexData)
 		Direct3d11::setCurrentVertexShaderBytecode(vertexData->getBytecode(), vertexData->getBytecodeSize(), vertexData->getSignatureHash());
 	else
 		Direct3d11::setCurrentVertexShaderBytecode(NULL, 0, 0);
+
+	Direct3d11::setCurrentDrawSkinned(skinned);
 
 	// This is where the specialisation DX9 compiled into the shader is handed over.
 	Direct3d11::setCurrentTextureCoordinateSetMapping(pass.textureCoordinateSetMapping, pass.textureCoordinateSetMappingCount);

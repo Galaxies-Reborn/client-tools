@@ -229,6 +229,23 @@ public:
 	// else in the difference between this plus prepareToDraw and the scene total.
 	static long long drawSubmitTicks;
 
+	// Draw calls attributed to the shader that issued them, so the frame's draw count can be read
+	// as a list of systems rather than one number. Keyed by the shader template name POINTER: those
+	// live as long as the template and the same material presents the same pointer, so this costs a
+	// compare per draw rather than a strcmp on the renderer's hottest path.
+	//
+	// Fixed size, with overflow counted rather than the table grown -- a diagnostic that allocates
+	// mid-frame would change what it is measuring.
+	enum { DRAW_ATTRIBUTION_SLOTS = 64 };
+
+	static char const *drawAttributionName[DRAW_ATTRIBUTION_SLOTS];
+	static int         drawAttributionCount[DRAW_ATTRIBUTION_SLOTS];
+	static int         drawAttributionUsed;
+	static int         drawAttributionOverflow;
+	static char const *drawAttributionCurrent;
+
+	static void noteDrawAttribution();
+
 	// The rest of the scene. Every bind this backend does goes through the static shader's apply,
 	// and every dynamic buffer unlock does a Map/memcpy/Unmap on a ring. Neither was timed, which
 	// left a 52 ms scene with nothing to attribute it to once prepareToDraw and the submits had

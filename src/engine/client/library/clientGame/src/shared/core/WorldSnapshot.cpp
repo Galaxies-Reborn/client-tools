@@ -14,6 +14,7 @@
 #include "clientGame/ConfigClientGame.h"
 #include "clientGame/ContainerInterface.h"
 #include "clientGame/Game.h"
+#include "clientObject/DetailAppearance.h"
 #include "clientGraphics/RenderWorld.h"
 #include "sharedDebug/DebugFlags.h"
 #include "sharedDebug/InstallTimer.h"
@@ -119,6 +120,13 @@ namespace WorldSnapshotNamespace
 	Vector ms_lastPosition_w (0.f, -9999.f, 0.f);
 	float ms_updateDistanceSquared;
 	int ms_maximumNumberOfCreatesPerFrame = 1000;
+
+	//-- How far ahead of its own authored radius a snapshot node is created. The shipped value is one
+	//   metre, which for a small prop like a sign or a wall-mounted trophy means it appears almost on
+	//   top of the camera. Scaled by the object detail slider, so the default is unchanged and the
+	//   top of the slider reaches ms_maximumQueryRange.
+	float ms_minimumQueryRange = 1.f;
+	float ms_maximumQueryRange = 256.f;
 	int ms_maximumNumberOfDeletesPerFrame = 1000;
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -351,6 +359,9 @@ void WorldSnapshot::install ()
 	ms_updateDistanceSquared = sqr (ConfigFile::getKeyFloat ("ClientGame/WorldSnapshot", "updateDistance", 4.f));
 	ms_maximumNumberOfCreatesPerFrame = ConfigFile::getKeyInt("ClientGame/WorldSnapshot", "maximumNumberOfCreatesPerFrame", ms_maximumNumberOfCreatesPerFrame);
 	ms_maximumNumberOfDeletesPerFrame = ConfigFile::getKeyInt("ClientGame/WorldSnapshot", "maximumNumberOfDeletesPerFrame", ms_maximumNumberOfDeletesPerFrame);
+
+	ms_minimumQueryRange = ConfigFile::getKeyFloat ("ClientGame/WorldSnapshot", "minimumQueryRange", ms_minimumQueryRange);
+	ms_maximumQueryRange = ConfigFile::getKeyFloat ("ClientGame/WorldSnapshot", "maximumQueryRange", ms_maximumQueryRange);
 
 	ExitChain::add (remove, "WorldSnapshot::remove");
 }
@@ -813,7 +824,19 @@ void WorldSnapshot::update(CellProperty const * const cellProperty, Vector const
 	//-- the first update's pending create query should ask the sphere tree for what should be loaded
 	ms_queryList.clear ();
 
-	ms_sphereTree.findInRange (position_w, 1.f, ms_queryList);
+	//-- Interpolated across the object detail slider, which runs 0.5 to 16. At or below the
+	//   slider's default of 1.0 this is the shipped one metre and nothing changes; at the top it is
+	//   ms_maximumQueryRange, which is what brings a small prop's creation forward far enough to see
+	//   it from a distance at all.
+	float queryRange = ms_minimumQueryRange;
+	{
+		const float bias = DetailAppearance::getDetailLevelBias ();
+		const float t = clamp (0.f, (bias - 1.f) / (16.f - 1.f), 1.f);
+
+		queryRange = linearInterpolate (ms_minimumQueryRange, ms_maximumQueryRange, t);
+	}
+
+	ms_sphereTree.findInRange (position_w, queryRange, ms_queryList);
 
 	if (!ms_queryList.empty () || !ms_loadedList.empty ())
 	{

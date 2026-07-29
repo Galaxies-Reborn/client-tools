@@ -108,6 +108,10 @@ private:
 	Direct3d11_StaticShaderData &operator =(Direct3d11_StaticShaderData const &);
 
 	void construct(StaticShader const &shader);
+
+	// The shader template's name, held for draw attribution. Owned by the template, which outlives
+	// this, so the pointer is stable and can be compared rather than copied.
+	char const *m_shaderTemplateName;
 	void destroy();
 
 private:
