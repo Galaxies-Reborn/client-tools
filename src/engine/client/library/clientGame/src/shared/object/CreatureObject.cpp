@@ -6192,6 +6192,18 @@ void CreatureObject::addBuffDebug(uint32 const buffHash, uint32 const timestamp,
 
 // ----------------------------------------------------------------------
 
+void CreatureObject::setBuffDebug(uint32 const buffHash, uint32 const timestamp, float value, uint32 const duration, uint32 const stackCount)
+{
+	Buff newBuff(buffHash, timestamp, value, duration, NetworkId::cms_invalid, stackCount);
+	Buff::PackedBuff const packedBuff = newBuff.getPackedBuffValue();
+	if (m_buffs.find(buffHash) == m_buffs.end())
+		m_buffs.insert(buffHash, packedBuff);
+	else
+		m_buffs.set(buffHash, packedBuff);
+}
+
+// ----------------------------------------------------------------------
+
 void CreatureObject::removeBuffDebug(uint32 const buffHash)
 {
 	m_buffs.erase(buffHash);

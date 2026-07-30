@@ -17,6 +17,7 @@
 #include "clientDirectInput/SetupClientDirectInput.h"
 #include "clientGame/ClientCommandQueue.h"
 #include "clientGame/ClientCommandChecks.h"
+#include "clientGame/ClientBuffManager.h"
 #include "clientGame/ClientObject.h"
 #include "clientGame/ContainerInterface.h"
 #include "clientGame/Game.h"
@@ -575,11 +576,16 @@ namespace ClientMainNamespace
 		BIC_lastDitchWeaponStatus,
 		BIC_queueFeignDeath,
 		BIC_feignDeathWeaponStatus,
-		BIC_queueCenterOfBeing
+		BIC_queueCenterOfBeing,
+		BIC_statusCatalogAudit,
+		BIC_statusPanelApply,
+		BIC_statusPanelRefresh,
+		BIC_statusPanelClear,
+		BIC_statusPanelState
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 247;
+	LRESULT const cms_backgroundInputProtocolVersion = 253;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1241,6 +1247,63 @@ namespace ClientMainNamespace
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
 		return queued;
+	}
+
+	LRESULT getBackgroundStatusCatalogAudit()
+	{
+		ClientBuffManager::CatalogAudit audit;
+		ClientBuffManager::auditVisibleBuffCatalog(audit);
+		REPORT_LOG(true, ("Pre-CU status catalog audit: records=%u visible=%u positive=%u debuff=%u authoredIconMisses=%u unresolvedIcons=%u\n",
+			audit.recordCount,
+			audit.visibleCount,
+			audit.positiveCount,
+			audit.debuffCount,
+			audit.authoredIconMissCount,
+			audit.unresolvedIconCount));
+
+		uint64 result = 0x4255000000000000ULL;
+		result |= static_cast<uint64>(audit.visibleCount & 0x0fffU);
+		result |= static_cast<uint64>(audit.positiveCount & 0x0fffU) << 12;
+		result |= static_cast<uint64>(audit.debuffCount & 0x03ffU) << 24;
+		result |= static_cast<uint64>(audit.authoredIconMissCount & 0x03ffU) << 34;
+		result |= static_cast<uint64>(audit.unresolvedIconCount & 0x000fU) << 44;
+		return static_cast<LRESULT>(result);
+	}
+
+	bool performBackgroundStatusPanelApply(int const durationSeconds, bool const refresh)
+	{
+		return ClientBuffManager::applyStatusPanelDebugFixtures(durationSeconds, refresh);
+	}
+
+	bool performBackgroundStatusPanelClear()
+	{
+		return ClientBuffManager::clearStatusPanelDebugFixtures();
+	}
+
+	LRESULT getBackgroundStatusPanelState()
+	{
+		ClientBuffManager::StatusPanelAudit audit;
+		if (!ClientBuffManager::getStatusPanelAudit(audit))
+			return 0;
+
+		uint64 result = 0x4250000000000000ULL;
+		if (audit.diagnosticsValid)
+			result |= 0x01ULL;
+		if (audit.panelVisible)
+			result |= 0x02ULL;
+		if (audit.hasPositiveFixture)
+			result |= 0x04ULL;
+		if (audit.hasDebuffFixture)
+			result |= 0x08ULL;
+		result |= static_cast<uint64>(audit.visibleCount & 0x0fffU) << 8;
+		result |= static_cast<uint64>(audit.positiveCount & 0x0fffU) << 20;
+		result |= static_cast<uint64>(audit.debuffCount & 0x03ffU) << 32;
+		// Keep the rendered count below the high 16-bit result tag. Six bits
+		// cover the panel's practical capacity without corrupting diagnostics.
+		result |= static_cast<uint64>(audit.renderedIconCount & 0x003fU) << 42;
+		if (audit.diagnosticsValid && audit.renderedIconCount == audit.visibleCount)
+			result |= 0x80ULL;
+		return static_cast<LRESULT>(result);
 	}
 
 	bool performBackgroundQueueMeditate()
@@ -3175,6 +3238,25 @@ namespace ClientMainNamespace
 				if (!performBackgroundQueueCenterOfBeing())
 					return 0;
 				return getBackgroundCombatQueueStatus();
+
+			case BIC_statusCatalogAudit:
+				return getBackgroundStatusCatalogAudit();
+
+			case BIC_statusPanelApply:
+				if (lParam < 1 || lParam > 120)
+					return 0;
+				return performBackgroundStatusPanelApply(static_cast<int>(lParam), false) ? 1 : 0;
+
+			case BIC_statusPanelRefresh:
+				if (lParam < 1 || lParam > 120)
+					return 0;
+				return performBackgroundStatusPanelApply(static_cast<int>(lParam), true) ? 1 : 0;
+
+			case BIC_statusPanelClear:
+				return performBackgroundStatusPanelClear() ? 1 : 0;
+
+			case BIC_statusPanelState:
+				return getBackgroundStatusPanelState();
 
 			case BIC_queueMeditate:
 				if (!performBackgroundQueueMeditate())

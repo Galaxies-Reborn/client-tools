@@ -19,6 +19,32 @@ class Buff;
 class ClientBuffManager
 {
 public:
+	struct CatalogAudit
+	{
+		CatalogAudit();
+
+		uint32 recordCount;
+		uint32 visibleCount;
+		uint32 positiveCount;
+		uint32 debuffCount;
+		uint32 authoredIconMissCount;
+		uint32 unresolvedIconCount;
+	};
+
+	struct StatusPanelAudit
+	{
+		StatusPanelAudit();
+
+		bool diagnosticsValid;
+		bool panelVisible;
+		bool hasPositiveFixture;
+		bool hasDebuffFixture;
+		uint32 visibleCount;
+		uint32 positiveCount;
+		uint32 debuffCount;
+		uint32 renderedIconCount;
+	};
+
 	static void install();
 	static void remove();
 
@@ -33,6 +59,11 @@ public:
 	static int  getBuffDisplayOrder(uint32 buffNameCrc);
 
 	static UIImageStyle * getBuffIconStyle(uint32 buffNameCrc);
+	static void auditVisibleBuffCatalog(CatalogAudit & result);
+	static bool applyStatusPanelDebugFixtures(int durationSeconds, bool refresh);
+	static bool clearStatusPanelDebugFixtures();
+	static bool getStatusPanelAudit(StatusPanelAudit & result);
+	static void setStatusPanelDiagnostics(uint32 renderedIconCount, bool panelVisible);
 	static void getBuffDescription(Buff const & buff, Unicode::String & result);
 	static void addTimestampToBuffDescription(Unicode::String const & description, int timeLeft, Unicode::String & result);
 

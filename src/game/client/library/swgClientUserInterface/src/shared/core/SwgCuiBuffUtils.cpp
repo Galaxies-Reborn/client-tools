@@ -285,8 +285,7 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 	if (!sharedStatusPage)
 		removePlaceholderIcons(debuffPage);
 
-	uint32 currentTime = creature.getPlayedTime();
-	uint32 creatureTime = currentTime;
+	uint32 const creatureTime = creature.getPlayedTime();
 	uint32 serverTime = 0;
 	 
 	
@@ -347,10 +346,9 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 
 						const Buff & buff = (*found).second;
 
-						if (ClientBuffManager::getBuffIsCelestial(buff.m_nameCrc))
-							currentTime = serverTime;
-						else
-							currentTime = creatureTime;
+						uint32 const currentTime = ClientBuffManager::getBuffIsCelestial(buff.m_nameCrc)
+							? serverTime
+							: creatureTime;
 	
 						int timeLeft = 0;
 						if (buff.m_timestamp > currentTime)
@@ -370,7 +368,10 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 							{
 								UIPage * const iconPage = static_cast<UIPage *>(object);
 								Unicode::String tooltipStr;
-								iconPage->GetProperty(BUFF_DESCRIPTION_PROPERTY, tooltipStr);
+								ClientBuffManager::getBuffDescription(buff, tooltipStr);
+								iconPage->SetProperty(BUFF_DESCRIPTION_PROPERTY, tooltipStr);
+								iconPage->SetPropertyInteger(BUFF_TIMESTAMP_PROPERTY, buff.m_timestamp);
+								iconPage->SetPropertyInteger(BUFF_LENGTH_PROPERTY, static_cast<int>(buff.m_duration));
 								Unicode::String result;
 								ClientBuffManager::addTimestampToBuffDescription(tooltipStr, timeLeft, result);
 								
@@ -404,7 +405,9 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 							{
 								UIImage * const image = static_cast<UIImage *>(object);
 								Unicode::String tooltipStr;
-								image->GetProperty(BUFF_DESCRIPTION_PROPERTY, tooltipStr);
+								ClientBuffManager::getBuffDescription(buff, tooltipStr);
+								image->SetProperty(BUFF_DESCRIPTION_PROPERTY, tooltipStr);
+								image->SetPropertyInteger(BUFF_TIMESTAMP_PROPERTY, buff.m_timestamp);
 								Unicode::String result;
 								ClientBuffManager::addTimestampToBuffDescription(tooltipStr, timeLeft, result);
 
@@ -476,6 +479,9 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 			for (std::map<uint32, Buff>::iterator i = buffs.begin(); i != buffs.end(); ++i)
 			{
 				const Buff & buff = (*i).second;
+				uint32 const currentTime = ClientBuffManager::getBuffIsCelestial(buff.m_nameCrc)
+					? serverTime
+					: creatureTime;
 
 				if(ClientBuffManager::getBuffIsGroupVisible(buff.m_nameCrc) || isPlayerGod)
 				{

@@ -467,6 +467,7 @@ public:
 	void   getBuffs(stdmap<uint32, Buff>::fwd & buffs) const;
 	uint32 getPlayedTime() const;
 	void addBuffDebug(uint32 const buffHash, uint32 const timestamp, float const value);
+	void setBuffDebug(uint32 const buffHash, uint32 const timestamp, float const value, uint32 const duration, uint32 const stackCount);
 	void removeBuffDebug(uint32 const buffHash);
 
 	unsigned long getLastWaterDamageTimeMs();

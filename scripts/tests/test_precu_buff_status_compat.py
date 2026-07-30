@@ -114,6 +114,53 @@ class Publish14BuffStatusCompatibilityTests(unittest.TestCase):
             self.buff_manager_source.index("CuiIconManager::getFallback", 0),
         )
 
+    def test_catalog_audit_checks_every_visible_status_icon(self):
+        self.assertIn(
+            "void ClientBuffManager::auditVisibleBuffCatalog",
+            self.buff_manager_source,
+        )
+        audit = self.buff_manager_source.split(
+            "void ClientBuffManager::auditVisibleBuffCatalog", 1
+        )[1]
+        self.assertIn("for (std::unordered_map<uint32, BuffRecord>", audit)
+        self.assertIn("if (!record.visible)", audit)
+        self.assertIn("++result.positiveCount", audit)
+        self.assertIn("++result.debuffCount", audit)
+        self.assertIn("++result.authoredIconMissCount", audit)
+        self.assertIn("++result.unresolvedIconCount", audit)
+
+    def test_internal_effect_parameters_do_not_truncate_tooltips(self):
+        unknown_effect = self.buff_manager_source.split(
+            'WARNING(true, ("Unknown effect crc', 1
+        )[1].split("EffectRecord const &effectRecord", 1)[0]
+        self.assertIn("continue;", unknown_effect)
+        self.assertNotIn("return;", unknown_effect)
+
+    def test_existing_icons_refresh_duration_description_and_timestamp(self):
+        existing = self.buff_utils_source.split(
+            "// the buff is on the creature's list", 1
+        )[1].split("buffs.erase(found);", 1)[0]
+        self.assertGreaterEqual(
+            existing.count("ClientBuffManager::getBuffDescription(buff, tooltipStr)"),
+            2,
+        )
+        self.assertGreaterEqual(
+            existing.count("SetPropertyInteger(BUFF_TIMESTAMP_PROPERTY, buff.m_timestamp)"),
+            2,
+        )
+        self.assertIn(
+            "SetPropertyInteger(BUFF_LENGTH_PROPERTY, static_cast<int>(buff.m_duration))",
+            existing,
+        )
+
+    def test_each_buff_uses_its_own_celestial_or_played_time_base(self):
+        self.assertGreaterEqual(
+            self.buff_utils_source.count(
+                "uint32 const currentTime = ClientBuffManager::getBuffIsCelestial"
+            ),
+            2,
+        )
+
     def test_optional_debuff_volume_is_guarded_for_pointer_input(self):
         right_mouse = re.search(
             r"if \(msg\.Type == UIMessage::RightMouseUp\).*?"

@@ -10,6 +10,7 @@
 
 #include "clientGame/ClientBuffManager.h"
 #include "clientGame/CreatureObject.h"
+#include "clientGame/Game.h"
 #include "clientGame/PlayerObject.h"
 #include "sharedGame/Buff.h"
 #include "sharedMessageDispatch/Transceiver.h"
@@ -35,6 +36,7 @@ namespace SwgCuiBuffDisplayNamespace
 	
 	static const UILowerString BUFF_TIMESTAMP_PROPERTY = UILowerString("BuffTimestamp");
 	static const int PLAYER_BUFF_BLINK_TIME = 10;
+
 }
 
 using namespace SwgCuiBuffDisplayNamespace;
@@ -143,6 +145,14 @@ void SwgCuiBuffDisplay::update(float deltaTimeSecs)
 		bool const hasActiveEffects = (state & (SwgCuiBuffUtils::UBRT_hasBuffs | SwgCuiBuffUtils::UBRT_hasDebufs)) != 0;
 		getPage().SetVisible(hasActiveEffects && !m_userClosed);
 		m_volume->Pack();
+
+		CreatureObject const * const playerCreature = Game::getPlayerCreature();
+		if (playerCreature && m_objectId == playerCreature->getNetworkId())
+		{
+			ClientBuffManager::setStatusPanelDiagnostics(
+				static_cast<uint32>(m_volume->GetChildCount()),
+				getPage().IsVisible());
+		}
 		return;
 	}
 

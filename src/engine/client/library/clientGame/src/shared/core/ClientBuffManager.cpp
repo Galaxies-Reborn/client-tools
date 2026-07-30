@@ -14,10 +14,12 @@
 #include "UIPage.h"
 #include "UIUtils.h"
 #include "clientGame/CreatureObject.h"
+#include "clientGame/Game.h"
 #include "clientGame/ProsePackageManagerClient.h"
 #include "clientUserInterface/CuiIconManager.h"
 #include "sharedFoundation/Crc.h"
 #include "sharedGame/ProsePackage.h"
+#include "sharedGame/Buff.h"
 #include "sharedUtility/DataTable.h"
 #include "sharedUtility/DataTableManager.h"
 #include "UnicodeUtils.h"
@@ -25,6 +27,7 @@
 #include "sharedFoundation/NetworkId.h"
 #include "sharedMath/Vector.h"
 #include <vector>
+#include <map>
 
 //======================================================================
 
@@ -102,6 +105,22 @@ namespace ClientBuffManagerNamespace
 
 	std::map<uint32, EffectRecord> ms_effectRecords;
 
+	bool ms_statusPanelDiagnosticsValid = false;
+	uint32 ms_statusPanelRenderedIconCount = 0;
+	bool ms_statusPanelVisible = false;
+
+	uint32 getStatusPanelPositiveFixtureCrc()
+	{
+		// Data-table NAME CRCs are normalized. Use an all-lowercase fixture so
+		// the injected map key resolves to the same catalog record on every build.
+		return Crc::calculate("proc_generic_test");
+	}
+
+	uint32 getStatusPanelDebuffFixtureCrc()
+	{
+		return Crc::calculate("co_hw_dot_fire_1");
+	}
+
 	const std::string ATTRIB_TYPE_HEALTH = "health";
 	const std::string ATTRIB_TYPE_STAMINA = "stamina";
 	const std::string ATTRIB_TYPE_CONSTITUTION = "constitution";
@@ -117,6 +136,32 @@ namespace ClientBuffManagerNamespace
 };
 
 using namespace ClientBuffManagerNamespace;
+
+//======================================================================
+
+ClientBuffManager::CatalogAudit::CatalogAudit() :
+recordCount(0),
+visibleCount(0),
+positiveCount(0),
+debuffCount(0),
+authoredIconMissCount(0),
+unresolvedIconCount(0)
+{
+}
+
+//======================================================================
+
+ClientBuffManager::StatusPanelAudit::StatusPanelAudit() :
+diagnosticsValid(false),
+panelVisible(false),
+hasPositiveFixture(false),
+hasDebuffFixture(false),
+visibleCount(0),
+positiveCount(0),
+debuffCount(0),
+renderedIconCount(0)
+{
+}
 
 //======================================================================
 
@@ -377,6 +422,123 @@ UIImageStyle * ClientBuffManager::getBuffIconStyle(uint32 buffNameCrc)
 
 //======================================================================
 
+void ClientBuffManager::auditVisibleBuffCatalog(CatalogAudit & result)
+{
+	result = CatalogAudit();
+	result.recordCount = static_cast<uint32>(ms_buffRecords.size());
+
+	UIPage * const rootPage = UIManager::gUIManager().GetRootPage();
+	for (std::unordered_map<uint32, BuffRecord>::const_iterator i = ms_buffRecords.begin();
+		i != ms_buffRecords.end(); ++i)
+	{
+		BuffRecord const & record = i->second;
+		if (!record.visible)
+			continue;
+
+		++result.visibleCount;
+		if (record.debuff)
+			++result.debuffCount;
+		else
+			++result.positiveCount;
+
+		UIImageStyle * const authoredStyle = rootPage
+			? safe_cast<UIImageStyle *>(rootPage->GetObjectFromPath(record.iconName.c_str(), TUIImageStyle))
+			: NULL;
+		if (authoredStyle)
+			continue;
+
+		++result.authoredIconMissCount;
+		char const * const compatibleFallback = record.debuff
+			? "/Styles.Icon.buffs.healthDebuff"
+			: "/Styles.Icon.buffs.healthBuff";
+		UIImageStyle * const compatibleStyle = rootPage
+			? safe_cast<UIImageStyle *>(rootPage->GetObjectFromPath(compatibleFallback, TUIImageStyle))
+			: NULL;
+		if (!compatibleStyle && !CuiIconManager::getFallback())
+			++result.unresolvedIconCount;
+	}
+}
+
+//======================================================================
+
+bool ClientBuffManager::applyStatusPanelDebugFixtures(int const durationSeconds, bool const refresh)
+{
+	CreatureObject * const player = Game::getPlayerCreature();
+	if (!player || durationSeconds < 1)
+		return false;
+
+	uint32 const duration = static_cast<uint32>(durationSeconds);
+	uint32 const timestamp = player->getPlayedTime() + duration;
+	player->setBuffDebug(
+		getStatusPanelPositiveFixtureCrc(),
+		timestamp,
+		refresh ? 250.0f : 100.0f,
+		duration,
+		1);
+	player->setBuffDebug(
+		getStatusPanelDebuffFixtureCrc(),
+		timestamp,
+		refresh ? 9.0f : 5.0f,
+		duration,
+		refresh ? 4 : 3);
+	return true;
+}
+
+//======================================================================
+
+bool ClientBuffManager::clearStatusPanelDebugFixtures()
+{
+	CreatureObject * const player = Game::getPlayerCreature();
+	if (!player)
+		return false;
+
+	player->removeBuffDebug(getStatusPanelPositiveFixtureCrc());
+	player->removeBuffDebug(getStatusPanelDebuffFixtureCrc());
+	return true;
+}
+
+//======================================================================
+
+bool ClientBuffManager::getStatusPanelAudit(StatusPanelAudit & result)
+{
+	result = StatusPanelAudit();
+	CreatureObject const * const player = Game::getPlayerCreature();
+	if (!player)
+		return false;
+
+	std::map<uint32, Buff> buffs;
+	player->getBuffs(buffs);
+	for (std::map<uint32, Buff>::const_iterator i = buffs.begin(); i != buffs.end(); ++i)
+	{
+		if (!getBuffIsGroupVisible(i->first))
+			continue;
+
+		++result.visibleCount;
+		if (getBuffIsDebuff(i->first))
+			++result.debuffCount;
+		else
+			++result.positiveCount;
+	}
+
+	result.diagnosticsValid = ms_statusPanelDiagnosticsValid;
+	result.panelVisible = ms_statusPanelVisible;
+	result.hasPositiveFixture = player->hasBuff(getStatusPanelPositiveFixtureCrc());
+	result.hasDebuffFixture = player->hasBuff(getStatusPanelDebuffFixtureCrc());
+	result.renderedIconCount = ms_statusPanelRenderedIconCount;
+	return true;
+}
+
+//======================================================================
+
+void ClientBuffManager::setStatusPanelDiagnostics(uint32 const renderedIconCount, bool const panelVisible)
+{
+	ms_statusPanelDiagnosticsValid = true;
+	ms_statusPanelRenderedIconCount = renderedIconCount;
+	ms_statusPanelVisible = panelVisible;
+}
+
+//======================================================================
+
 void ClientBuffManager::getBuffDescription(Buff const & buff, Unicode::String &result)
 {
 	// Start with the default description, looked up from the default buff string file
@@ -407,7 +569,11 @@ void ClientBuffManager::getBuffDescription(Buff const & buff, Unicode::String &r
 			if(eit == ms_effectRecords.end())
 			{
 				WARNING(true, ("Unknown effect crc %d (%s)\n", effectCrc, buffRecord.effectParamString[effectNum].c_str()));
-				return;
+				// Some retained live-era rows contain internal handler parameters
+				// (for example shared, stackable, and weapon_lock) that never had
+				// localized client prose.  Keep the status tooltip and continue so
+				// a later displayable effect is not lost with the internal one.
+				continue;
 			}
 			EffectRecord const &effectRecord = eit->second;
 
