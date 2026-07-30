@@ -574,7 +574,8 @@ namespace ClientMainNamespace
 		BIC_queueLastDitch,
 		BIC_lastDitchWeaponStatus,
 		BIC_queueFeignDeath,
-		BIC_feignDeathWeaponStatus
+		BIC_feignDeathWeaponStatus,
+		BIC_queueCenterOfBeing
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
@@ -1219,6 +1220,23 @@ namespace ClientMainNamespace
 		ClientCommandQueue::commandsAreNowFromToolbar(true);
 		bool const queued = ClientCommandQueue::enqueueCommand(
 			"berserk1",
+			NetworkId::cms_invalid,
+			Unicode::emptyString) != 0;
+		ClientCommandQueue::commandsAreNowFromToolbar(false);
+		return queued;
+	}
+
+	bool performBackgroundQueueCenterOfBeing()
+	{
+		if (!Game::getPlayer())
+			return false;
+
+		// Center of Being is a nonqueued self command. The server owns skill,
+		// weapon-family, duplicate-buff, HAM-cost, and duration validation.
+		ClientCommandQueue::clearLastCommandRemoval();
+		ClientCommandQueue::commandsAreNowFromToolbar(true);
+		bool const queued = ClientCommandQueue::enqueueCommand(
+			"centerOfBeing",
 			NetworkId::cms_invalid,
 			Unicode::emptyString) != 0;
 		ClientCommandQueue::commandsAreNowFromToolbar(false);
@@ -3150,6 +3168,11 @@ namespace ClientMainNamespace
 
 			case BIC_queueBerserk1:
 				if (!performBackgroundQueueBerserk1())
+					return 0;
+				return getBackgroundCombatQueueStatus();
+
+			case BIC_queueCenterOfBeing:
+				if (!performBackgroundQueueCenterOfBeing())
 					return 0;
 				return getBackgroundCombatQueueStatus();
 

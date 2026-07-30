@@ -103,8 +103,8 @@ UIImage * SwgCuiBuffUtils::addBuffIcon(const Buff & buff, UIVolumePage & bufPage
 
 	image->Link();
 	image->SetVisible(true);
-	image->SetEnabled(false);
 	image->SetEnabled(true);
+	image->SetOpacity(1.0f);
 
 	Unicode::String tooltipStr;
 	ClientBuffManager::getBuffDescription(buff, tooltipStr);
@@ -215,8 +215,8 @@ UIPage * SwgCuiBuffUtils::addBuffIcon(const Buff & buff, UIVolumePage & buffPage
 	//copy-paste from above
 	iconPage->Link();
 	iconPage->SetVisible(true);
-	iconPage->SetEnabled(false);
 	iconPage->SetEnabled(true);
+	iconPage->SetOpacity(1.0f);
 
 	Unicode::String tooltipStr;
 	ClientBuffManager::getBuffDescription(buff, tooltipStr);
@@ -358,7 +358,8 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 						// make the image blink if needed
 						if (effectorBlink != NULL)
 						{
-							if ((timeLeft > 0) && (timeLeft <= CREATURE_BUFF_BLINK_TIME))
+							if ((buff.m_duration > CREATURE_BUFF_BLINK_TIME) &&
+								(timeLeft > 0) && (timeLeft <= CREATURE_BUFF_BLINK_TIME))
 							{
 								UIManager::gUIManager().ExecuteEffector(effectorBlink, object, false);
 							}
@@ -484,12 +485,10 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 						if (ClientBuffManager::getBuffIsDebuff(buff.m_nameCrc))
 						{
 							buffIcon = addBuffIcon(buff, debuffPage, *sampleIconPage, isPlayerHamBar, isPlayerGod);
-							returnValue |= UBRT_hasDebufs;
 						}
 						else
 						{
 							buffIcon =  addBuffIcon(buff, buffPage, *sampleIconPage, isPlayerHamBar, isPlayerGod);
-							returnValue |= UBRT_hasBuffs;
 						}
 					}
 					else
@@ -497,13 +496,16 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 						if (ClientBuffManager::getBuffIsDebuff(buff.m_nameCrc))
 						{
 							buffIcon = addBuffIcon(buff, debuffPage, sampleStateIcon, isPlayerHamBar, isPlayerGod);
-							returnValue |= UBRT_hasDebufs;
 						}
 						else
 						{
 							buffIcon =  addBuffIcon(buff, buffPage, sampleStateIcon, isPlayerHamBar, isPlayerGod);
-							returnValue |= UBRT_hasBuffs;
 						}
+					}
+
+					if (buffIcon != NULL)
+					{
+						returnValue |= (ClientBuffManager::getBuffIsDebuff(buff.m_nameCrc) ? UBRT_hasDebufs : UBRT_hasBuffs);
 					}
 
 					if (buffIcon != NULL && effectorBlink != NULL)
@@ -512,7 +514,8 @@ uint32 SwgCuiBuffUtils::updateBuffs(const CreatureObject & creature, UIVolumePag
 						int timeLeft = 0;
 						if (buff.m_timestamp > currentTime)
 							timeLeft = buff.m_timestamp - currentTime;
-						if ((timeLeft > 0) && (timeLeft <= CREATURE_BUFF_BLINK_TIME))
+						if ((buff.m_duration > CREATURE_BUFF_BLINK_TIME) &&
+							(timeLeft > 0) && (timeLeft <= CREATURE_BUFF_BLINK_TIME))
 						{
 							UIManager::gUIManager().ExecuteEffector(effectorBlink, buffIcon, false);
 						}

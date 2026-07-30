@@ -1336,6 +1336,22 @@ void SwgCuiStatusGround::updateCreatureBuffs(CreatureObject const & creature)
 {
 	if(m_volumeStates && m_sampleStateIcon)
 	{
+		// Publish 14 owns a dedicated AttribMod panel for the player's timed
+		// buffs and debuffs.  Its inline MFD status volume occupies half of the
+		// horizontal composite, so exposing that volume also collapses the HAM
+		// bars to half width.  Leave target/group volumes intact, but keep the
+		// player's authored inline volume empty and hidden.
+		if (m_statusType == ST_player && !m_debuffStates)
+		{
+			bool const hadIcons = m_volumeStates->GetChildCount() > 0;
+			if (hadIcons)
+				SwgCuiBuffUtils::clearBuffIcons(*m_volumeStates);
+			bool const visibilityChanged = pageSetVisible(m_volumeStates, false);
+			if (hadIcons || visibilityChanged)
+				getPage().ForcePackChildren();
+			return;
+		}
+
 		UIVolumePage & debuffPage = m_debuffStates ? *m_debuffStates : *m_volumeStates;
 		uint32 const buffStates = SwgCuiBuffUtils::updateBuffs(creature, *m_volumeStates, debuffPage, *m_sampleStateIcon, m_effectorBlink, m_sampleIconPage);
 

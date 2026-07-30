@@ -93,6 +93,18 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             install_body.index("RegisterWindowMessageA"),
         )
 
+    def test_mouse_helper_honors_repeat_for_background_double_clicks(self):
+        self.assertIn(
+            "for ($click = 0; $click -lt $Repeat; ++$click)", self.helper
+        )
+        self.assertIn("Start-Sleep -Milliseconds 50", self.helper)
+        self.assertIn('$detail = "x=$X y=$Y repeat=$Repeat"', self.helper)
+
+    def test_mouse_helper_exposes_process_targeted_drag_primitives(self):
+        self.assertIn('"LeftDown", "LeftUp", "LeftClick"', self.helper)
+        self.assertIn('$command.LeftMouseDown', self.helper)
+        self.assertIn('$command.LeftMouseUp', self.helper)
+
     def test_hidden_start_uses_a_process_local_fallback_window(self):
         install_start = self.client_main.index("bool installBackgroundInputBridge()")
         install_end = self.client_main.index(
@@ -1892,6 +1904,10 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             '"FeignDeathWeaponStatus"',
             "QueueFeignDeath = 448",
             "FeignDeathWeaponStatus = 449",
+            "BIC_queueCenterOfBeing",
+            "performBackgroundQueueCenterOfBeing()",
+            '"QueueCenterOfBeing"',
+            "QueueCenterOfBeing = 450",
         ]:
             with self.subTest(full_auto_single_two_token=token):
                 self.assertIn(
@@ -2600,6 +2616,20 @@ $results | ConvertTo-Json -Compress
             "ClientCommandQueue::commandsAreNowFromToolbar(false)",
             berserk_one,
         )
+        center_of_being = function_body(
+            self.client_main,
+            "bool performBackgroundQueueCenterOfBeing()",
+        )
+        self.assertIn('"centerOfBeing"', center_of_being)
+        self.assertIn("NetworkId::cms_invalid", center_of_being)
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(true)",
+            center_of_being,
+        )
+        self.assertIn(
+            "ClientCommandQueue::commandsAreNowFromToolbar(false)",
+            center_of_being,
+        )
         berserk_two = function_body(
             self.client_main,
             "bool performBackgroundQueueBerserk2()",
@@ -2941,6 +2971,7 @@ $results | ConvertTo-Json -Compress
             "QueueEmboldenPets",
             "QueueHealMind",
             "QueueBerserk1",
+            "QueueCenterOfBeing",
             "QueueBerserk2",
             "TargetSquadCounterpart",
             "QueueFormup",

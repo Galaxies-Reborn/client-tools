@@ -47,6 +47,20 @@ class Publish14BuffStatusCompatibilityTests(unittest.TestCase):
         )
         self.assertIn("if (!m_debuffStates)", self.status_source)
 
+    def test_player_uses_attribmod_without_collapsing_ham_width(self):
+        self.assertIn(
+            "if (m_statusType == ST_player && !m_debuffStates)",
+            self.status_source,
+        )
+        self.assertIn(
+            "SwgCuiBuffUtils::clearBuffIcons(*m_volumeStates);",
+            self.status_source,
+        )
+        self.assertIn(
+            "pageSetVisible(m_volumeStates, false)",
+            self.status_source,
+        )
+
     def test_authored_placeholders_are_removed_before_population(self):
         self.assertIn("void removePlaceholderIcons(UIVolumePage & page)", self.buff_utils_source)
         self.assertIn(
@@ -54,6 +68,29 @@ class Publish14BuffStatusCompatibilityTests(unittest.TestCase):
             self.buff_utils_source,
         )
         self.assertIn("removePlaceholderIcons(buffPage);", self.buff_utils_source)
+
+    def test_dynamic_icons_are_visible_and_only_report_successful_creation(self):
+        self.assertGreaterEqual(
+            self.buff_utils_source.count("SetOpacity(1.0f);"),
+            2,
+        )
+        new_buff_section = self.buff_utils_source.split(
+            "// add any new buffs to the display", 1
+        )[1]
+        before_success = new_buff_section.split("if (buffIcon != NULL)", 1)[0]
+        self.assertNotIn("returnValue |= UBRT_has", before_success)
+        self.assertIn(
+            "returnValue |= (ClientBuffManager::getBuffIsDebuff",
+            new_buff_section,
+        )
+
+    def test_short_lived_buffs_do_not_blink_for_their_entire_lifetime(self):
+        self.assertEqual(
+            2,
+            self.buff_utils_source.count(
+                "buff.m_duration > CREATURE_BUFF_BLINK_TIME"
+            ),
+        )
 
     def test_shared_volume_is_enumerated_and_cleared_only_once(self):
         self.assertIn(
