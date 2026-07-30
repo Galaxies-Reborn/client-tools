@@ -1738,17 +1738,17 @@ void SwgCuiPlanetMap::setupCurrentZone ()
 
 	if(m_zoomLevel == ZL_Zone)
 	{
-		if(PlanetMapManager::sceneHasSupermap(zoneName))
+		if(m_buttonZoom && PlanetMapManager::sceneHasSupermap(zoneName))
 		{
 			m_buttonZoom->SetVisible(true);
 			m_buttonZoom->SetLocalText(CuiStringIdsPlanetMap::show_planet.localize ());
 		}
-		else
+		else if(m_buttonZoom)
 		{
 			m_buttonZoom->SetVisible(false);
 		}
 	}
-	else if(m_zoomLevel == ZL_Planet)
+	else if(m_zoomLevel == ZL_Planet && m_buttonZoom)
 	{
 		m_buttonZoom->SetVisible(false);
 	}

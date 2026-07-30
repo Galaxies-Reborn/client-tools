@@ -17,6 +17,7 @@
 
 class ClientObject;
 class CuiWidget3dObjectListViewer;
+class CuiWidget3dPaperdoll;
 class UIButton;
 class UIText;
 
@@ -51,6 +52,7 @@ private:
 	SwgCuiInventoryEquipment & operator= (const SwgCuiInventoryEquipment & rhs);
 
 	CuiWidget3dObjectListViewer *     m_characterViewer;
+	CuiWidget3dPaperdoll *            m_characterPaperdoll;
 
 	UIButton *                 m_zoomInButton;
 	UIButton *                 m_zoomOutButton;

@@ -20,6 +20,7 @@
 #include "clientGame/ClientWorld.h"
 #include "clientSkeletalAnimation/SkeletalAppearance2.h"
 #include "clientUserInterface/CuiWidget3dObjectListViewer.h"
+#include "clientUserInterface/CuiWidget3dPaperdoll.h"
 #include "sharedObject/Container.h"
 #include "sharedObject/World.h"
 #include "sharedMessageDispatch/Transceiver.h"
@@ -31,6 +32,7 @@ SwgCuiInventoryEquipment::SwgCuiInventoryEquipment (UIPage & page) :
 CuiMediator            ("SwgCuiInventoryEquipment", page),
 UIEventCallback        (),
 m_characterViewer      (0),
+m_characterPaperdoll   (0),
 m_zoomInButton         (0),
 m_zoomOutButton        (0),
 m_leftButton           (0),
@@ -41,7 +43,10 @@ m_callback             (new MessageDispatch::Callback)
 {
 	UIWidget *widget = 0;
 	getCodeDataObject (TUIWidget, widget, "CharacterViewer");
-	m_characterViewer = NON_NULL (dynamic_cast<CuiWidget3dObjectListViewer *>(widget));
+	m_characterViewer = dynamic_cast<CuiWidget3dObjectListViewer *>(widget);
+	m_characterPaperdoll = dynamic_cast<CuiWidget3dPaperdoll *>(widget);
+	WARNING (!m_characterViewer && !m_characterPaperdoll,
+		("SwgCuiInventoryEquipment: unsupported CharacterViewer type"));
 
 	getCodeDataObject (TUIButton, m_zoomInButton,  "zoomInButton");
 	getCodeDataObject (TUIButton, m_zoomOutButton, "zoomOutButton");
@@ -51,7 +56,8 @@ m_callback             (new MessageDispatch::Callback)
 
 	getCodeDataObject (TUIText,   m_label,         "label"); 
 
-	registerMediatorObject (*m_characterViewer, true);
+	if (widget)
+		registerMediatorObject (*widget, true);
 	registerMediatorObject (*m_zoomInButton, true);
 	registerMediatorObject (*m_zoomOutButton, true);
 	registerMediatorObject (*m_leftButton, true);
@@ -67,6 +73,7 @@ SwgCuiInventoryEquipment::~SwgCuiInventoryEquipment ()
 	deactivate ();
 	setupCharacterViewer (0);
 	m_characterViewer = 0;
+	m_characterPaperdoll = 0;
 
 	m_zoomInButton  = 0;
 	m_zoomOutButton = 0;
@@ -84,14 +91,20 @@ SwgCuiInventoryEquipment::~SwgCuiInventoryEquipment ()
 
 void SwgCuiInventoryEquipment::performActivate ()
 {
-	m_characterViewer->setPaused (false);
+	if (m_characterViewer)
+		m_characterViewer->setPaused (false);
+	else if (m_characterPaperdoll)
+		m_characterPaperdoll->setPaused (false);
 }
 
 //-----------------------------------------------------------------
 
 void SwgCuiInventoryEquipment::performDeactivate ()
 {
-	m_characterViewer->setPaused (true);
+	if (m_characterViewer)
+		m_characterViewer->setPaused (true);
+	else if (m_characterPaperdoll)
+		m_characterPaperdoll->setPaused (true);
 	setupCharacterViewer (0);
 }
 
@@ -99,29 +112,42 @@ void SwgCuiInventoryEquipment::performDeactivate ()
 
 void SwgCuiInventoryEquipment::setupCharacterViewer (ClientObject * object)
 {
-	m_characterViewer->setCameraLodBias (2.0f);
-	m_characterViewer->setAutoZoomOutOnly       (false);
-	m_characterViewer->setCameraZoomInWhileTurn (true);
-	m_characterViewer->setAlterObjects          (false);
-	m_characterViewer->setCameraLookAtCenter    (false);
-	m_characterViewer->setDragYawOk             (true);
-	m_characterViewer->setPaused                (false);
-	m_characterViewer->SetDragable              (false);	
-	m_characterViewer->SetContextCapable        (true, false);
-	m_characterViewer->setRotateSpeed           (0.0f);
-	m_characterViewer->setCameraForceTarget     (false);
-	m_characterViewer->setCameraTransformToObj  (true);
-	m_characterViewer->setCameraLodBias         (3.0f);
-	m_characterViewer->setCameraLodBiasOverride (true);
-	m_characterViewer->setCameraForceTarget   (true);
-	m_characterViewer->setObject              (object);
-	m_characterViewer->recomputeZoom          ();
-	m_characterViewer->setRotationSlowsToStop (true);
+	if (m_characterViewer)
+	{
+		m_characterViewer->setCameraLodBias (2.0f);
+		m_characterViewer->setAutoZoomOutOnly       (false);
+		m_characterViewer->setCameraZoomInWhileTurn (true);
+		m_characterViewer->setAlterObjects          (false);
+		m_characterViewer->setCameraLookAtCenter    (false);
+		m_characterViewer->setDragYawOk             (true);
+		m_characterViewer->setPaused                (false);
+		m_characterViewer->SetDragable              (false);
+		m_characterViewer->SetContextCapable        (true, false);
+		m_characterViewer->setRotateSpeed           (0.0f);
+		m_characterViewer->setCameraForceTarget     (false);
+		m_characterViewer->setCameraTransformToObj  (true);
+		m_characterViewer->setCameraLodBias         (3.0f);
+		m_characterViewer->setCameraLodBiasOverride (true);
+		m_characterViewer->setCameraForceTarget   (true);
+		m_characterViewer->setObject              (object);
+		m_characterViewer->recomputeZoom          ();
+		m_characterViewer->setRotationSlowsToStop (true);
 
-	m_characterViewer->setCameraForceTarget   (false);
-	m_characterViewer->setCameraAutoZoom      (true);
-	m_characterViewer->setCameraLookAtBone    ("root");
-	m_characterViewer->setCameraZoomLookAtBone("head");
+		m_characterViewer->setCameraForceTarget   (false);
+		m_characterViewer->setCameraAutoZoom      (true);
+		m_characterViewer->setCameraLookAtBone    ("root");
+		m_characterViewer->setCameraZoomLookAtBone("head");
+	}
+	else if (m_characterPaperdoll)
+	{
+		// Publish 14 authors this CodeData object as CuiWidget3dPaperdoll.
+		// The later inventory mediator expects CuiWidget3dObjectListViewer;
+		// preserve both contracts instead of replacing the complete P14 UI.
+		m_characterPaperdoll->setAutoComputeMinimumVectorFromExtent (true);
+		m_characterPaperdoll->setAlterObject (false);
+		const Vector cameraMaximum (CONST_REAL (0.0), CONST_REAL (1.65), CONST_REAL (1.0));
+		IGNORE_RETURN (m_characterPaperdoll->setObject (object, Vector (), cameraMaximum));
+	}
 	
 
 	m_label->SetLocalText (object ? object->getObjectName () : Unicode::String ());
