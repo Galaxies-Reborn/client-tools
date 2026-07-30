@@ -159,7 +159,14 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
             'Join-Path (Split-Path -Parent $repoRoot) "pre-cu-reborn-assets"',
             script,
         )
-        self.assertIn('foreach ($relativePath in @("ui\\ui_skill.inc"))', script)
+        for relative_path in (
+            "ui\\ui_skill.inc",
+            "datatables\\command\\command_table.iff",
+            "datatables\\buff\\buff.iff",
+            "datatables\\buff\\effect_mapping.iff",
+            "datatables\\combat\\combat_data.iff",
+        ):
+            self.assertIn(f'"{relative_path}"', script)
         self.assertIn(
             'foreach ($archiveName in @("precu_runtime.tre", "precu_worlds.tre"))',
             script,

@@ -132,7 +132,16 @@ if ($RuntimeProfile -eq "Precu") {
         }
     }
 
-    foreach ($relativePath in @("ui\ui_skill.inc")) {
+    # Keep loose overrides synchronized with the generated runtime archive.
+    # Loose files win the virtual-file search order and stale copies would
+    # otherwise mask newer tables packaged in precu_runtime.tre.
+    foreach ($relativePath in @(
+        "ui\ui_skill.inc",
+        "datatables\command\command_table.iff",
+        "datatables\buff\buff.iff",
+        "datatables\buff\effect_mapping.iff",
+        "datatables\combat\combat_data.iff"
+    )) {
         $sourcePath = Join-Path $precuAssetsRoot $relativePath
         if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
             throw "The Pre-CU asset override is missing: $sourcePath"
