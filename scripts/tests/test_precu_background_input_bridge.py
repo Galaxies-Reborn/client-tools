@@ -371,8 +371,24 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         ]
         positions = [self.client_main.index(command) for command in expected_commands]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn("cms_backgroundInputProtocolVersion = 253", self.client_main)
-        self.assertIn("$expectedProtocolVersion = 253", self.helper)
+        self.assertIn("cms_backgroundInputProtocolVersion = 255", self.client_main)
+        self.assertIn("$expectedProtocolVersion = 255", self.helper)
+
+    def test_status_catalog_audit_fields_cannot_truncate_the_full_catalog(self):
+        for token in [
+            "audit.positiveCount & 0x07ffU) << 12",
+            "audit.debuffCount & 0x03ffU) << 23",
+            "audit.authoredIconMissCount & 0x07ffU) << 33",
+        ]:
+            with self.subTest(client_token=token):
+                self.assertIn(token, self.client_main)
+        for token in [
+            "($unsignedStatus -shr 12) -band 0x07ff",
+            "($unsignedStatus -shr 23) -band 0x03ff",
+            "($unsignedStatus -shr 33) -band 0x07ff",
+        ]:
+            with self.subTest(helper_token=token):
+                self.assertIn(token, self.helper)
 
     def test_bridge_exposes_core3_random_area_pilot(self):
         for token in [
@@ -1949,6 +1965,10 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
             with self.subTest(call=call):
                 self.assertIn(call, self.client_main)
         self.assertIn("lParam < 0 || lParam > 255", self.client_main)
+        self.assertIn("audit.hasReplicatedBuffs", self.client_main)
+        self.assertIn("audit.hasBerserkStatus", self.client_main)
+        self.assertIn("hasReplicatedBuffs=", self.helper)
+        self.assertIn("hasBerserkStatus=", self.helper)
 
     def test_bridge_does_not_reinterpret_native_window_input(self):
         forbidden_native_cases = [

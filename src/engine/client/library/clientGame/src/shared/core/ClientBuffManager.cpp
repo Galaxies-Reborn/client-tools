@@ -156,6 +156,8 @@ diagnosticsValid(false),
 panelVisible(false),
 hasPositiveFixture(false),
 hasDebuffFixture(false),
+hasReplicatedBuffs(false),
+hasBerserkStatus(false),
 visibleCount(0),
 positiveCount(0),
 debuffCount(0),
@@ -508,6 +510,8 @@ bool ClientBuffManager::getStatusPanelAudit(StatusPanelAudit & result)
 
 	std::map<uint32, Buff> buffs;
 	player->getBuffs(buffs);
+	result.hasReplicatedBuffs = !buffs.empty();
+	result.hasBerserkStatus = player->hasBuff(Crc::calculate("precu_berserk_status"));
 	for (std::map<uint32, Buff>::const_iterator i = buffs.begin(); i != buffs.end(); ++i)
 	{
 		if (!getBuffIsGroupVisible(i->first))

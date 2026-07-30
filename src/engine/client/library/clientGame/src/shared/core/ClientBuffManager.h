@@ -39,6 +39,8 @@ public:
 		bool panelVisible;
 		bool hasPositiveFixture;
 		bool hasDebuffFixture;
+		bool hasReplicatedBuffs;
+		bool hasBerserkStatus;
 		uint32 visibleCount;
 		uint32 positiveCount;
 		uint32 debuffCount;

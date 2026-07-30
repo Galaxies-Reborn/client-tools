@@ -585,7 +585,7 @@ namespace ClientMainNamespace
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
-	LRESULT const cms_backgroundInputProtocolVersion = 253;
+	LRESULT const cms_backgroundInputProtocolVersion = 255;
 	LRESULT const cms_backgroundSkillsStatusMarker = 0x534b0000;
 	LRESULT const cms_backgroundSkillsSelectionMarker = 0x53500000;
 	LRESULT const cms_backgroundCombatQueueStatusMarker = 0x43510000;
@@ -1263,9 +1263,9 @@ namespace ClientMainNamespace
 
 		uint64 result = 0x4255000000000000ULL;
 		result |= static_cast<uint64>(audit.visibleCount & 0x0fffU);
-		result |= static_cast<uint64>(audit.positiveCount & 0x0fffU) << 12;
-		result |= static_cast<uint64>(audit.debuffCount & 0x03ffU) << 24;
-		result |= static_cast<uint64>(audit.authoredIconMissCount & 0x03ffU) << 34;
+		result |= static_cast<uint64>(audit.positiveCount & 0x07ffU) << 12;
+		result |= static_cast<uint64>(audit.debuffCount & 0x03ffU) << 23;
+		result |= static_cast<uint64>(audit.authoredIconMissCount & 0x07ffU) << 33;
 		result |= static_cast<uint64>(audit.unresolvedIconCount & 0x000fU) << 44;
 		return static_cast<LRESULT>(result);
 	}
@@ -1295,6 +1295,10 @@ namespace ClientMainNamespace
 			result |= 0x04ULL;
 		if (audit.hasDebuffFixture)
 			result |= 0x08ULL;
+		if (audit.hasReplicatedBuffs)
+			result |= 0x10ULL;
+		if (audit.hasBerserkStatus)
+			result |= 0x20ULL;
 		result |= static_cast<uint64>(audit.visibleCount & 0x0fffU) << 8;
 		result |= static_cast<uint64>(audit.positiveCount & 0x0fffU) << 20;
 		result |= static_cast<uint64>(audit.debuffCount & 0x03ffU) << 32;

@@ -73,7 +73,7 @@ $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
-$expectedProtocolVersion = 253
+$expectedProtocolVersion = 255
 $command = @{
     Ping            = 0
     MouseMove       = 1
@@ -894,9 +894,9 @@ function ConvertTo-StatusCatalogAuditDetail {
     }
 
     $visible = $unsignedStatus -band 0x0fff
-    $positive = ($unsignedStatus -shr 12) -band 0x0fff
-    $debuff = ($unsignedStatus -shr 24) -band 0x03ff
-    $authoredIconMisses = ($unsignedStatus -shr 34) -band 0x03ff
+    $positive = ($unsignedStatus -shr 12) -band 0x07ff
+    $debuff = ($unsignedStatus -shr 23) -band 0x03ff
+    $authoredIconMisses = ($unsignedStatus -shr 33) -band 0x07ff
     $unresolvedIcons = ($unsignedStatus -shr 44) -band 0x000f
     return "visible=$visible positive=$positive debuff=$debuff authoredIconMisses=$authoredIconMisses unresolvedIcons=$unresolvedIcons packed=0x$($unsignedStatus.ToString('x16'))"
 }
@@ -916,12 +916,14 @@ function ConvertTo-StatusPanelStateDetail {
     $panelVisible = ($unsignedStatus -band 0x02) -ne 0
     $hasPositiveTest = ($unsignedStatus -band 0x04) -ne 0
     $hasDebuffTest = ($unsignedStatus -band 0x08) -ne 0
+    $hasReplicatedBuffs = ($unsignedStatus -band 0x10) -ne 0
+    $hasBerserkStatus = ($unsignedStatus -band 0x20) -ne 0
     $visible = ($unsignedStatus -shr 8) -band 0x0fff
     $positive = ($unsignedStatus -shr 20) -band 0x0fff
     $debuff = ($unsignedStatus -shr 32) -band 0x03ff
     $renderedIcons = ($unsignedStatus -shr 42) -band 0x003f
     $renderCountMatches = ($unsignedStatus -band 0x80) -ne 0
-    return "diagnosticsValid=$($diagnosticsValid.ToString().ToLowerInvariant()) panelVisible=$($panelVisible.ToString().ToLowerInvariant()) hasPositiveTest=$($hasPositiveTest.ToString().ToLowerInvariant()) hasDebuffTest=$($hasDebuffTest.ToString().ToLowerInvariant()) visible=$visible positive=$positive debuff=$debuff renderedIcons=$renderedIcons renderCountMatches=$($renderCountMatches.ToString().ToLowerInvariant()) packed=0x$($unsignedStatus.ToString('x16'))"
+    return "diagnosticsValid=$($diagnosticsValid.ToString().ToLowerInvariant()) panelVisible=$($panelVisible.ToString().ToLowerInvariant()) hasPositiveTest=$($hasPositiveTest.ToString().ToLowerInvariant()) hasDebuffTest=$($hasDebuffTest.ToString().ToLowerInvariant()) hasReplicatedBuffs=$($hasReplicatedBuffs.ToString().ToLowerInvariant()) hasBerserkStatus=$($hasBerserkStatus.ToString().ToLowerInvariant()) visible=$visible positive=$positive debuff=$debuff renderedIcons=$renderedIcons renderCountMatches=$($renderCountMatches.ToString().ToLowerInvariant()) packed=0x$($unsignedStatus.ToString('x16'))"
 }
 
 function Send-BridgeKeySequence {
