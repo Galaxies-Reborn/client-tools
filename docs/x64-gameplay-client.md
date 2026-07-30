@@ -66,7 +66,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Stage-X64Clien
 The profile owns the canonical tracked archive order, login/preload defaults,
 1024x768 windowed settings, the legacy-interior Bloom compatibility lock, the
 DX11 renderer selection, and the HLSL overrides that translate legacy D3D9
-shader assembly for D3D11. It preserves `user.cfg`.
+shader assembly for D3D11. It preserves `user.cfg`. Command, combat, buff,
+status, progression, weapon-template, string, and UI restoration assets are
+owned only by `precu_runtime.tre`; staging reads its response manifest, backs
+up, and removes every stale loose copy that could shadow the archive.
 
 Or build and stage in one command:
 
@@ -76,7 +79,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-X64Clien
   -RuntimeProfile Precu
 ```
 
-Staging validates every copied PE as x64, backs up replaced runtime/profile/shader files under `.x64-backups` while preserving their relative paths, and writes `x64-runtime-manifest.json`. It deploys only `gl11`, removes backed-up `gl00`, `gl05`, `gl06`, and `gl07` renderer DLLs, and installs the complete tracked `scripts/asm2hlsl/converted` tree as loose shader overrides for the Pre-CU profile. It also backs up and removes incompatible local x86 copies of system DLLs such as `dbghelp.dll`, allowing the x64 process to use `System32`. The default `None` profile does not change client configuration, login settings, TOCs, TRE files, or shader assets; `-RuntimeProfile Precu` installs the tracked dedicated configuration and DX11 shader overrides but never changes TRE files or `user.cfg`.
+Staging validates every copied PE as x64, backs up replaced runtime/profile/shader files under `.x64-backups` while preserving their relative paths, and writes `x64-runtime-manifest.json`. It deploys only `gl11`, removes backed-up `gl00`, `gl05`, `gl06`, and `gl07` renderer DLLs, installs `precu_runtime.tre` and `precu_worlds.tre`, and installs the complete tracked `scripts/asm2hlsl/converted` tree as loose shader overrides for the Pre-CU profile. It also backs up and removes incompatible local x86 copies of system DLLs such as `dbghelp.dll`, allowing the x64 process to use `System32`. The default `None` profile does not change client configuration, login settings, TOCs, TRE files, or shader assets; `-RuntimeProfile Precu` installs the tracked dedicated configuration, Pre-CU archives, and DX11 shader overrides without changing `user.cfg`.
 
 SDL3 provides native input from as many as eight independent joysticks, throttles, rudder pedals, and gamepads. Existing keymaps continue to load; newly saved keymaps record stable device GUIDs so bindings can be restored after reconnecting or reordering controllers. See [the multi-controller input guide](inputreborn.md) for configuration and compatibility details.
 

@@ -64,7 +64,7 @@ $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 
 $profileFiles = @()
 $shaderOverrideFiles = @()
-$precuAssetOverrideFiles = @()
+$precuManagedLoosePaths = @()
 $precuAssetArchiveFiles = @()
 if ($RuntimeProfile -eq "Precu") {
     $profileDirectory = Join-Path $repoRoot "config\precu"
@@ -132,24 +132,29 @@ if ($RuntimeProfile -eq "Precu") {
         }
     }
 
-    # Keep loose overrides synchronized with the generated runtime archive.
-    # Loose files win the virtual-file search order and stale copies would
-    # otherwise mask newer tables packaged in precu_runtime.tre.
-    foreach ($relativePath in @(
-        "ui\ui_skill.inc",
-        "datatables\command\command_table.iff",
-        "datatables\buff\buff.iff",
-        "datatables\buff\effect_mapping.iff",
-        "datatables\combat\combat_data.iff"
-    )) {
+    # Every response entry is owned by precu_runtime.tre. Remove any old loose
+    # copy because SearchAbsolute would otherwise mask the versioned archive.
+    $runtimeResponsePath = Join-Path $precuAssetsRoot "precu_runtime.rsp"
+    if (-not (Test-Path -LiteralPath $runtimeResponsePath -PathType Leaf)) {
+        throw "The Pre-CU runtime response is missing: $runtimeResponsePath"
+    }
+    $precuManagedLoosePaths = @(
+        Get-Content -LiteralPath $runtimeResponsePath |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object {
+                $parts = @($_ -split '\s+@\s+', 2)
+                if ($parts.Count -ne 2 -or $parts[0] -cne $parts[1]) {
+                    throw "Invalid Pre-CU runtime response entry: $_"
+                }
+                $parts[0].Replace("/", "\")
+            } |
+            Sort-Object -Unique
+    )
+    foreach ($relativePath in $precuManagedLoosePaths) {
         $sourcePath = Join-Path $precuAssetsRoot $relativePath
+        Get-ChildRelativePath -Root $precuAssetsRoot -Path $sourcePath | Out-Null
         if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
-            throw "The Pre-CU asset override is missing: $sourcePath"
-        }
-
-        $precuAssetOverrideFiles += [pscustomobject]@{
-            Source = $sourcePath
-            Name   = $relativePath
+            throw "The Pre-CU archive input is missing: $sourcePath"
         }
     }
 
@@ -268,8 +273,13 @@ if (-not $PSCmdlet.ShouldProcess($clientRootPath, "stage $Configuration x64 game
 }
 
 $stagedSources = @($runtimeFiles) + @($profileFiles) +
-    @($shaderOverrideFiles) + @($precuAssetArchiveFiles) +
-    @($precuAssetOverrideFiles)
+    @($shaderOverrideFiles) + @($precuAssetArchiveFiles)
+
+$precuLooseOverridePaths = @(
+    $precuManagedLoosePaths |
+        ForEach-Object { Join-Path $clientRootPath $_ } |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+)
 
 $backupDirectory = $null
 if (-not $NoBackup) {
@@ -285,6 +295,7 @@ if (-not $NoBackup) {
     }
     $existingTargets += $incompatibleLocalPaths
     $existingTargets += $obsoleteRuntimePaths
+    $existingTargets += $precuLooseOverridePaths
     $existingTargets = @($existingTargets | Sort-Object -Unique)
 
     if ($existingTargets.Count -gt 0) {
@@ -304,7 +315,8 @@ if (-not $NoBackup) {
     }
 }
 
-foreach ($path in @($incompatibleLocalPaths) + @($obsoleteRuntimePaths)) {
+foreach ($path in @($incompatibleLocalPaths) + @($obsoleteRuntimePaths) + @($precuLooseOverridePaths)) {
+    Get-ChildRelativePath -Root $clientRootPath -Path $path | Out-Null
     Remove-Item -LiteralPath $path -Force
 }
 
@@ -345,12 +357,15 @@ $manifest = [ordered]@{
     rendererBackend = "Direct3d11 (gl11)"
     shaderOverrideCount = $shaderOverrideFiles.Count
     precuAssetArchiveCount = $precuAssetArchiveFiles.Count
-    precuAssetOverrideCount = $precuAssetOverrideFiles.Count
+    precuAssetOverrideCount = 0
     inputBackend     = "SDL 3.4.10 multi-device controller input"
     audioBackend     = "JUCE 8.0.14 with WASAPI and WAV/MP3/Ogg decoders"
     backupDirectory  = $backupDirectory
     removedIncompatibleLocalFiles = @($incompatibleLocalPaths | ForEach-Object { [IO.Path]::GetFileName($_) })
     removedObsoleteRuntimeFiles = @($obsoleteRuntimePaths | ForEach-Object { [IO.Path]::GetFileName($_) })
+    removedPrecuLooseOverrides = @($precuLooseOverridePaths | ForEach-Object {
+        Get-ChildRelativePath -Root $clientRootPath -Path $_
+    })
     files            = $stagedFiles
 }
 

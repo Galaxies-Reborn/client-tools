@@ -151,7 +151,7 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
             self.assertIsNotNone(function, function_name)
             self.assertIn("ms_disableViaConfig", function.group(1))
 
-    def test_precu_staging_copies_and_records_the_profile(self):
+    def test_precu_staging_uses_archive_owned_assets_and_records_the_profile(self):
         script = STAGE_SCRIPT.read_text(encoding="utf-8")
         self.assertIn('[ValidateSet("None", "Precu")]', script)
         self.assertIn('Join-Path $repoRoot "config\\precu"', script)
@@ -159,22 +159,20 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
             'Join-Path (Split-Path -Parent $repoRoot) "pre-cu-reborn-assets"',
             script,
         )
-        for relative_path in (
-            "ui\\ui_skill.inc",
-            "datatables\\command\\command_table.iff",
-            "datatables\\buff\\buff.iff",
-            "datatables\\buff\\effect_mapping.iff",
-            "datatables\\combat\\combat_data.iff",
-        ):
-            self.assertIn(f'"{relative_path}"', script)
+        self.assertIn('"precu_runtime.rsp"', script)
+        self.assertIn("Invalid Pre-CU runtime response entry", script)
+        self.assertIn("$parts[0].Replace", script)
         self.assertIn(
             'foreach ($archiveName in @("precu_runtime.tre", "precu_worlds.tre"))',
             script,
         )
         self.assertIn("Name='xpbar'", script)
-        self.assertIn("@($precuAssetOverrideFiles)", script)
+        self.assertIn("$precuManagedLoosePaths", script)
+        self.assertIn("$precuLooseOverridePaths", script)
+        self.assertIn("removedPrecuLooseOverrides", script)
+        self.assertNotIn("@($precuAssetOverrideFiles)", script)
         self.assertIn("runtimeProfile   = $RuntimeProfile", script)
-        self.assertIn("precuAssetOverrideCount", script)
+        self.assertIn("precuAssetOverrideCount = 0", script)
         self.assertIn("precuAssetArchiveCount", script)
 
     def test_client_build_uses_bounded_parallelism(self):
