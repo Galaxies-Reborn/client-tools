@@ -2277,6 +2277,30 @@ void CuiRadialMenuManager::performMenuAction (int sel, int index, bool serverNot
 		return;
 	}
 
+	// Equip is already fully resolved by the client-authored inventory menu.
+	// Execute the container transfer directly so inventory double-click and the
+	// right-click menu cannot be lost behind an unrelated object-menu response.
+	if (sel == ITEM_EQUIP)
+	{
+		IGNORE_RETURN(CuiInventoryManager::equipObject(object->getNetworkId()));
+		return;
+	}
+	if (sel == ITEM_UNEQUIP)
+	{
+		CuiInventoryManager::unequipObject(object->getNetworkId());
+		return;
+	}
+	if (sel == ITEM_EQUIP_APPEARANCE)
+	{
+		CuiInventoryManager::equipAppearanceItem(object->getNetworkId());
+		return;
+	}
+	if (sel == ITEM_UNEQUIP_APPEARANCE)
+	{
+		CuiInventoryManager::unequipAppearanceItem(object->getNetworkId());
+		return;
+	}
+
 	// Trying to place a story teller object. We need to intercept this so the user can enter targeting
 	// mode and get us a location before we tell the server anything.
 	if (sel == ITEM_USE || sel == SERVER_MENU1 || sel == SERVER_MENU2)

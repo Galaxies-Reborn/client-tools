@@ -432,9 +432,16 @@ bool ClientCommandChecks::doesWeaponInvalidateCommand(Command const * command, C
 		if(!creature->getPlayerObject()->getDefaultAttackOverride().empty())
 			return false;
 	}
-	//a weapon of some sort is required
+	// Publish 14 represents bare hands as the implicit unarmed weapon.  The
+	// restored server does not need to equip a hidden WeaponObject for punches,
+	// so validate a missing client weapon against the command's unarmed mask.
 	if (!creature->getCurrentWeapon())
-		return true;
+	{
+		return !WeaponObject::weaponTypeSatisfies(
+			WeaponObject::WT_unarmed,
+			command->m_weaponTypesValid,
+			command->m_weaponTypesInvalid);
+	}
 
 	WeaponObject const * weapon = creature->getCurrentWeapon();
 

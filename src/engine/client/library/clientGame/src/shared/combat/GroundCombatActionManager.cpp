@@ -960,7 +960,15 @@ void GroundCombatActionManager::update(float const deltaTimeSecs, ObjectVector c
 		}
 
 		WeaponObject const * const weaponObject = player->getCurrentWeapon();
-		if (shouldAttack && (weaponObject != 0))
+		bool const implicitUnarmedWeapon = (weaponObject == 0) &&
+			WeaponObject::weaponTypeSatisfies(
+				WeaponObject::WT_unarmed,
+				command.m_weaponTypesValid,
+				command.m_weaponTypesInvalid);
+		bool const canUsePrimaryActionWithoutWeapon =
+			primaryActionIsOverridden || implicitUnarmedWeapon;
+
+		if (shouldAttack && (weaponObject != 0 || canUsePrimaryActionWithoutWeapon))
 		{
 			if (primaryActionIsOverridden && command.m_targetType == Command::CTT_None && tc == ClientCommandChecks::TC_pass)
 			{
@@ -978,7 +986,7 @@ void GroundCombatActionManager::update(float const deltaTimeSecs, ObjectVector c
 					shouldAttack = (ReticleManager::getReticleCurrentlyValid() && (tc == ClientCommandChecks::TC_pass));
 				}
 			}
-			else if (!CuiPreferences::getAutoAimToggle() && weaponObject->isDirectionalTargetting())
+			else if (weaponObject && !CuiPreferences::getAutoAimToggle() && weaponObject->isDirectionalTargetting())
 			{			
 				ClientCommandChecks::TestCode tc = ClientCommandChecks::canCreatureFireHeavyWeapon(commandName, player);
 				if(tc == ClientCommandChecks::TC_failNotEnoughAction)
@@ -987,7 +995,7 @@ void GroundCombatActionManager::update(float const deltaTimeSecs, ObjectVector c
 				}
 				shouldAttack = !firstTargetIsUnattackable && (tc == ClientCommandChecks::TC_pass);
 			}
-			else if (!CuiPreferences::getAutoAimToggle() && weaponObject->isGroundTargetting())
+			else if (weaponObject && !CuiPreferences::getAutoAimToggle() && weaponObject->isGroundTargetting())
 			{
 				ClientCommandChecks::TestCode tc = ClientCommandChecks::canCreatureFireHeavyWeapon(commandName, player);
 				if(tc == ClientCommandChecks::TC_failNotEnoughAction)
@@ -1017,7 +1025,10 @@ void GroundCombatActionManager::update(float const deltaTimeSecs, ObjectVector c
 
 		if (s_wasPrimaryPostureTransitionTimerUsed || shouldAttack)
 		{						
-			std::string const weaponType(WeaponObject::getWeaponTypeString(weaponObject->getWeaponType()));
+			WeaponObject::WeaponType const weaponTypeId = weaponObject
+				? weaponObject->getWeaponType()
+				: WeaponObject::WT_unarmed;
+			std::string const weaponType(WeaponObject::getWeaponTypeString(weaponTypeId));
 			int   const maximumShotsTillWeaponReload = CombatTimingTable::getMaximumShotsTillWeaponReload(weaponType);
 			float const weaponReloadTimeSeconds      = CombatTimingTable::getWeaponReloadTimeSeconds(weaponType);
 
@@ -1067,6 +1078,14 @@ void GroundCombatActionManager::update(float const deltaTimeSecs, ObjectVector c
 				else if (weaponObject != 0)
 				{
 					s_throttleTimer.setExpireTime(weaponObject->getAttackSpeed());
+				}
+				else
+				{
+					// The server remains authoritative for the final attack speed;
+					// this only prevents a tight client retry loop between replies.
+					float const commandSpacingTime =
+						command.m_warmTime + command.m_execTime + command.m_coolTime;
+					s_throttleTimer.setExpireTime(std::max(0.1f, commandSpacingTime));
 				}
 
 				++s_shotsTillWeaponReload;

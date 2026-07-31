@@ -41,6 +41,14 @@ RADIAL_CPP = ROOT / (
     "src/engine/client/library/clientUserInterface/src/shared/core/"
     "CuiRadialMenuManager.cpp"
 )
+GROUND_COMBAT_CPP = ROOT / (
+    "src/engine/client/library/clientGame/src/shared/combat/"
+    "GroundCombatActionManager.cpp"
+)
+COMMAND_CHECKS_CPP = ROOT / (
+    "src/engine/client/library/clientGame/src/shared/command/"
+    "ClientCommandChecks.cpp"
+)
 
 
 def function_body(source: str, signature: str) -> str:
@@ -72,6 +80,8 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
         cls.status_ground_cpp = STATUS_GROUND_CPP.read_text(encoding="utf-8")
         cls.hud_cpp = HUD_CPP.read_text(encoding="utf-8")
         cls.radial_cpp = RADIAL_CPP.read_text(encoding="utf-8")
+        cls.ground_combat_cpp = GROUND_COMBAT_CPP.read_text(encoding="utf-8")
+        cls.command_checks_cpp = COMMAND_CHECKS_CPP.read_text(encoding="utf-8")
 
     def test_clear_uses_the_authoritative_all_combat_sentinel(self) -> None:
         clear_body = function_body(
@@ -155,6 +165,33 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
             "LeftMouseDoubleClick && CuiPreferences::getAutoAimToggle()",
             hud_message,
         )
+
+    def test_bare_hands_are_treated_as_the_implicit_unarmed_weapon(self) -> None:
+        weapon_check = function_body(
+            self.command_checks_cpp,
+            "bool ClientCommandChecks::doesWeaponInvalidateCommand(",
+        )
+        update = function_body(
+            self.ground_combat_cpp,
+            "void GroundCombatActionManager::update(",
+        )
+
+        self.assertIn("WeaponObject::WT_unarmed", weapon_check)
+        self.assertIn("implicitUnarmedWeapon", update)
+        self.assertIn("canUsePrimaryActionWithoutWeapon", update)
+        self.assertIn("std::max(0.1f, commandSpacingTime)", update)
+
+    def test_inventory_default_and_radial_actions_transfer_items_directly(self) -> None:
+        menu_action = function_body(
+            self.radial_cpp, "void CuiRadialMenuManager::performMenuAction ("
+        )
+
+        self.assertIn("sel == ITEM_EQUIP", menu_action)
+        self.assertIn("CuiInventoryManager::equipObject", menu_action)
+        self.assertIn("sel == ITEM_UNEQUIP", menu_action)
+        self.assertIn("CuiInventoryManager::unequipObject", menu_action)
+        self.assertIn("sel == ITEM_EQUIP_APPEARANCE", menu_action)
+        self.assertIn("CuiInventoryManager::equipAppearanceItem", menu_action)
 
     def test_queue_subscriptions_outlive_activation(self) -> None:
         constructor = function_body(
