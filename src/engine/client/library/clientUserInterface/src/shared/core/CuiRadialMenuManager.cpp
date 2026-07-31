@@ -1979,13 +1979,19 @@ bool CuiRadialMenuManager::performCombatAttack(Object const & object)
 	// physical double-click.
 	CuiPreferences::setAutoAimToggle(true);
 	player->setLookAtAndIntendedTarget(targetId);
+
+	// Repeat mode does not request the first attack.  Explicitly arm the
+	// primary action so Attack always sends one command immediately, then keep
+	// repeat enabled for the normal Pre-CU auto-attack behavior.
+	GroundCombatActionManager::attemptAction(
+		GroundCombatActionManager::AT_primaryAttack);
 	if (!GroundCombatActionManager::getRepeatAttackEnabled())
 	{
 		GroundCombatActionManager::attemptAction(
 			GroundCombatActionManager::AT_toggleRepeatPrimaryAttack);
 	}
 
-	return GroundCombatActionManager::getRepeatAttackEnabled();
+	return true;
 }
 
 //----------------------------------------------------------------------

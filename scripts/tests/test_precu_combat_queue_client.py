@@ -157,10 +157,20 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
         self.assertIn("tangible->isAttackable()", combat_attack)
         self.assertIn("CuiPreferences::setAutoAimToggle(true)", combat_attack)
         self.assertIn("player->setLookAtAndIntendedTarget(targetId)", combat_attack)
+        self.assertIn("AT_primaryAttack", combat_attack)
         self.assertIn("AT_toggleRepeatPrimaryAttack", combat_attack)
+        self.assertLess(
+            combat_attack.index("AT_primaryAttack"),
+            combat_attack.index("AT_toggleRepeatPrimaryAttack"),
+        )
         self.assertIn("performCombatAttack(*object)", menu_action)
         self.assertIn("performCombatAttack(object)", double_click)
-        self.assertIn("CuiRadialMenuManager::performCombatAttack(", hud_message)
+        self.assertIn(
+            "CuiRadialMenuManager::performDefaultDoubleClickAction(", hud_message
+        )
+        self.assertNotIn(
+            "findDefaultAction(*m_lastSelectedObject.getPointer())", hud_message
+        )
         self.assertNotIn(
             "LeftMouseDoubleClick && CuiPreferences::getAutoAimToggle()",
             hud_message,

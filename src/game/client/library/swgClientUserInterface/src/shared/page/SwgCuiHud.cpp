@@ -939,10 +939,14 @@ bool SwgCuiHud::OnMessage( UIWidget * const context, const UIMessage & msg)
 
 			if (msg.Type == UIMessage::LeftMouseDoubleClick)
 			{
-				if (m_lastSelectedObject.getPointer() && CuiRadialMenuManager::findDefaultAction(*m_lastSelectedObject.getPointer()) == Cui::MenuInfoTypes::COMBAT_ATTACK)
+				Object * const selectedObject = m_lastSelectedObject.getPointer();
+				if (selectedObject)
 				{
-					IGNORE_RETURN(CuiRadialMenuManager::performCombatAttack(
-						*m_lastSelectedObject.getPointer()));
+					// Route modeless world double-clicks through the same handler used
+					// by modal clicks and radial actions.  Server menu cache ordering
+					// must not be able to hide an attackable object's basic action.
+					IGNORE_RETURN(CuiRadialMenuManager::performDefaultDoubleClickAction(
+						*selectedObject, false));
 				}
 			}
 
