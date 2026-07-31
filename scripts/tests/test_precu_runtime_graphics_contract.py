@@ -27,6 +27,11 @@ DIRECT3D11_DYNAMIC_INDEX_SOURCE = REPOSITORY_ROOT / (
 CLIENT_PROJECT = REPOSITORY_ROOT / (
     "src/game/client/application/SwgClient/build/win32/SwgClient.vcxproj"
 )
+CLIENT_MAIN = REPOSITORY_ROOT / (
+    "src/game/client/application/SwgClient/src/win32/ClientMain.cpp"
+)
+DIRECTORY_TARGETS = REPOSITORY_ROOT / "Directory.Build.targets"
+INPUT_SCRIPT = REPOSITORY_ROOT / "scripts" / "Invoke-PrecuBackgroundInput.ps1"
 STAGE_SCRIPT = REPOSITORY_ROOT / "scripts" / "Stage-X64Client.ps1"
 BUILD_SCRIPT = REPOSITORY_ROOT / "scripts" / "Build-X64Client.ps1"
 
@@ -185,13 +190,24 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
 
     def test_dedicated_client_has_an_unambiguous_executable_identity(self):
         project = CLIENT_PROJECT.read_text(encoding="utf-8")
+        targets = DIRECTORY_TARGETS.read_text(encoding="utf-8")
         build = BUILD_SCRIPT.read_text(encoding="utf-8")
         stage = STAGE_SCRIPT.read_text(encoding="utf-8")
+        client_main = CLIENT_MAIN.read_text(encoding="utf-8")
+        input_script = INPUT_SCRIPT.read_text(encoding="utf-8")
 
-        self.assertIn("<TargetName>Galaxies PRECU Reborn</TargetName>", project)
-        self.assertIn("$(OutDir)Galaxies PRECU Reborn.exe", project)
-        self.assertIn('Release   = "Galaxies PRECU Reborn.exe"', build)
-        self.assertIn('Release   = "Galaxies PRECU Reborn.exe"', stage)
+        self.assertIn("<TargetName>Galaxies Reborn PRECU</TargetName>", project)
+        self.assertIn("$(OutDir)Galaxies Reborn PRECU.exe", project)
+        self.assertIn(">Galaxies Reborn PRECU</TargetName>", targets)
+        self.assertIn('Release   = "Galaxies Reborn PRECU.exe"', build)
+        self.assertIn('Release   = "Galaxies Reborn PRECU.exe"', stage)
+        self.assertIn('"Galaxies PRECU Reborn.exe"', stage)
+        self.assertIn(
+            'char clientWindowName[128] = "Galaxies Reborn PRECU";',
+            client_main,
+        )
+        self.assertNotIn('"Star Wars Galaxies";', client_main)
+        self.assertIn('"Galaxies Reborn PRECU"', input_script)
         self.assertIn('"SwgClient_d.exe", "SwgClient_o.exe", "SwgClient_r.exe"', stage)
 
     def test_dx11_index_ring_covers_expanded_water_tessellation(self):

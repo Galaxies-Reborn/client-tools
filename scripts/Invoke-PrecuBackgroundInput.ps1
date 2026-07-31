@@ -72,9 +72,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $clientProcessIdWasSpecified = $PSBoundParameters.ContainsKey("ClientProcessId")
 $expectedClientProcessNames = @(
-    "Galaxies PRECU Reborn",
-    "Galaxies PRECU Reborn_o",
-    "Galaxies PRECU Reborn_d"
+    "Galaxies Reborn PRECU",
+    "Galaxies Reborn PRECU_o",
+    "Galaxies Reborn PRECU_d"
 )
 
 $messageName = "SWGSource.PreCU.BackgroundInput.v1"
@@ -619,7 +619,7 @@ function Resolve-ClientWindow {
     if ($clientProcessIdWasSpecified) {
         $client = Get-Process -Id $ClientProcessId -ErrorAction Stop
         if ($client.ProcessName -notin $expectedClientProcessNames) {
-            throw "Process $ClientProcessId is '$($client.ProcessName)', not the dedicated Galaxies PRECU Reborn client."
+            throw "Process $ClientProcessId is '$($client.ProcessName)', not the dedicated Galaxies Reborn PRECU client."
         }
         if ($client.MainWindowHandle -eq [IntPtr]::Zero) {
             $fallbackWindow = [PrecuBackgroundInput.NativeMethods]::FindTopLevelWindow(
@@ -643,11 +643,11 @@ function Resolve-ClientWindow {
         }
     )
     if ($clients.Count -eq 0) {
-        throw "No running Galaxies PRECU Reborn window was found."
+        throw "No running Galaxies Reborn PRECU window was found."
     }
     if ($clients.Count -gt 1) {
         $ids = ($clients.Id | Sort-Object) -join ", "
-        throw "Multiple Galaxies PRECU Reborn windows were found ($ids). Use -ClientProcessId to select one explicitly."
+        throw "Multiple Galaxies Reborn PRECU windows were found ($ids). Use -ClientProcessId to select one explicitly."
     }
 
     return $clients[0]

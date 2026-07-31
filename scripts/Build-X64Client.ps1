@@ -96,9 +96,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $clientExecutableName = @{
-    Release   = "Galaxies PRECU Reborn.exe"
-    Optimized = "Galaxies PRECU Reborn_o.exe"
-    Debug     = "Galaxies PRECU Reborn_d.exe"
+    Release   = "Galaxies Reborn PRECU.exe"
+    Optimized = "Galaxies Reborn PRECU_o.exe"
+    Debug     = "Galaxies Reborn PRECU_d.exe"
 }[$Configuration]
 
 $suffix = @{

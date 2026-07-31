@@ -5088,12 +5088,7 @@ int ClientMain(
 
 	InstallTimer rootInstallTimer("root");
 
-	char clientWindowName[128] = "Star Wars Galaxies";
-
-#if PRODUCTION != 1
-	snprintf(clientWindowName, sizeof(clientWindowName), "SwgClient (%s.%s)", Branch().getBranchName().c_str(), ApplicationVersion::getPublicVersion());
-	clientWindowName[sizeof(clientWindowName) - 1] = '\0';
-#endif
+	char clientWindowName[128] = "Galaxies Reborn PRECU";
 
 
 	//-- foundation

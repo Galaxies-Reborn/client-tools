@@ -182,9 +182,9 @@ $suffix = @{
 }[$Configuration]
 
 $clientExecutableName = @{
-    Release   = "Galaxies PRECU Reborn.exe"
-    Optimized = "Galaxies PRECU Reborn_o.exe"
-    Debug     = "Galaxies PRECU Reborn_d.exe"
+    Release   = "Galaxies Reborn PRECU.exe"
+    Optimized = "Galaxies Reborn PRECU_o.exe"
+    Debug     = "Galaxies Reborn PRECU_d.exe"
 }[$Configuration]
 
 $runtimeFiles = @(
@@ -263,6 +263,7 @@ $incompatibleLocalPaths = @(
 )
 $obsoleteRuntimeNames = @(
     "SwgClient_d.exe", "SwgClient_o.exe", "SwgClient_r.exe",
+    "Galaxies PRECU Reborn.exe", "Galaxies PRECU Reborn_o.exe", "Galaxies PRECU Reborn_d.exe",
     "mss64.dll",
     "gl00_d.dll", "gl00_o.dll", "gl00_r.dll",
     "gl05_d.dll", "gl05_o.dll", "gl05_r.dll",
