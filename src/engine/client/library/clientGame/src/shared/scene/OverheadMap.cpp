@@ -823,49 +823,45 @@ void OverheadMapNamespace::renderIndexedTriangleList (const Transform& transform
 
 	Graphics::setObjectToWorldTransformAndScale (t, scale);
 
-	{
-		const std::vector<Vector> vertices = indexedTriangleList->getVertices ();
-		
-		VertexBufferFormat format;
-		format.setPosition ();
-		format.setColor0 ();
-		DynamicVertexBuffer vertexBuffer (format);
+	const std::vector<Vector> vertices = indexedTriangleList->getVertices ();
+	VertexBufferFormat format;
+	format.setPosition ();
+	format.setNormal ();
+	format.setColor0 ();
+	DynamicVertexBuffer vertexBuffer (format);
 
-		vertexBuffer.lock (vertices.size ());
+	vertexBuffer.lock (vertices.size ());
 
-			VertexBufferWriteIterator v = vertexBuffer.begin ();
-			const uint n = vertices.size ();
-			uint i;
-			for (i = 0; i < n; ++i, ++v)
-			{
-				Vector vertex = vertices [i];
-				vertex.y = 0.f;
-				v.setPosition (vertex);
-				v.setColor0 (color);
-			}
+		VertexBufferWriteIterator v = vertexBuffer.begin ();
+		const uint n = vertices.size ();
+		uint i;
+		for (i = 0; i < n; ++i, ++v)
+		{
+			Vector vertex = vertices [i];
+			vertex.y = 0.f;
+			v.setPosition (vertex);
+			v.setNormal (Vector::unitY);
+			v.setColor0 (color);
+		}
 
-		vertexBuffer.unlock ();
+	vertexBuffer.unlock ();
+	Graphics::setVertexBuffer (vertexBuffer);
 
-		Graphics::setVertexBuffer (vertexBuffer);
-	}
+	const std::vector<int> indices = indexedTriangleList->getIndices ();
 
-	{
-		const std::vector<int> indices = indexedTriangleList->getIndices ();
+	DynamicIndexBuffer indexBuffer;
 
-		DynamicIndexBuffer indexBuffer;
+	indexBuffer.lock (indices.size ());
 
-		indexBuffer.lock (indices.size ());
+		Index *ii = indexBuffer.begin ();
+		const uint indexCount = indices.size ();
+		uint index;
+		for (index = 0; index < indexCount; ++index, ++ii)
+			*ii = static_cast<Index> (indices [index]);
 
-			Index *ii = indexBuffer.begin ();
-			const uint n = indices.size ();
-			uint i;
-			for (i = 0; i < n; ++i, ++ii)
-				*ii = static_cast<Index> (indices [i]);
+	indexBuffer.unlock ();
 
-		indexBuffer.unlock ();
-
-		Graphics::setIndexBuffer (indexBuffer);
-	}
+	Graphics::setIndexBuffer (indexBuffer);
 
 	Graphics::drawIndexedTriangleList ();
 }
@@ -886,29 +882,29 @@ void OverheadMapNamespace::renderLineList (const Transform& transform, const std
 
 	Graphics::setObjectToWorldTransformAndScale (t, Vector::xyz111);
 
-	{
-		VertexBufferFormat format;
-		format.setPosition ();
-		format.setColor0 ();
-		DynamicVertexBuffer vertexBuffer (format);
+	VertexBufferFormat format;
+	format.setPosition ();
+	format.setNormal ();
+	format.setColor0 ();
+	DynamicVertexBuffer vertexBuffer (format);
 
-		vertexBuffer.lock (vertices.size ());
+	vertexBuffer.lock (vertices.size ());
 
-			VertexBufferWriteIterator v = vertexBuffer.begin ();
-			const uint n = vertices.size ();
-			uint i;
-			for (i = 0; i < n; ++i, ++v)
-			{
-				Vector vertex = vertices [i];
-				vertex.y = 0.f;
-				v.setPosition (vertex);
-				v.setColor0 (color);
-			}
+		VertexBufferWriteIterator v = vertexBuffer.begin ();
+		const uint n = vertices.size ();
+		uint i;
+		for (i = 0; i < n; ++i, ++v)
+		{
+			Vector vertex = vertices [i];
+			vertex.y = 0.f;
+			v.setPosition (vertex);
+			v.setNormal (Vector::unitY);
+			v.setColor0 (color);
+		}
 
-		vertexBuffer.unlock ();
+	vertexBuffer.unlock ();
 
-		Graphics::setVertexBuffer (vertexBuffer);
-	}
+	Graphics::setVertexBuffer (vertexBuffer);
 
 	Graphics::drawLineList ();
 }
@@ -929,29 +925,29 @@ void OverheadMapNamespace::renderLineStrip (const Transform& transform, const st
 
 	Graphics::setObjectToWorldTransformAndScale (t, Vector::xyz111);
 
-	{
-		VertexBufferFormat format;
-		format.setPosition ();
-		format.setColor0 ();
-		DynamicVertexBuffer vertexBuffer (format);
+	VertexBufferFormat format;
+	format.setPosition ();
+	format.setNormal ();
+	format.setColor0 ();
+	DynamicVertexBuffer vertexBuffer (format);
 
-		vertexBuffer.lock (vertices.size ());
+	vertexBuffer.lock (vertices.size ());
 
-			VertexBufferWriteIterator v = vertexBuffer.begin ();
-			const uint n = vertices.size ();
-			uint i;
-			for (i = 0; i < n; ++i, ++v)
-			{
-				Vector vertex = vertices [i];
-				vertex.y = 0.f;
-				v.setPosition (vertex);
-				v.setColor0 (color);
-			}
+		VertexBufferWriteIterator v = vertexBuffer.begin ();
+		const uint n = vertices.size ();
+		uint i;
+		for (i = 0; i < n; ++i, ++v)
+		{
+			Vector vertex = vertices [i];
+			vertex.y = 0.f;
+			v.setPosition (vertex);
+			v.setNormal (Vector::unitY);
+			v.setColor0 (color);
+		}
 
-		vertexBuffer.unlock ();
+	vertexBuffer.unlock ();
 
-		Graphics::setVertexBuffer (vertexBuffer);
-	}
+	Graphics::setVertexBuffer (vertexBuffer);
 
 	Graphics::drawLineStrip ();
 }

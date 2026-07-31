@@ -112,6 +112,46 @@ namespace CuiCombatManagerNamespace
 
 	bool s_installed = false;
 
+	Unicode::String selectPrecuCombatSpamLine(Unicode::String const & decoded, bool const playerIsAttacker, bool const playerIsDefender)
+	{
+		std::vector<Unicode::String> messageLines;
+		bool foundPlaceholder = false;
+		Unicode::String::size_type lineStart = 0;
+		Unicode::String const whitespace = Unicode::narrowToWide(" \t\r");
+		Unicode::String const placeholder = Unicode::narrowToWide("~");
+
+		while (lineStart <= decoded.size())
+		{
+			Unicode::String::size_type const lineEnd = decoded.find('\n', lineStart);
+			Unicode::String line = decoded.substr(
+				lineStart,
+				lineEnd == Unicode::String::npos ? Unicode::String::npos : lineEnd - lineStart);
+			Unicode::String::size_type const first = line.find_first_not_of(whitespace);
+			if (first != Unicode::String::npos)
+			{
+				Unicode::String::size_type const last = line.find_last_not_of(whitespace);
+				line = line.substr(first, last - first + 1);
+				if (line == placeholder)
+					foundPlaceholder = true;
+				else
+					messageLines.push_back(line);
+			}
+
+			if (lineEnd == Unicode::String::npos)
+				break;
+			lineStart = lineEnd + 1;
+		}
+
+		if (!foundPlaceholder || messageLines.empty())
+			return decoded;
+
+		if (playerIsDefender)
+			return messageLines.back();
+		if (!playerIsAttacker && messageLines.size() >= 3)
+			return messageLines[1];
+		return messageLines.front();
+	}
+
 	class Listener : public MessageDispatch::Receiver
 	{
 	public:
@@ -1132,7 +1172,8 @@ bool CuiCombatManager::isCombatCommand (const Command & command)
 			Crc::normalizeAndCalculate ("combat_non_loop")
 		};
 
-		return (command.m_commandGroup == combatGroupSpecCrcs [0] ||
+		return (command.m_addToCombatQueue ||
+				command.m_commandGroup == combatGroupSpecCrcs [0] ||
 				command.m_commandGroup == combatGroupSpecCrcs [1] ||
 				command.m_commandGroup == combatGroupSpecCrcs [2] ||
 				command.m_commandGroup == combatGroupSpecCrcs [3]);
@@ -1794,6 +1835,11 @@ void CuiCombatManager::processCombatSpam (const MessageQueueCombatSpam & spamMsg
 		// this is a specialized prose package/oob message
 		ProsePackageManagerClient::appendAllProsePackages(spamMsg.m_spamMessage, decoded1);
 	}
+
+	decoded1 = CuiCombatManagerNamespace::selectPrecuCombatSpamLine(
+		decoded1,
+		attacker == Game::getClientPlayer(),
+		defender == Game::getClientPlayer());
 
 	switch (static_cast<CombatResult>(spamMsg.m_spamType))
 	{
