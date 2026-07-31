@@ -24,6 +24,9 @@ DIRECT3D11_DYNAMIC_INDEX_SOURCE = REPOSITORY_ROOT / (
     "src/engine/client/application/Direct3d11/src/win32/"
     "Direct3d11_DynamicIndexBufferData.cpp"
 )
+CLIENT_PROJECT = REPOSITORY_ROOT / (
+    "src/game/client/application/SwgClient/build/win32/SwgClient.vcxproj"
+)
 STAGE_SCRIPT = REPOSITORY_ROOT / "scripts" / "Stage-X64Client.ps1"
 BUILD_SCRIPT = REPOSITORY_ROOT / "scripts" / "Build-X64Client.ps1"
 
@@ -179,6 +182,17 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
         script = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn("[int]$MaxCpuCount = 4", script)
         self.assertIn('"/m:$MaxCpuCount"', script)
+
+    def test_dedicated_client_has_an_unambiguous_executable_identity(self):
+        project = CLIENT_PROJECT.read_text(encoding="utf-8")
+        build = BUILD_SCRIPT.read_text(encoding="utf-8")
+        stage = STAGE_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("<TargetName>Galaxies PRECU Reborn</TargetName>", project)
+        self.assertIn("$(OutDir)Galaxies PRECU Reborn.exe", project)
+        self.assertIn('Release   = "Galaxies PRECU Reborn.exe"', build)
+        self.assertIn('Release   = "Galaxies PRECU Reborn.exe"', stage)
+        self.assertIn('"SwgClient_d.exe", "SwgClient_o.exe", "SwgClient_r.exe"', stage)
 
     def test_dx11_index_ring_covers_expanded_water_tessellation(self):
         source = DIRECT3D11_DYNAMIC_INDEX_SOURCE.read_text(encoding="utf-8")

@@ -95,6 +95,12 @@ if ($LASTEXITCODE -ne 0) {
     throw "The x64 client build failed with exit code $LASTEXITCODE."
 }
 
+$clientExecutableName = @{
+    Release   = "Galaxies PRECU Reborn.exe"
+    Optimized = "Galaxies PRECU Reborn_o.exe"
+    Debug     = "Galaxies PRECU Reborn_d.exe"
+}[$Configuration]
+
 $suffix = @{
     Release   = "r"
     Optimized = "o"
@@ -102,7 +108,7 @@ $suffix = @{
 }[$Configuration]
 
 $artifacts = @(
-    "src\build\win32\x64\$Configuration\SwgClient_$suffix.exe",
+    "src\build\win32\x64\$Configuration\$clientExecutableName",
     "src\build\win32\x64\$Configuration\gl11_$suffix.dll",
     "src\build\win32\x64\$Configuration\DllExport.dll"
 )

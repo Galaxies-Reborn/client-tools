@@ -181,10 +181,16 @@ $suffix = @{
     Debug     = "d"
 }[$Configuration]
 
+$clientExecutableName = @{
+    Release   = "Galaxies PRECU Reborn.exe"
+    Optimized = "Galaxies PRECU Reborn_o.exe"
+    Debug     = "Galaxies PRECU Reborn_d.exe"
+}[$Configuration]
+
 $runtimeFiles = @(
     [pscustomobject]@{
-        Source = Join-Path $repoRoot "src\build\win32\x64\$Configuration\SwgClient_$suffix.exe"
-        Name   = "SwgClient_$suffix.exe"
+        Source = Join-Path $repoRoot "src\build\win32\x64\$Configuration\$clientExecutableName"
+        Name   = $clientExecutableName
     },
     [pscustomobject]@{
         Source = Join-Path $repoRoot "src\build\win32\x64\$Configuration\gl11_$suffix.dll"
@@ -256,6 +262,7 @@ $incompatibleLocalPaths = @(
     }
 )
 $obsoleteRuntimeNames = @(
+    "SwgClient_d.exe", "SwgClient_o.exe", "SwgClient_r.exe",
     "mss64.dll",
     "gl00_d.dll", "gl00_o.dll", "gl00_r.dll",
     "gl05_d.dll", "gl05_o.dll", "gl05_r.dll",

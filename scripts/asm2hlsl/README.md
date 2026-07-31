@@ -159,6 +159,18 @@ all 223 assembly programs recovered from the clean Publish 14 client plus
 `a_specmap_bump_diffuse.psh` from the clean x64-DX11 base for compatibility with later effect
 references.
 
+The Pre-CU NGE content layer also reaches seven later retail programs that do not exist in
+the Publish 14 TRE stack. They are native HLSL rather than assembly and are hash-pinned in
+`precu-content-hlsl.tsv`. Run `import_precu_content_hlsl.py --source-client <clean-client>`
+to import them into the tracked `converted` tree; `--stage-client` also writes the exact
+payloads into a test client. The importer rejects a source-precedence change, a byte/hash
+change, or any payload that is not HLSL. For the four vertex programs it removes only the
+D3D9-era `register(vN)` annotations from input-struct members and binds their two required
+transform/fog helpers directly to the tracked flat DX11 constant ABI in `asm_constants.inc`.
+This avoids inheriting a different `functions.inc` from the NGE or Publish 14 archive stack;
+the DX11 output hashes are pinned separately. The normal x64 Pre-CU staging workflow then
+deploys these programs with the rest of the tracked loose DX11 overrides.
+
 Three program names that a live implementation references —
 `pixel_program/lava_ps14.psh`, `vertex_program/lava_ps14.vsh` and
 `vertex_program/lava_static.vsh` — exist in no archive, no `.toc` and no loose file, so they

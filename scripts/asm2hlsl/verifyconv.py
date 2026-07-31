@@ -5,11 +5,13 @@
 # asset overlay will do at runtime.
 
 import collections
+import ast
 import io
 import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -17,6 +19,17 @@ CORPUS = os.path.join(HERE, "corpus")
 CONVERTED = os.path.join(HERE, "converted")
 WORK = os.path.join(HERE, "convwork")
 FXC = r"C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\fxc.exe"
+RUNTIME_SHADER_SOURCE = (
+    Path(HERE).parents[1]
+    / "src"
+    / "engine"
+    / "client"
+    / "application"
+    / "Direct3d11"
+    / "src"
+    / "win32"
+    / "Direct3d11_ShaderSource.cpp"
+)
 
 
 def psrc(data):
@@ -27,6 +40,27 @@ def psrc(data):
         return None
     length = int.from_bytes(data[i + 4:i + 8], "big")
     return data[i + 8:i + 8 + length]
+
+
+def runtime_include(array_name):
+    """Extract an include override exactly as the DX11 backend serves it."""
+    lines = RUNTIME_SHADER_SOURCE.read_text(encoding="utf-8").splitlines()
+    marker = "char const %s[] =" % array_name
+    collecting = False
+    pieces = []
+    for line in lines:
+        if not collecting:
+            if marker in line:
+                collecting = True
+            else:
+                continue
+        for literal in re.findall(r'"((?:\\.|[^"\\])*)"', line):
+            pieces.append(ast.literal_eval('"%s"' % literal))
+        if line.rstrip().endswith('";'):
+            break
+    if not collecting or not pieces:
+        raise RuntimeError("could not extract %s from %s" % (array_name, RUNTIME_SHADER_SOURCE))
+    return "".join(pieces).encode("latin-1")
 
 
 def main():
@@ -43,6 +77,19 @@ def main():
             target = os.path.join(root, rel)
             os.makedirs(os.path.dirname(target), exist_ok=True)
             shutil.copyfile(source, target)
+
+    # The runtime does not serve the retail constant includes to D3DCompile:
+    # Direct3d11_ShaderCompiler's include handler substitutes these two arrays
+    # from Direct3d11_ShaderSource.cpp. Mirror that exact behavior here so native
+    # HLSL programs and converted assembly programs see the same register ABI in
+    # verification and in the client.
+    for rel, array_name in (
+        ("pixel_program/include/pixel_shader_constants.inc", "cms_pixelShaderConstants"),
+        ("vertex_program/include/vertex_shader_constants.inc", "cms_vertexShaderConstants"),
+    ):
+        target = os.path.join(root, *rel.split("/"))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        open(target, "wb").write(runtime_include(array_name))
 
     deep = os.path.join(root, "_c", "_c")
     os.makedirs(deep, exist_ok=True)

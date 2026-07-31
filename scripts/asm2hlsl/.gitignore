@@ -5,3 +5,5 @@
 corpus/
 corpus-manifest.tsv
 __pycache__/
+conv-failures.txt
+convwork/

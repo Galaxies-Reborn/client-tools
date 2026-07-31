@@ -6,7 +6,9 @@
     <SwgOutputSuffix Condition="'$(Configuration)' == 'Release'">r</SwgOutputSuffix>
     <SwgOutputSuffix Condition="'$(Configuration)' == 'Optimized'">o</SwgOutputSuffix>
     <SwgOutputSuffix Condition="'$(Configuration)' == 'Debug'">d</SwgOutputSuffix>
-    <TargetName Condition="'$(MSBuildProjectName)' == 'SwgClient'">SwgClient_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(MSBuildProjectName)' == 'SwgClient' and '$(Configuration)' == 'Release'">Galaxies PRECU Reborn</TargetName>
+    <TargetName Condition="'$(MSBuildProjectName)' == 'SwgClient' and '$(Configuration)' == 'Optimized'">Galaxies PRECU Reborn_o</TargetName>
+    <TargetName Condition="'$(MSBuildProjectName)' == 'SwgClient' and '$(Configuration)' == 'Debug'">Galaxies PRECU Reborn_d</TargetName>
     <TargetName Condition="'$(MSBuildProjectName)' == 'Direct3d9'">gl05_$(SwgOutputSuffix)</TargetName>
     <TargetName Condition="'$(MSBuildProjectName)' == 'Direct3d9_ffp'">gl06_$(SwgOutputSuffix)</TargetName>
     <TargetName Condition="'$(MSBuildProjectName)' == 'Direct3d9_vsps'">gl07_$(SwgOutputSuffix)</TargetName>

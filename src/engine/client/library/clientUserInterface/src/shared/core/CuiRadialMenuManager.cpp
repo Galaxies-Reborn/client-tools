@@ -175,11 +175,13 @@ namespace CuiRadialMenuManagerNamespace
 		NetworkId networkId;
 		uint8 sequence;
 		float timestamp;
+		int retryCount;
 	};
 	std::list<PendingResponseInfo> s_pendingResponses;
 
 	float s_cacheTimeout    = 30.0f;
 	float s_responseTimeout = 5.0f;
+	int const s_maxResponseRetries = 1;
 	
 	enum GroundTargetMode
 	{
@@ -383,6 +385,7 @@ namespace CuiRadialMenuManagerNamespace
 			responseInfo.networkId = id;
 			responseInfo.sequence  = s_sequenceGlobal;
 			responseInfo.timestamp = currentTime;
+			responseInfo.retryCount = 0;
 			s_pendingResponses.push_back(responseInfo);
 		}
 
@@ -715,12 +718,12 @@ void CuiRadialMenuManager::update()
 					const CacheMap::iterator i = s_cacheMap.find (entry.networkId);
 					if (i != s_cacheMap.end())
 					{
-						const ObjectMenuCacheData & cacheData = (*i).second;
+						ObjectMenuCacheData & cacheData = (*i).second;
 						
 						if (cacheData.responsePending && cacheData.sequence == entry.sequence)
 						{
 							//-- dont refresh if the object is deleted
-							if (NetworkIdManager::getObjectById (entry.networkId))
+							if (NetworkIdManager::getObjectById (entry.networkId) && entry.retryCount < s_maxResponseRetries)
 							{
 								WARNING(true, ("CuiRadialMenuManager timing out and resending request with no response for [%s]", entry.networkId.getValueString ().c_str()));
 								if (player->getController())
@@ -731,10 +734,23 @@ void CuiRadialMenuManager::update()
 										0.0f,
 										msg,
 										GameControllerMessageFlags::SEND | GameControllerMessageFlags::RELIABLE | GameControllerMessageFlags::DEST_AUTH_SERVER);
+									++entry.retryCount;
 									entry.timestamp = currentTime;
 									return;
 								}
 							}
+
+							// A client snapshot object can legitimately have no authoritative
+							// server counterpart.  Never let one such object remain at the
+							// front of the response queue forever and poison every later
+							// terminal or NPC interaction.
+							WARNING(true, ("CuiRadialMenuManager abandoning unanswered request for [%s] after [%d] retry", entry.networkId.getValueString ().c_str(), entry.retryCount));
+							cacheData.responsePending = false;
+							cacheData.ok = false;
+							s_pendingServerNotifications.erase(RequestId(entry.networkId, entry.sequence));
+
+							if (s_object.getPointer() && s_object->getNetworkId() == entry.networkId)
+								clear();
 						}
 					}
 				}
