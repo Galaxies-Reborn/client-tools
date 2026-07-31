@@ -937,20 +937,12 @@ bool SwgCuiHud::OnMessage( UIWidget * const context, const UIMessage & msg)
 				return true;
 			}
 
-			if (msg.Type == UIMessage::LeftMouseDoubleClick && CuiPreferences::getAutoAimToggle())
+			if (msg.Type == UIMessage::LeftMouseDoubleClick)
 			{
 				if (m_lastSelectedObject.getPointer() && CuiRadialMenuManager::findDefaultAction(*m_lastSelectedObject.getPointer()) == Cui::MenuInfoTypes::COMBAT_ATTACK)
 				{
-					NetworkId selectedId = m_lastSelectedObject.getPointer()->getNetworkId();
-					CreatureObject * const player = Game::getPlayerCreature();
-					if (player && 
-						(!player->getIntendedTarget().isValid() || player->getIntendedTarget() == selectedId) && 
-						!GroundCombatActionManager::getRepeatAttackEnabled())
-					{
-						player->setIntendedTarget(selectedId);
-						GroundCombatActionManager::ActionType actionType = GroundCombatActionManager::AT_toggleRepeatPrimaryAttack;
-						GroundCombatActionManager::attemptAction(actionType);
-					}
+					IGNORE_RETURN(CuiRadialMenuManager::performCombatAttack(
+						*m_lastSelectedObject.getPointer()));
 				}
 			}
 

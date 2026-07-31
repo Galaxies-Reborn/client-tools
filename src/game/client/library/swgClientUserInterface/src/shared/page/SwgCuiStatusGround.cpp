@@ -1568,8 +1568,13 @@ bool SwgCuiStatusGround::updateTargetHam(CreatureObject const & creature, float 
 	{
 		if(creature.isAttackable() || m_isPlayerControlled || (m_statusType == ST_target && creature.getForceShowHam()))
 		{
-			if(creature.getAttribute(Attributes::Action) > 0 &&
-				creature.getAttribute(Attributes::Mind) > 0)
+			// Publish 14 targets always expose all three combat pools.  Some
+			// restored creatures arrive with an exhausted or not-yet-replicated
+			// Action/Mind current value; that must not collapse their target frame
+			// to the later single-health presentation.
+			if(m_isLookAtTarget ||
+				(creature.getAttribute(Attributes::Action) > 0 &&
+				 creature.getAttribute(Attributes::Mind) > 0))
 			{
 				pageStyle = PS_ham;
 			}

@@ -30,6 +30,17 @@ TARGETS_CPP = ROOT / (
     "src/game/client/library/swgClientUserInterface/src/shared/page/"
     "SwgCuiTargets.cpp"
 )
+STATUS_GROUND_CPP = ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/page/"
+    "SwgCuiStatusGround.cpp"
+)
+HUD_CPP = ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/page/SwgCuiHud.cpp"
+)
+RADIAL_CPP = ROOT / (
+    "src/engine/client/library/clientUserInterface/src/shared/core/"
+    "CuiRadialMenuManager.cpp"
+)
 
 
 def function_body(source: str, signature: str) -> str:
@@ -58,6 +69,9 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
             encoding="utf-8"
         )
         cls.targets_cpp = TARGETS_CPP.read_text(encoding="utf-8")
+        cls.status_ground_cpp = STATUS_GROUND_CPP.read_text(encoding="utf-8")
+        cls.hud_cpp = HUD_CPP.read_text(encoding="utf-8")
+        cls.radial_cpp = RADIAL_CPP.read_text(encoding="utf-8")
 
     def test_clear_uses_the_authoritative_all_combat_sentinel(self) -> None:
         clear_body = function_body(
@@ -105,6 +119,42 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
         self.assertIn("target = primaryTargetObject->getLookAtTarget()", update)
         self.assertIn("getPage ().SetVisible (true)", update)
         self.assertIn("getPage ().SetVisible (false)", update)
+
+    def test_target_creatures_keep_the_three_pool_ham_presentation(self) -> None:
+        update_ham = function_body(
+            self.status_ground_cpp,
+            "bool SwgCuiStatusGround::updateTargetHam(CreatureObject const & creature",
+        )
+        self.assertIn("if(m_isLookAtTarget ||", update_ham)
+        self.assertIn("pageStyle = PS_ham", update_ham)
+
+    def test_radial_attack_and_double_click_share_the_basic_attack_path(self) -> None:
+        combat_attack = function_body(
+            self.radial_cpp,
+            "bool CuiRadialMenuManager::performCombatAttack(Object const & object)",
+        )
+        menu_action = function_body(
+            self.radial_cpp, "void CuiRadialMenuManager::performMenuAction ("
+        )
+        double_click = function_body(
+            self.radial_cpp,
+            "bool CuiRadialMenuManager::performDefaultDoubleClickAction(",
+        )
+        hud_message = function_body(
+            self.hud_cpp, "bool SwgCuiHud::OnMessage("
+        )
+
+        self.assertIn("tangible->isAttackable()", combat_attack)
+        self.assertIn("CuiPreferences::setAutoAimToggle(true)", combat_attack)
+        self.assertIn("player->setLookAtAndIntendedTarget(targetId)", combat_attack)
+        self.assertIn("AT_toggleRepeatPrimaryAttack", combat_attack)
+        self.assertIn("performCombatAttack(*object)", menu_action)
+        self.assertIn("performCombatAttack(object)", double_click)
+        self.assertIn("CuiRadialMenuManager::performCombatAttack(", hud_message)
+        self.assertNotIn(
+            "LeftMouseDoubleClick && CuiPreferences::getAutoAimToggle()",
+            hud_message,
+        )
 
     def test_queue_subscriptions_outlive_activation(self) -> None:
         constructor = function_body(

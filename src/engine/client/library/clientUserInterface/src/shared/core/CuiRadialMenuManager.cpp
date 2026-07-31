@@ -1958,6 +1958,38 @@ void CuiRadialMenuManager::performDefaultAction (Object & object, bool allowOpen
 
 //----------------------------------------------------------------------
 
+bool CuiRadialMenuManager::performCombatAttack(Object const & object)
+{
+	CreatureObject * const player = Game::getPlayerCreature();
+	ClientObject const * const clientObject = object.asClientObject();
+	TangibleObject const * const tangible = clientObject ? clientObject->asTangibleObject() : 0;
+	CreatureObject const * const creature = tangible ? tangible->asCreatureObject() : 0;
+	NetworkId const & targetId = object.getNetworkId();
+
+	if (!player || player == &object || player->isIncapacitated() || player->isDead() ||
+		!targetId.isValid() || !tangible || !tangible->isAttackable() ||
+		(creature && (creature->isDead() || creature->isIncapacitated())))
+	{
+		return false;
+	}
+
+	// The Pre-CU Attack radial and double-click action both select the mob and
+	// begin the weapon's zero-HAM-cost default attack.  Make this operation
+	// idempotent because the HUD and modal targeting paths can observe the same
+	// physical double-click.
+	CuiPreferences::setAutoAimToggle(true);
+	player->setLookAtAndIntendedTarget(targetId);
+	if (!GroundCombatActionManager::getRepeatAttackEnabled())
+	{
+		GroundCombatActionManager::attemptAction(
+			GroundCombatActionManager::AT_toggleRepeatPrimaryAttack);
+	}
+
+	return GroundCombatActionManager::getRepeatAttackEnabled();
+}
+
+//----------------------------------------------------------------------
+
 int CuiRadialMenuManager::findDefaultAction (Object & object)
 {
 	static bool inFunction = false;
@@ -2241,9 +2273,8 @@ void CuiRadialMenuManager::performMenuAction (int sel, int index, bool serverNot
 	// We handle this on the client now, so lets do this before we let the server consume the message.
 	if (sel == COMBAT_ATTACK)
 	{
-		CuiPreferences::setAutoAimToggle(true);
-		GroundCombatActionManager::ActionType actionType = GroundCombatActionManager::AT_toggleRepeatPrimaryAttack;
-		GroundCombatActionManager::attemptAction(actionType);
+		IGNORE_RETURN(performCombatAttack(*object));
+		return;
 	}
 
 	// Trying to place a story teller object. We need to intercept this so the user can enter targeting
@@ -2790,8 +2821,12 @@ bool CuiRadialMenuManager::performDefaultDoubleClickAction(Object const & object
 	////////////////////////////////////
 
 	bool processedByDoubleClickManager = false;
+	if (isAttackable)
+	{
+		processedByDoubleClickManager = performCombatAttack(object);
+	}
 		
-	if (isInRange) 
+	if (!processedByDoubleClickManager && isInRange)
 	{
 		if(isEnemy && isIncapacitated && isPlayer)
 		{

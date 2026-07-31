@@ -35,6 +35,7 @@ public:
 	static bool createMenu           (Object & object, const UIPoint & pt, bool usePopup = false);
 	static bool createMenu           (Object & object, const UIPoint & pt, const Vector & radialOffset_c, bool usePopup = false);
 	static void performDefaultAction (Object & object, bool allowOpenOnly = false, int typeToUse = 0, bool fromButton = false);
+	static bool performCombatAttack  (Object const & object);
 	static int  findDefaultAction    (Object & object);
 
 	static bool isActive             ();
