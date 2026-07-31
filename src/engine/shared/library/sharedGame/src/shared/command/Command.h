@@ -101,6 +101,7 @@ public:
 public:
 	std::string                                    m_commandName;
 	uint32                                         m_commandHash;
+	uint32                                         m_commandCategory;
 	Priority                                       m_defaultPriority;
 	std::string                                    m_scriptHook;
 	std::string                                    m_failScriptHook;

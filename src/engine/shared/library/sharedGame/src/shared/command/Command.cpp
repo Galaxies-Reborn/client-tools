@@ -23,6 +23,7 @@ using namespace CommandNamespace;
 Command::Command() :
 	m_commandName(),
 	m_commandHash(Crc::crcNull),
+	m_commandCategory(0),
 	m_defaultPriority(CP_NumberOfPriorities),
 	m_scriptHook(),
 	m_failScriptHook(),
@@ -62,6 +63,7 @@ Command::Command() :
 Command::Command(Command const &rhs) :
 	m_commandName(rhs.m_commandName),
 	m_commandHash(rhs.m_commandHash),
+	m_commandCategory(rhs.m_commandCategory),
 	m_defaultPriority(rhs.m_defaultPriority),
 	m_scriptHook(rhs.m_scriptHook),
 	m_failScriptHook(rhs.m_failScriptHook),
@@ -104,6 +106,7 @@ Command &Command::operator=(Command const &rhs)
 	{
 		m_commandName = rhs.m_commandName;
 		m_commandHash = rhs.m_commandHash;
+		m_commandCategory = rhs.m_commandCategory;
 		m_defaultPriority = rhs.m_defaultPriority;
 		m_scriptHook = rhs.m_scriptHook;
 		m_failScriptHook = rhs.m_failScriptHook;

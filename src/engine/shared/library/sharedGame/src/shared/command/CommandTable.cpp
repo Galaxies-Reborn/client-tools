@@ -131,6 +131,16 @@ void CommandTableNamespace::loadCommandRow(DataTable const &t, int row)
 	cmd.m_commandName = commandName;
 	cmd.m_commandHash = commandHash;
 
+	int const commandCategoryColumn = t.findColumnNumber("commandCategory");
+	if (commandCategoryColumn >= 0)
+	{
+		std::string const commandCategory =
+			Unicode::getTrim(t.getStringValue(commandCategoryColumn, row));
+		if (!commandCategory.empty())
+			cmd.m_commandCategory =
+				Crc::normalizeAndCalculate(commandCategory.c_str());
+	}
+
 	{
 		int const priority = t.getIntValue("defaultPriority", row);
 		if (priority < 0 || priority >= static_cast<int>(Command::CP_NumberOfPriorities))

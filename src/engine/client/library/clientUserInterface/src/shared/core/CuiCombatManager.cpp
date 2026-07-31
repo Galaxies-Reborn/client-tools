@@ -152,6 +152,73 @@ namespace CuiCombatManagerNamespace
 		return messageLines.front();
 	}
 
+	Unicode::String buildPrecuNamedCombatMessage(
+		MessageQueueCombatSpam const & spamMsg,
+		ClientObject const * const attacker,
+		ClientObject const * const defender)
+	{
+		if (spamMsg.m_attackName == StringId::cms_invalid)
+			return Unicode::emptyString;
+
+		Unicode::String result;
+		bool const playerIsAttacker = attacker == Game::getClientPlayer();
+		bool const playerIsDefender = defender == Game::getClientPlayer();
+
+		if (playerIsAttacker)
+			result = Unicode::narrowToWide("You use ");
+		else
+		{
+			result = attacker != NULL
+				? attacker->getLocalizedName()
+				: Unicode::narrowToWide("An attacker");
+			result += Unicode::narrowToWide(" uses ");
+		}
+
+		result += spamMsg.m_attackName.localize();
+		result += Unicode::narrowToWide(" on ");
+		if (playerIsDefender)
+			result += Unicode::narrowToWide("you");
+		else
+			result += defender != NULL
+				? defender->getLocalizedName()
+				: Unicode::narrowToWide("the target");
+
+		switch (static_cast<CuiCombatManager::CombatResult>(spamMsg.m_spamType))
+		{
+			case CuiCombatManager::COMBAT_RESULT_HIT:
+			{
+				char damageText[64];
+				snprintf(
+					damageText,
+					sizeof(damageText),
+					" for %d points of damage!",
+					spamMsg.m_finalDamage + spamMsg.m_elementalDamage);
+				result += Unicode::narrowToWide(damageText);
+			}
+			break;
+			case CuiCombatManager::COMBAT_RESULT_MISS:
+				result += Unicode::narrowToWide(", but miss.");
+				break;
+			case CuiCombatManager::COMBAT_RESULT_EVADE:
+				result += Unicode::narrowToWide(", but the target evades.");
+				break;
+			case CuiCombatManager::COMBAT_RESULT_COUNTER:
+			case CuiCombatManager::COMBAT_RESULT_LIGHTSABER_COUNTER:
+			case CuiCombatManager::COMBAT_RESULT_LIGHTSABER_COUNTER_TARGET:
+				result += Unicode::narrowToWide(", but the target counters.");
+				break;
+			case CuiCombatManager::COMBAT_RESULT_BLOCK:
+			case CuiCombatManager::COMBAT_RESULT_LIGHTSABER_BLOCK:
+				result += Unicode::narrowToWide(", but the target blocks.");
+				break;
+			default:
+				result += Unicode::narrowToWide(".");
+				break;
+		}
+
+		return result;
+	}
+
 	class Listener : public MessageDispatch::Receiver
 	{
 	public:
@@ -1164,6 +1231,14 @@ bool CuiCombatManager::isCombatCommand (const Command & command)
 {
 	if (!command.isNull())
 	{
+		static uint32 const combatCategoryCrc =
+			Crc::normalizeAndCalculate ("combat");
+		// Restored Publish 14 source rows were exported with the already-computed
+		// combat_ranged CRC in the hash-string column.  Older rebuilt IFFs hashed
+		// those decimal digits a second time, so accept that exact legacy value
+		// while corrected assets retain the normal named combat groups below.
+		static uint32 const precuRehashedCombatGroupCrc =
+			Crc::normalizeAndCalculate ("391413347");
 		static uint32 combatGroupSpecCrcs [] = 
 		{
 			Crc::normalizeAndCalculate ("combat_ranged"),
@@ -1172,7 +1247,8 @@ bool CuiCombatManager::isCombatCommand (const Command & command)
 			Crc::normalizeAndCalculate ("combat_non_loop")
 		};
 
-		return (command.m_addToCombatQueue ||
+		return (command.m_commandCategory == combatCategoryCrc ||
+				command.m_commandGroup == precuRehashedCombatGroupCrc ||
 				command.m_commandGroup == combatGroupSpecCrcs [0] ||
 				command.m_commandGroup == combatGroupSpecCrcs [1] ||
 				command.m_commandGroup == combatGroupSpecCrcs [2] ||
@@ -1691,7 +1767,16 @@ void CuiCombatManager::processCombatSpam (const MessageQueueCombatSpam & spamMsg
 
 	const ClientObject * const defender = safe_cast<const ClientObject *>(NetworkIdManager::getObjectById(spamMsg.m_defender));
 
-	if (spamMsg.m_spamMessage.empty())
+	if (spamMsg.m_spamMessage.empty() && spamMsg.m_attackName != StringId::cms_invalid)
+	{
+		// Named attacks always use the localized command name supplied by the
+		// server.  This avoids substituting unrelated legacy flavor-move names.
+		decoded1 = CuiCombatManagerNamespace::buildPrecuNamedCombatMessage(
+			spamMsg,
+			attacker,
+			defender);
+	}
+	else if (spamMsg.m_spamMessage.empty())
 	{
 		// Fill ms_spamStrings with the indexing in the same order as the above comment, and the flags given below.
 		// In other words, pass the array to each of the functions and fill the array value at the correct index
