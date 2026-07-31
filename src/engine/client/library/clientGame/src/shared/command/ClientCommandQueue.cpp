@@ -825,24 +825,9 @@ void ClientCommandQueue::clear()
 		// this is done by telling it to remove sequenceId 0, which means everything
 		PlayerCreatureController * const playerController = safe_cast<PlayerCreatureController*>(player->getController());
 		playerController->sendCommandQueueRemove(0);
-		// clear the queue locally.  note that you shouldn't clear the current command - nothing can stop that.
-		ClientCommandQueue::EntryMap::const_iterator it = ms_commandQueue.begin ();
-		if(it != ms_commandQueue.end())
-		{
-			std::pair<uint32, Entry> firstValue = *it;
-			ms_commandQueue.clear();
-
-			double const currentTime = Clock::getCurrentTime();
-			double timeUntilExecuteCompletes = (firstValue.second.m_command->isPrimaryCommand()) 
-				? ms_timeUntilPrimaryCommandExecuteCompletes 
-				: ms_timeUntilSecondaryCommandExecuteCompletes;
-
-			// Determine if we are in the middle of executing it; if so, can't remove it
-			if (currentTime < timeUntilExecuteCompletes)
-			{
-				ms_commandQueue.insert(firstValue);
-			}
-		}		
+		// Mirror the authoritative clear immediately so every displayed combat
+		// action, including the currently executing entry, disappears together.
+		ms_commandQueue.clear();
 	}
 }
 

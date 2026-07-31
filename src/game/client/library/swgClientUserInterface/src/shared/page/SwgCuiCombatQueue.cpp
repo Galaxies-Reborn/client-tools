@@ -216,11 +216,7 @@ void SwgCuiCombatQueue::update(float deltaTimeSecs)
 
 void SwgCuiCombatQueue::clearCombatQueue()
 {
-	CuiCombatManager::IntVector sequenceIds;
-	CuiCombatManager::getCombatCommandsFromQueue(sequenceIds);
-
-	for (CuiCombatManager::IntVector::const_iterator it = sequenceIds.begin(); it != sequenceIds.end(); ++it)
-		IGNORE_RETURN(ClientCommandQueue::removeCommand(*it));
+	ClientCommandQueue::clear();
 }
 
 //----------------------------------------------------------------------

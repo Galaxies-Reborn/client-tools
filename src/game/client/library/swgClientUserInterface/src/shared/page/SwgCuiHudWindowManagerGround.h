@@ -17,6 +17,7 @@ class PlayerObject;
 class SwgCuiBuffDisplay;
 class SwgCuiGroundRadar;
 class SwgCuiStatusGround;
+class SwgCuiTargets;
 
 //======================================================================
 
@@ -49,8 +50,6 @@ public:
 	virtual void handlePerformActivate();
 	virtual void handlePerformDeactivate();
 
-	void updateTargetStatusPages();
-
 private:
 	                         SwgCuiHudWindowManagerGround ();
 	                         SwgCuiHudWindowManagerGround (const SwgCuiHudWindowManagerGround & rhs);
@@ -62,8 +61,8 @@ private:
 
 	SwgCuiGroundRadar * m_groundRadarMediator;
 	SwgCuiBuffDisplay * m_attributeModifierDisplay;
-	SwgCuiStatusGround *  m_targetStatusPage;
-	SwgCuiStatusGround *  m_secondaryTargetStatusPage;
+	SwgCuiTargets *  m_targetStatusPage;
+	SwgCuiTargets *  m_secondaryTargetStatusPage;
 	SwgCuiStatusGround *  m_playerStatusPage;
 	SwgCuiStatusGround *  m_petStatusPage;
 };

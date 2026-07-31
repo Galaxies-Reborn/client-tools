@@ -22,6 +22,14 @@ HUD_MANAGER_CPP = ROOT / (
     "src/game/client/library/swgClientUserInterface/src/shared/page/"
     "SwgCuiHudWindowManager.cpp"
 )
+GROUND_HUD_MANAGER_CPP = ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/page/"
+    "SwgCuiHudWindowManagerGround.cpp"
+)
+TARGETS_CPP = ROOT / (
+    "src/game/client/library/swgClientUserInterface/src/shared/page/"
+    "SwgCuiTargets.cpp"
+)
 
 
 def function_body(source: str, signature: str) -> str:
@@ -46,33 +54,57 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
         cls.command_queue_cpp = COMMAND_QUEUE_CPP.read_text(encoding="utf-8")
         cls.player_controller_cpp = PLAYER_CONTROLLER_CPP.read_text(encoding="utf-8")
         cls.hud_manager_cpp = HUD_MANAGER_CPP.read_text(encoding="utf-8")
+        cls.ground_hud_manager_cpp = GROUND_HUD_MANAGER_CPP.read_text(
+            encoding="utf-8"
+        )
+        cls.targets_cpp = TARGETS_CPP.read_text(encoding="utf-8")
 
-    def test_clear_is_combat_only_and_sequence_specific(self) -> None:
+    def test_clear_uses_the_authoritative_all_combat_sentinel(self) -> None:
         clear_body = function_body(
             self.queue_cpp, "void SwgCuiCombatQueue::clearCombatQueue()"
         )
-        self.assertIn("getCombatCommandsFromQueue(sequenceIds)", clear_body)
-        self.assertIn("ClientCommandQueue::removeCommand(*it)", clear_body)
-        self.assertNotIn("ClientCommandQueue::clear()", clear_body)
+        self.assertIn("ClientCommandQueue::clear()", clear_body)
+        self.assertNotIn("getCombatCommandsFromQueue(sequenceIds)", clear_body)
 
-        remove_body = function_body(
-            self.command_queue_cpp,
-            "bool ClientCommandQueue::removeCommand(uint32 sequenceId)",
-        )
-        self.assertIn("sequenceId == 0", remove_body)
-        self.assertIn("sendCommandQueueRemove(sequenceId)", remove_body)
-        self.assertNotIn("handleCommandRemoved(sequenceId", remove_body)
-
-        self.assertIn("case CM_commandQueueRemove:", self.player_controller_cpp)
-        self.assertIn(
-            "ClientCommandQueue::handleCommandRemoved(msg->getSequenceId(), msg->getWaitTime()",
-            self.player_controller_cpp,
-        )
-
-        broad_clear = function_body(
+        clear_queue = function_body(
             self.command_queue_cpp, "void ClientCommandQueue::clear()"
         )
-        self.assertIn("sendCommandQueueRemove(0)", broad_clear)
+        self.assertIn("sendCommandQueueRemove(0)", clear_queue)
+        self.assertIn("ms_commandQueue.clear()", clear_queue)
+        self.assertNotIn("ms_commandQueue.insert(firstValue)", clear_queue)
+
+    def test_peace_button_queues_the_immediate_server_command(self) -> None:
+        pressed = function_body(
+            self.queue_cpp, "void SwgCuiCombatQueue::OnButtonPressed("
+        )
+        self.assertIn('enqueueCommand("peace"', pressed)
+
+    def test_publish14_target_and_target_of_target_pages_are_both_owned(self) -> None:
+        constructor = function_body(
+            self.ground_hud_manager_cpp,
+            "SwgCuiHudWindowManagerGround::SwgCuiHudWindowManagerGround",
+        )
+        update = function_body(self.targets_cpp, "void SwgCuiTargets::update (")
+
+        self.assertIn('"TargetsPage"', constructor)
+        self.assertIn('"SecondaryTargetsPage"', constructor)
+        self.assertIn("primaryTargetPage->DuplicateObject()", constructor)
+        self.assertIn('SetName("SecondaryTarget")', constructor)
+        self.assertIn("new SwgCuiTargets(*mediatorPage, SwgCuiTargets::TR_primary)", constructor)
+        self.assertIn(
+            "new SwgCuiTargets(*mediatorPage, SwgCuiTargets::TR_targetOfTarget)",
+            constructor,
+        )
+        self.assertIn('getCodeDataObject (TUIPage, statusPage, "pagestatus")', self.targets_cpp)
+        self.assertIn("groundStatus->setLookAtTarget(true)", self.targets_cpp)
+        self.assertIn(
+            "intendedTarget.isValid() ? intendedTarget : lookAtTarget", update
+        )
+        self.assertIn("m_targetRole == TR_targetOfTarget", update)
+        self.assertIn("target = primaryTargetObject->getIntendedTarget()", update)
+        self.assertIn("target = primaryTargetObject->getLookAtTarget()", update)
+        self.assertIn("getPage ().SetVisible (true)", update)
+        self.assertIn("getPage ().SetVisible (false)", update)
 
     def test_queue_subscriptions_outlive_activation(self) -> None:
         constructor = function_body(

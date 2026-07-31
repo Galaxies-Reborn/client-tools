@@ -23,6 +23,7 @@
 #include "sharedNetworkMessages/ConsoleChannelMessages.h"
 #include "swgClientUserInterface/SwgCuiActions.h"
 #include "swgClientUserInterface/SwgCuiStatusFactory.h"
+#include "swgClientUserInterface/SwgCuiStatusGround.h"
 
 //======================================================================
 
@@ -46,7 +47,7 @@ private:
 };
 
 //----------------------------------------------------------------------
-SwgCuiTargets::SwgCuiTargets (UIPage & page) :
+SwgCuiTargets::SwgCuiTargets (UIPage & page, TargetRole targetRole) :
 CuiMediator                ("SwgCuiTargets", page),
 UIEventCallback            (),
 m_action                   (0),
@@ -54,7 +55,8 @@ m_mfdStatus                (0),
 m_buttonCollapse           (0),
 m_buttonExpand             (0),
 m_pageToggle               (0),
-m_sceneType(Game::getHudSceneType())
+m_sceneType(Game::getHudSceneType()),
+m_targetRole(targetRole)
 {
 	//----------------------------------------------------------------------
 	//-- setup the icon
@@ -76,6 +78,9 @@ m_sceneType(Game::getHudSceneType())
 
 	m_mfdStatus = SwgCuiStatusFactory::createStatusPage(static_cast<Game::SceneType>(m_sceneType), *statusPage);
 	m_mfdStatus->fetch ();
+	SwgCuiStatusGround * const groundStatus = dynamic_cast<SwgCuiStatusGround *>(m_mfdStatus);
+	if (groundStatus)
+		groundStatus->setLookAtTarget(true);
 
 	m_mfdStatus->setShowRange(m_mfdStatus->getTarget().getObject() != Game::getPlayer());
 
@@ -130,7 +135,22 @@ void SwgCuiTargets::update (float deltaTimeSecs)
 	if (!player)
 		return;
 
-	const CachedNetworkId & target = player->getLookAtTarget ();
+	CachedNetworkId const intendedTarget = player->getIntendedTarget();
+	CachedNetworkId const lookAtTarget = player->getLookAtTarget();
+	CachedNetworkId const primaryTarget = intendedTarget.isValid() ? intendedTarget : lookAtTarget;
+	CachedNetworkId target(primaryTarget);
+	if (m_targetRole == TR_targetOfTarget)
+	{
+		CreatureObject const * const primaryTargetObject = CreatureObject::asCreatureObject(primaryTarget.getObject());
+		if (primaryTargetObject)
+		{
+			target = primaryTargetObject->getIntendedTarget();
+			if (!target.isValid())
+				target = primaryTargetObject->getLookAtTarget();
+		}
+		else
+			target = NetworkId::cms_invalid;
+	}
 	const CachedNetworkId & oldId = m_mfdStatus->getTarget ();
 
 	CachedNetworkId combatTarget;
@@ -146,7 +166,7 @@ void SwgCuiTargets::update (float deltaTimeSecs)
 		m_mfdStatus->setTarget (target.getObject ()->asClientObject ()->asTangibleObject ());
 	}
 
-	if (target != CachedNetworkId::cms_invalid)
+	if (target.isValid() && target.getObject())
 	{
 		if (!getPage ().IsVisible ())
 			getPage ().SetVisible (true);
@@ -182,9 +202,26 @@ void SwgCuiTargets::update (float deltaTimeSecs)
 	}
 	else
 	{
+		if (oldId.isValid())
+			m_mfdStatus->setTarget(NetworkId::cms_invalid);
 		if (getPage ().IsVisible ())
 			getPage ().SetVisible (false);
 	}
+}
+
+//----------------------------------------------------------------------
+
+const CachedNetworkId & SwgCuiTargets::getTarget() const
+{
+	return m_mfdStatus->getTarget();
+}
+
+//----------------------------------------------------------------------
+
+void SwgCuiTargets::clearTarget()
+{
+	m_mfdStatus->setTarget(NetworkId::cms_invalid);
+	getPage().SetVisible(false);
 }
 
 //----------------------------------------------------------------------

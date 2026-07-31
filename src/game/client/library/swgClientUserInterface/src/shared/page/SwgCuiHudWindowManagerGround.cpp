@@ -41,6 +41,7 @@
 #include "swgClientUserInterface/SwgCuiShipView.h"
 #include "swgClientUserInterface/SwgCuiStatusGround.h"
 #include "swgClientUserInterface/SwgCuiSurvey.h"
+#include "swgClientUserInterface/SwgCuiTargets.h"
 #include "swgClientUserInterface/SwgCuiToolbar.h"
 #include "swgSharedNetworkMessages/ResourceListForSurveyMessage.h"
 
@@ -73,6 +74,7 @@ m_playerStatusPage(NULL),
 m_petStatusPage(NULL)
 {
 	UIPage * mediatorPage = NULL;
+	UIPage * primaryTargetPage = NULL;
 
 	{
 		// The Publish 14 HUD keeps its player buff/debuff window as a direct
@@ -147,18 +149,12 @@ m_petStatusPage(NULL)
 		hud.getCodeDataObject (TUIPage, mediatorPage, "TargetsPage", true);
 		if (mediatorPage)
 		{
-			m_targetStatusPage = new SwgCuiStatusGround(*mediatorPage, SwgCuiStatusGround::ST_intendedTarget);
+			primaryTargetPage = mediatorPage;
+			m_targetStatusPage = new SwgCuiTargets(*mediatorPage, SwgCuiTargets::TR_primary);
 			if (m_targetStatusPage != NULL)
 			{
 				mediatorPage->SetEnabled(false);
 				mediatorPage->SetEnabled(true);
-
-				CreatureObject * const player = Game::getPlayerCreature();
-				if (player)
-				{
-					m_targetStatusPage->setTarget(player);
-					m_targetStatusPage->setTarget(NetworkId::cms_invalid);
-				}
 				m_targetStatusPage->setSettingsAutoSizeLocation(true, true);
 				m_targetStatusPage->setStickyVisible(true);
 				m_targetStatusPage->fetch();
@@ -202,20 +198,23 @@ m_petStatusPage(NULL)
 	{
 		mediatorPage = NULL;
 		hud.getCodeDataObject (TUIPage, mediatorPage, "SecondaryTargetsPage", true);
+		if (!mediatorPage && primaryTargetPage && primaryTargetPage->GetParent())
+		{
+			// Publish 14 only shipped one target page.  Retain that authentic
+			// presentation and create the target-of-target page from it at runtime.
+			mediatorPage = safe_cast<UIPage *>(primaryTargetPage->DuplicateObject());
+			mediatorPage->SetName("SecondaryTarget");
+			mediatorPage->SetLocation(primaryTargetPage->GetLocation() + UIPoint(0, primaryTargetPage->GetHeight() + 4));
+			IGNORE_RETURN(primaryTargetPage->GetParent()->AddChild(mediatorPage));
+			mediatorPage->Link();
+		}
 		if (mediatorPage)
 		{
-			m_secondaryTargetStatusPage = new SwgCuiStatusGround(*mediatorPage, SwgCuiStatusGround::ST_lookAtTarget);
+			m_secondaryTargetStatusPage = new SwgCuiTargets(*mediatorPage, SwgCuiTargets::TR_targetOfTarget);
 			if (m_secondaryTargetStatusPage != NULL)
 			{
 				mediatorPage->SetEnabled(false);
 				mediatorPage->SetEnabled(true);
-
-				CreatureObject * const player = Game::getPlayerCreature();
-				if (player)
-				{
-					m_secondaryTargetStatusPage->setTarget(player);
-					m_secondaryTargetStatusPage->setTarget(NetworkId::cms_invalid);
-				}
 				m_secondaryTargetStatusPage->setSettingsAutoSizeLocation(true, true);
 				m_secondaryTargetStatusPage->setStickyVisible(true);
 				m_secondaryTargetStatusPage->fetch();
@@ -543,8 +542,6 @@ void SwgCuiHudWindowManagerGround::update ()
 		}
 	}
 
-	updateTargetStatusPages();
-
 	SwgCuiHudWindowManager::update();
 }
 
@@ -572,49 +569,6 @@ void SwgCuiHudWindowManagerGround::clearLookAtTarget()
 	}
 }
 
-
-//----------------------------------------------------------------------
-
-void SwgCuiHudWindowManagerGround::updateTargetStatusPages()
-{
-	if (m_targetStatusPage && m_secondaryTargetStatusPage)
-	{
-		CreatureObject const * const playerCreature = Game::getPlayerCreature();
-		if (playerCreature) 
-		{
-			CachedNetworkId const intendedTarget = playerCreature->getIntendedTarget();
-			m_targetStatusPage->setTarget(intendedTarget);
-
-			switch (CuiPreferences::getSecondaryTargetMode())
-			{
-			case CuiPreferences::STM_lookAtTarget:
-				m_secondaryTargetStatusPage->setTarget(playerCreature->getLookAtTarget());
-				break;
-			case CuiPreferences::STM_targetOfTarget:
-				{
-					CreatureObject const * const intendedTargetObject = CreatureObject::asCreatureObject(intendedTarget.getObject());
-
-					if (intendedTargetObject)
-						m_secondaryTargetStatusPage->setTarget(intendedTargetObject->isPlayer() ? intendedTargetObject->getIntendedTarget() : intendedTargetObject->getLookAtTarget());
-					else
-						m_secondaryTargetStatusPage->setTarget(NetworkId::cms_invalid);
-				}
-				break;
-			case CuiPreferences::STM_none:
-			default:
-				m_secondaryTargetStatusPage->setTarget(NetworkId::cms_invalid);
-				break;
-			}
-		}
-		else
-		{
-			m_targetStatusPage->setTarget(NetworkId::cms_invalid);
-			m_secondaryTargetStatusPage->setTarget(NetworkId::cms_invalid);
-		}
-	}
-}
-
-//----------------------------------------------------------------------
 
 void SwgCuiHudWindowManagerGround::onTargetChanged(const CreatureObject & payload)
 {

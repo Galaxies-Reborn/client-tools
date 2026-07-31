@@ -11,6 +11,7 @@
 //======================================================================
 
 #include "clientUserInterface/CuiMediator.h"
+#include "sharedObject/CachedNetworkId.h"
 
 #include "UIEventCallback.h"
 
@@ -29,9 +30,17 @@ public CuiMediator,
 public UIEventCallback
 {
 public:
-	explicit            SwgCuiTargets (UIPage & page);
+	enum TargetRole
+	{
+		TR_primary,
+		TR_targetOfTarget
+	};
+
+	explicit            SwgCuiTargets (UIPage & page, TargetRole targetRole = TR_primary);
 
 	void                update         (float deltaTimeSecs);
+	const CachedNetworkId & getTarget   () const;
+	void                clearTarget     ();
 
 	void                OnButtonPressed (UIWidget *context);
 
@@ -58,6 +67,7 @@ private:
 	UIPage *               m_pageToggle;
 
 	int m_sceneType; // Game::SceneType
+	TargetRole m_targetRole;
 };
 
 //======================================================================
