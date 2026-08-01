@@ -157,10 +157,15 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
         self.assertIn("tangible->isAttackable()", combat_attack)
         self.assertIn("CuiPreferences::setAutoAimToggle(true)", combat_attack)
         self.assertIn("player->setLookAtAndIntendedTarget(targetId)", combat_attack)
-        self.assertIn("AT_primaryAttack", combat_attack)
+        self.assertIn("commandsAreNowFromToolbar(true)", combat_attack)
+        self.assertIn("ClientCommandQueue::enqueueCommand(", combat_attack)
+        self.assertIn("player->getCurrentPrimaryActionName()", combat_attack)
+        self.assertIn("commandsAreNowFromToolbar(false)", combat_attack)
+        self.assertIn("sequenceId == 0", combat_attack)
+        self.assertNotIn("AT_primaryAttack", combat_attack)
         self.assertIn("AT_toggleRepeatPrimaryAttack", combat_attack)
         self.assertLess(
-            combat_attack.index("AT_primaryAttack"),
+            combat_attack.index("ClientCommandQueue::enqueueCommand("),
             combat_attack.index("AT_toggleRepeatPrimaryAttack"),
         )
         self.assertIn("performCombatAttack(*object)", menu_action)

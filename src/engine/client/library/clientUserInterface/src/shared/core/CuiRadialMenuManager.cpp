@@ -1980,11 +1980,21 @@ bool CuiRadialMenuManager::performCombatAttack(Object const & object)
 	CuiPreferences::setAutoAimToggle(true);
 	player->setLookAtAndIntendedTarget(targetId);
 
-	// Repeat mode does not request the first attack.  Explicitly arm the
-	// primary action so Attack always sends one command immediately, then keep
-	// repeat enabled for the normal Pre-CU auto-attack behavior.
-	GroundCombatActionManager::attemptAction(
-		GroundCombatActionManager::AT_primaryAttack);
+	// Send the zero-HAM-cost default attack immediately.  The command-table
+	// rows for meleeHit/rangedShot are toolbar-only, so a world double-click or
+	// Attack radial must use the same admission flag as the toolbar callback.
+	// Deferring this to GroundCombatActionManager made the first command depend
+	// on a later UI callback and could leave the player targeted but idle.
+	ClientCommandQueue::commandsAreNowFromToolbar(true);
+	uint32 const sequenceId = ClientCommandQueue::enqueueCommand(
+		Crc::normalizeAndCalculate(player->getCurrentPrimaryActionName().c_str()),
+		targetId,
+		Unicode::emptyString);
+	ClientCommandQueue::commandsAreNowFromToolbar(false);
+	if (sequenceId == 0)
+		return false;
+
+	// Keep the normal Pre-CU repeat attack armed after the first command.
 	if (!GroundCombatActionManager::getRepeatAttackEnabled())
 	{
 		GroundCombatActionManager::attemptAction(
