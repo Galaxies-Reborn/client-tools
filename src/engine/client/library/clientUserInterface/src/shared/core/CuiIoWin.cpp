@@ -1300,7 +1300,7 @@ void CuiIoWin::resetDeadZone ()
 	if (Game::isHudSceneTypeSpace())
 		ms_reticleDeadZoneSizeUsable = std::max(ms_minimumSpaceDeadZone, ms_reticleDeadZoneSize);
 	else
-		ms_reticleDeadZoneSizeUsable = ms_reticleDeadZoneSize;
+		ms_reticleDeadZoneSizeUsable = 0;
 	
 	const UISize deadZoneSize (ms_reticleDeadZoneSizeUsable, ms_reticleDeadZoneSizeUsable);
 	setDeadZone (deadZoneSize);
@@ -1383,7 +1383,7 @@ void CuiIoWin::setDeadZoneSize         (int xy)
 		if (Game::isHudSceneTypeSpace())
 			ms_reticleDeadZoneSizeUsable = std::max(ms_minimumSpaceDeadZone, ms_reticleDeadZoneSize);
 		else
-			ms_reticleDeadZoneSizeUsable = ms_reticleDeadZoneSize;
+			ms_reticleDeadZoneSizeUsable = 0;
 
 		if (CuiManager::getInstalled ())
 			CuiManager::getIoWin ().resetDeadZone ();
