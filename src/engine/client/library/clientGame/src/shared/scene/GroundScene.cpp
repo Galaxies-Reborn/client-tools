@@ -1382,7 +1382,24 @@ void GroundScene::postload (void)
 	FileName fileName (TerrainObject::getConstInstance ()->getAppearance ()->getAppearanceTemplate ()->getName ());
 	fileName.stripPathAndExt ();
 
-	if (!m_disableWorldSnapshot)
+	//-- Either source may suppress the static object layer: the server sends a flag for the scene,
+	//   and the client can force it locally with ClientGame/disableWorldSnapshot. The local override
+	//   exists so the empty world can be previewed against a live server without reconfiguring and
+	//   restarting that server.
+	bool const disableSnapshot = m_disableWorldSnapshot || ConfigClientGame::getDisableWorldSnapshot();
+
+	//-- Say which source decided, and which path was taken. Without this the two flags are
+	//   indistinguishable from the outside: a world that still has buildings in it looks the same
+	//   whether the override was ignored, the server overruled it, or the objects came from the
+	//   server as ordinary replicated objects rather than from the static layer.
+	WARNING(true, ("GroundScene: scene '%s' -- static object layer %s (server flag %d, client config %d). %s.",
+		fileName.getString(),
+		disableSnapshot ? "SUPPRESSED" : "loaded",
+		m_disableWorldSnapshot ? 1 : 0,
+		ConfigClientGame::getDisableWorldSnapshot() ? 1 : 0,
+		disableSnapshot ? "Registering area rectangles only; any objects still visible are server-replicated" : "Loading the world snapshot"));
+
+	if (!disableSnapshot)
 	{
 		WorldSnapshot::load(fileName);
 	}

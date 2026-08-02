@@ -1030,11 +1030,16 @@ void ConfigClientGame::install(void)
 
 	KEY_BOOL   (useCustomInputMaps,            false);
 
-#if PRODUCTION
-	ms_disableWorldSnapshot = false;
-#else
-	KEY_BOOL   (disableWorldSnapshot,          true);
-#endif
+	//-- Read from config in every configuration, defaulting to off.
+	//
+	//   This was hardcoded false under PRODUCTION and read from config otherwise, which meant a
+	//   Release client could not be asked to draw a world without its static objects. That preview
+	//   is wanted here: it shows the terrain alone, which is the starting state for a world players
+	//   build themselves, and it costs one config key rather than deleting any data.
+	//
+	//   In a multiplayer session the server also sends its own flag, and GroundScene honours either.
+	//   The default is false, so a client that does not set the key behaves exactly as before.
+	KEY_BOOL   (disableWorldSnapshot,          false);
 
 	KEY_BOOL   (worldSnapshotIgnorePobChanges,    false);
 	KEY_FLOAT (worldSnapshotDetailLevelBias, 0.f);
