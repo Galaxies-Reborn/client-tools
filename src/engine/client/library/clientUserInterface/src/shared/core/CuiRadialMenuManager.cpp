@@ -2583,7 +2583,10 @@ void CuiRadialMenuManager::clear ()
 
 	if (ms_popup)
 	{
-		UIManager::gUIManager ().PopContextWidgets (ms_radial);
+		// A popup menu is a distinct context widget from the radial menu.  Passing
+		// the (normally null) radial pointer left the popup on the context stack,
+		// where it could consume every later NPC or terminal interaction.
+		UIManager::gUIManager ().PopContextWidgets (ms_popup);
 		setPopup (0);
 	}
 }

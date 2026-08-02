@@ -697,6 +697,11 @@ namespace ClientMainNamespace
 		int const x = static_cast<int>(static_cast<short>(LOWORD(lParam)));
 		int const y = static_cast<int>(static_cast<short>(HIWORD(lParam)));
 		IoWinManager::queueSetSystemMouseCursorPosition(x, y);
+		// The absolute-position event updates MouseCursor but intentionally does
+		// not dispatch a UIMessage::MouseMove.  Follow it with a zero-delta mouse
+		// event so UI hit-testing and the HUD's world-pick cache observe the new
+		// position before a queued button event uses it.
+		IoWinManager::queueMouseTranslateX(0, 0.0f);
 	}
 
 	bool queueBackgroundKey(bool down, LPARAM lParam)

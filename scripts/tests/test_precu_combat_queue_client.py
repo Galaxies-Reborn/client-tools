@@ -153,6 +153,11 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
         hud_message = function_body(
             self.hud_cpp, "bool SwgCuiHud::OnMessage("
         )
+        modeless_double_click = hud_message[
+            hud_message.index(
+                "if (msg.Type == UIMessage::LeftMouseDoubleClick &&"
+            ) : hud_message.index("if (msg.Type == UIMessage::MouseWheel)")
+        ]
 
         self.assertIn("tangible->isAttackable()", combat_attack)
         self.assertIn("CuiPreferences::setAutoAimToggle(true)", combat_attack)
@@ -171,7 +176,15 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
         self.assertIn("performCombatAttack(*object)", menu_action)
         self.assertIn("performCombatAttack(object)", double_click)
         self.assertIn(
-            "CuiRadialMenuManager::performDefaultDoubleClickAction(", hud_message
+            "CuiPreferences::getUseModelessInterface()", modeless_double_click
+        )
+        self.assertIn(
+            "CuiRadialMenuManager::performDefaultAction(*selectedObject)",
+            modeless_double_click,
+        )
+        self.assertNotIn(
+            "CuiRadialMenuManager::performDefaultDoubleClickAction(",
+            modeless_double_click,
         )
         self.assertNotIn(
             "findDefaultAction(*m_lastSelectedObject.getPointer())", hud_message

@@ -937,16 +937,18 @@ bool SwgCuiHud::OnMessage( UIWidget * const context, const UIMessage & msg)
 				return true;
 			}
 
-			if (msg.Type == UIMessage::LeftMouseDoubleClick)
+			if (msg.Type == UIMessage::LeftMouseDoubleClick &&
+				CuiPreferences::getUseModelessInterface())
 			{
 				Object * const selectedObject = m_lastSelectedObject.getPointer();
 				if (selectedObject)
 				{
-					// Route modeless world double-clicks through the same handler used
-					// by modal clicks and radial actions.  Server menu cache ordering
-					// must not be able to hide an attackable object's basic action.
-					IGNORE_RETURN(CuiRadialMenuManager::performDefaultDoubleClickAction(
-						*selectedObject, false));
+					// Modeless targeting does not run targetAtCursorModal(), which is
+					// where the retail input path dispatches an object's complete default
+					// action.  Use the full radial/default dispatcher here: its fast path
+					// still starts Pre-CU basic attacks, while conversable NPCs, Bazaar
+					// terminals, and every other object type retain their authored default.
+					CuiRadialMenuManager::performDefaultAction(*selectedObject);
 				}
 			}
 

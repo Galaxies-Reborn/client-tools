@@ -100,6 +100,19 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         self.assertIn("Start-Sleep -Milliseconds 50", self.helper)
         self.assertIn('$detail = "x=$X y=$Y repeat=$Repeat"', self.helper)
 
+    def test_absolute_mouse_position_refreshes_ui_and_world_picking(self):
+        position = function_body(
+            self.client_main, "void queueBackgroundMousePosition(LPARAM lParam)"
+        )
+        self.assertIn(
+            "IoWinManager::queueSetSystemMouseCursorPosition(x, y)", position
+        )
+        self.assertIn("IoWinManager::queueMouseTranslateX(0, 0.0f)", position)
+        self.assertLess(
+            position.index("queueSetSystemMouseCursorPosition"),
+            position.index("queueMouseTranslateX"),
+        )
+
     def test_mouse_helper_exposes_process_targeted_drag_primitives(self):
         self.assertIn('"LeftDown", "LeftUp", "LeftClick"', self.helper)
         self.assertIn('$command.LeftMouseDown', self.helper)

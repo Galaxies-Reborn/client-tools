@@ -10,6 +10,20 @@ RADIAL_SOURCE = REPOSITORY_ROOT / (
 )
 
 
+def function_body(source: str, signature: str) -> str:
+    start = source.index(signature)
+    open_brace = source.index("{", start + len(signature))
+    depth = 0
+    for position in range(open_brace, len(source)):
+        if source[position] == "{":
+            depth += 1
+        elif source[position] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start : position + 1]
+    raise ValueError(f"unterminated function body: {signature}")
+
+
 class PreCuRadialTimeoutRecoveryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -36,6 +50,14 @@ class PreCuRadialTimeoutRecoveryTests(unittest.TestCase):
         self.assertIn("s_pendingServerNotifications.erase", body)
         self.assertIn("clear();", body)
         self.assertIn("s_pendingResponses.erase", body)
+
+    def test_popup_clear_removes_the_popup_context_widget(self):
+        clear = function_body(
+            self.source, "void CuiRadialMenuManager::clear ()"
+        )
+        popup_branch = clear[clear.index("if (ms_popup)") :]
+        self.assertIn("PopContextWidgets (ms_popup)", popup_branch)
+        self.assertNotIn("PopContextWidgets (ms_radial)", popup_branch)
 
 
 if __name__ == "__main__":
