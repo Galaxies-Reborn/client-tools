@@ -38,6 +38,7 @@ class Shader;
 class ShipTurretCamera;
 class SpaceTargetBracketOverlay;
 class StructurePlacementCamera;
+class TopDownCamera;
 class Vector2d;
 class Vector;
 
@@ -63,6 +64,7 @@ public:
 		CI_flyBy,
 		CI_debugPortal,
 		CI_structurePlacement,
+		CI_topDown,
 
 		CI_COUNT
 	};
@@ -96,6 +98,7 @@ private:
 	FreeCamera*             m_freeCamera;
 	DebugPortalCamera*      m_debugPortalCamera;
 	StructurePlacementCamera* m_structurePlacementCamera;
+	TopDownCamera*            m_topDownCamera;
 	FlyByCamera * m_flyByCamera;
 
 	GameCamera*             m_cameras [CI_COUNT];

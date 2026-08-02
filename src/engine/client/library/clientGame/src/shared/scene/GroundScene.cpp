@@ -69,6 +69,7 @@
 #include "clientGame/SpacePreloadedAssetManager.h"
 #include "clientGame/SpaceTargetBracketOverlay.h"
 #include "clientGame/StructurePlacementCamera.h"
+#include "clientGame/TopDownCamera.h"
 #include "clientGame/WorldSnapshot.h"
 #include "clientGraphics/DebugPrimitive.h"
 #include "clientGraphics/Graphics.h"
@@ -724,6 +725,11 @@ void GroundScene::init (const char* const terrainFilename, CreatureObject* const
 	m_structurePlacementCamera->setActive (false);
 	ClientWorld::addCamera (m_structurePlacementCamera);
 
+	m_topDownCamera        = NON_NULL (new TopDownCamera ());
+	m_cameras [CI_topDown] = m_topDownCamera;
+	m_topDownCamera->setActive (false);
+	ClientWorld::addCamera (m_topDownCamera);
+
 	m_flyByCamera = NON_NULL(new FlyByCamera());
 	m_cameras[CI_flyBy] = m_flyByCamera;
 	m_flyByCamera->setActive(false);
@@ -759,7 +765,7 @@ void GroundScene::init (const char* const terrainFilename, CreatureObject* const
 	//-- post load mission
 	postload ();
 
-	GroundScene::setView (CI_freeChase);
+	GroundScene::setView (ConfigClientGame::getTopDownCamera () ? CI_topDown : CI_freeChase);
 
 	CameraController* const freeCameraController = NON_NULL (new CameraController (m_freeCamera));
 	m_freeCamera->setController (freeCameraController);
@@ -802,6 +808,11 @@ void GroundScene::init (const char* const terrainFilename, CreatureObject* const
 
 	m_structurePlacementCamera->setTarget (player);
 	m_structurePlacementCamera->setMessageQueue (m_structurePlacementCameraInputMap->getMessageQueue ());
+
+	//-- Driven by the ordinary movement queue: while this view is active the pan keys steer the
+	//   camera rather than the avatar, which is what an overhead game does.
+	m_topDownCamera->setTarget (player);
+	m_topDownCamera->setMessageQueue (controller->getMessageQueue ());
 
 	//-- put iowin on stack
 	IoWin::open ();
@@ -892,6 +903,7 @@ GroundScene::GroundScene(
 	m_freeCamera (0),
 	m_debugPortalCamera (0),
 	m_structurePlacementCamera (0),
+	m_topDownCamera (0),
 	m_flyByCamera(NULL),
 	m_currentView (-1),
 	m_disableWorldSnapshot(ConfigClientGame::getDisableWorldSnapshot()),
@@ -1002,6 +1014,7 @@ GroundScene::GroundScene(
 	m_freeCamera (0),
 	m_debugPortalCamera (0),
 	m_structurePlacementCamera (0),
+	m_topDownCamera (0),
 	m_flyByCamera(NULL),
 	m_currentView (-1),
 	m_disableWorldSnapshot(disableSnapshot),
@@ -1437,7 +1450,11 @@ void GroundScene::scanInputMapForSceneMessages (InputMap * inputMap)
 					setView (CI_free);
 				else
 				{
-					int view = CI_freeChase;
+					//-- The overhead point-and-click view replaces the chase camera when asked for.
+					//   A ship station still wins: there is no sensible overhead view of a cockpit,
+					//   and being locked out of the pilot camera would be worse than the scheme is
+					//   worth.
+					int view = ConfigClientGame::getTopDownCamera () ? CI_topDown : CI_freeChase;
 
 					CreatureObject const * const player = safe_cast<CreatureObject const *>(getPlayer());
 					if (player)

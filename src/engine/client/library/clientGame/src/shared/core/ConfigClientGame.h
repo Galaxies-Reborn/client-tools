@@ -104,6 +104,7 @@ public:
 
 	static bool                getUseCustomInputMaps ();
 	static bool                getDisableWorldSnapshot ();
+	static bool                getTopDownCamera ();
 	static bool                getWorldSnapshotIgnorePobChanges();
 	static float               getWorldSnapshotDetailLevelBias ();
 

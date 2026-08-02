@@ -101,6 +101,7 @@ namespace ConfigClientGameNamespace
 
 	bool            ms_useCustomInputMaps;
 	bool            ms_disableWorldSnapshot;
+	bool            ms_topDownCamera;
 	bool            ms_worldSnapshotIgnorePobChanges;
 	float           ms_worldSnapshotDetailLevelBias;
 
@@ -637,6 +638,13 @@ bool ConfigClientGame::getDisableWorldSnapshot ()
 
 // ----------------------------------------------------------------------
 
+bool ConfigClientGame::getTopDownCamera ()
+{
+	return ms_topDownCamera;
+}
+
+// ----------------------------------------------------------------------
+
 bool ConfigClientGame::getWorldSnapshotIgnorePobChanges()
 {
 	return ms_worldSnapshotIgnorePobChanges;
@@ -1040,6 +1048,11 @@ void ConfigClientGame::install(void)
 	//   In a multiplayer session the server also sends its own flag, and GroundScene honours either.
 	//   The default is false, so a client that does not set the key behaves exactly as before.
 	KEY_BOOL   (disableWorldSnapshot,          false);
+
+	//-- Selects the overhead point-and-click camera in place of the third-person chase camera.
+	//   Off by default while the control scheme is being built, so the shipped behaviour is
+	//   unchanged for anyone who does not ask for it.
+	KEY_BOOL   (topDownCamera,                 false);
 
 	KEY_BOOL   (worldSnapshotIgnorePobChanges,    false);
 	KEY_FLOAT (worldSnapshotDetailLevelBias, 0.f);
