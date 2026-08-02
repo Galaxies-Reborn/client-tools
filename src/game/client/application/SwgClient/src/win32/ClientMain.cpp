@@ -44,6 +44,7 @@
 #include "clientUserInterface/CuiManager.h"
 #include "clientUserInterface/CuiMediatorFactory.h"
 #include "clientUserInterface/CuiMessageQueueManager.h"
+#include "clientUserInterface/CuiRadialMenuManager.h"
 #include "clientUserInterface/CuiSettings.h"
 #include "clientUserInterface/CuiWorkspace.h"
 #include "clientGraphics/IndexedTriangleListAppearance.h"
@@ -581,7 +582,8 @@ namespace ClientMainNamespace
 		BIC_statusPanelApply,
 		BIC_statusPanelRefresh,
 		BIC_statusPanelClear,
-		BIC_statusPanelState
+		BIC_statusPanelState,
+		BIC_performDefaultTargetAction
 	};
 
 	char const * const cms_backgroundInputMessageName = "SWGSource.PreCU.BackgroundInput.v1";
@@ -850,6 +852,19 @@ namespace ClientMainNamespace
 		else
 			return false;
 
+		return true;
+	}
+
+	bool performBackgroundDefaultTargetAction()
+	{
+		Object * const target = CuiCombatManager::getLookAtTarget().getObject();
+		if (!target)
+			return false;
+
+		// Exercise the production selection path. This deliberately does not
+		// enqueue a command directly: the radial manager must resolve the live
+		// datatables/player/radial_menu.iff row and dispatch its mapped action.
+		CuiRadialMenuManager::performDefaultAction(*target);
 		return true;
 	}
 
@@ -4924,6 +4939,9 @@ namespace ClientMainNamespace
 						"melee1hHealthHit2", static_cast<int>(lParam)))
 					return 0;
 				return getBackgroundCombatQueueStatus();
+
+			case BIC_performDefaultTargetAction:
+				return performBackgroundDefaultTargetAction() ? 1 : 0;
 
 			default:
 				return 0;

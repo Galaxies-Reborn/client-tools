@@ -118,6 +118,17 @@ class PrecuBackgroundInputBridgeTests(unittest.TestCase):
         self.assertIn('$command.LeftMouseDown', self.helper)
         self.assertIn('$command.LeftMouseUp', self.helper)
 
+    def test_selected_target_default_action_uses_the_production_radial_path(self):
+        action = function_body(
+            self.client_main, "bool performBackgroundDefaultTargetAction()"
+        )
+        self.assertIn("CuiCombatManager::getLookAtTarget().getObject()", action)
+        self.assertIn("CuiRadialMenuManager::performDefaultAction(*target)", action)
+        self.assertNotIn("ClientCommandQueue::enqueueCommand", action)
+        self.assertIn("BIC_performDefaultTargetAction", self.client_main)
+        self.assertIn('"PerformDefaultTargetAction"', self.helper)
+        self.assertIn("PerformDefaultTargetAction = 456", self.helper)
+
     def test_hidden_start_uses_a_process_local_fallback_window(self):
         install_start = self.client_main.index("bool installBackgroundInputBridge()")
         install_end = self.client_main.index(
