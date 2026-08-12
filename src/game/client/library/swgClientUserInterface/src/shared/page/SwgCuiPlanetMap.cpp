@@ -1459,15 +1459,16 @@ void SwgCuiPlanetMap::setupMarkersForType (uint8 category, uint8 subCategory, co
 
 	{
 		const SampleButtonMap::const_iterator it = m_sampleButtonMap->find (category);
-		if (it !=  m_sampleButtonMap->end ())
+		if (it !=  m_sampleButtonMap->end () && (*it).second)
 			sampleButton = (*it).second;
 	}
+
+	if (!sampleButton)
+		return;
 	
 	const bool isCityCategory     = category == PlanetMapManager::getCityCategory ();
 	const bool isGCWCategory      = category == PlanetMapManager::getGCWRegionCategory();
 	const bool isWaypointCategory = (!isGCWCategory && !isCityCategory && (category == PlanetMapManager::getWaypointCategory ())) || (category == PlanetMapManager::getPoiCategory ());
-	
-	NOT_NULL (sampleButton);
 	
 	for (PlanetMapManagerClient::MapLocationVector::const_iterator it = mlv.begin (); it != mlv.end (); ++it)
 	{

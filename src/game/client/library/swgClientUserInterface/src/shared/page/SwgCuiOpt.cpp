@@ -138,7 +138,7 @@ m_standaloneKeymap (0)
 	//getCodeDataObject (TUIPage, optionPage, "pageVoice");
 	//(*m_optionPages) [OT_voice] = new SwgCuiOptVoice (*optionPage);
 
-	// Keymap: in NGE-retail the bind table lives at the standalone /PDA.keymap
+	// In Publish 14 the bind table lives at the standalone /PDA.keymap
 	// page (defined in ui_pda.inc) rather than as an OptMain sub-tab. /PDA is
 	// declared Visible='false' in the .ui XML, so we duplicate the keymap page
 	// under a known-visible parent (HUD root) and bind a mediator to the
@@ -166,7 +166,7 @@ m_standaloneKeymap (0)
 	}
 
 	// Strip tabs whose target widget doesn't exist in this UI bundle.
-	// In NGE-retail OptMain the tab Target paths look like "target.misc",
+	// OptMain tab Target paths look like "target.misc",
 	// which UITabbedPane resolves against its TargetPage (OptMain.comp).
 	if (m_tabs)
 	{
@@ -187,7 +187,13 @@ m_standaloneKeymap (0)
 
 				std::string const narrowPath = Unicode::wideToNarrow(targetPath);
 				UIBaseObject * const target = tabTargetBase->GetObjectFromPath(narrowPath.c_str(), TUIWidget);
-				if (!target)
+				// ui_options.inc keeps a compatibility Keymap tab, while the
+				// authentic Publish 14 bind editor lives at /PDA.keymap.  Its
+				// optional ui_options_keymap.inc target is absent from the
+				// Publish 14 bundle. Retain this one tab so either the standalone
+				// dialog or its explicit unavailable-page fallback stays reachable.
+				bool const routesToStandaloneKeymap = narrowPath == "target.keymap";
+				if (!target && !routesToStandaloneKeymap)
 				{
 					tabDataSource->RemoveChild(tabData);
 				}
@@ -341,25 +347,19 @@ void SwgCuiOpt::OnTabbedPaneChanged (UIWidget * context)
 {
 	if (context == m_tabs)
 	{
-		// Keymap-tab intercept. The NGE-retail UI doesn't ship a
-		// real keymap page so we pop a CuiMessageBox instead of trying to
-		// show the empty cloned page.
+		// Publish 14 keeps key binding in the standalone PDA dialog rather
+		// than an OptMain target page.
 		long const activeTabIndex = m_tabs->GetActiveTab();
 		UIData const * const activeTabData = (activeTabIndex >= 0) ? m_tabs->GetTabData(activeTabIndex) : NULL;
-		std::string const activeName = activeTabData ? activeTabData->GetName() : std::string("<none>");
-		// SetProperty(DATA_NAME, ...) overrides SetName(), so the tab's
-		// effective name ends up matching the localization string ID like
-		// "@ui_opt:b_keymap". Match by substring instead of exact equality.
-		bool const isKeymapTab = activeTabData &&
-			(activeName.find("keymap") != std::string::npos
-			 || activeName.find("Keymap") != std::string::npos
-			 || activeName.find("KEYMAP") != std::string::npos);
+		UIString activeTarget;
+		bool const hasActiveTarget = activeTabData &&
+			activeTabData->GetProperty(UITabbedPane::DataProperties::DATA_TARGET, activeTarget);
+		bool const isKeymapTab = hasActiveTarget &&
+			Unicode::wideToNarrow(activeTarget) == "target.keymap";
 		if (isKeymapTab)
 		{
-			// The Keymap tab in NGE-retail's OptMain has no target page; it
-			// was paired with a "/ui action keymap" button on the Controls
-			// tab that opened the standalone /PDA.keymap dialog. We replay
-			// that by activating the bound standalone mediator.
+			// The authentic Controls button opened /PDA.keymap. Keep the
+			// compatibility tab wired to that same standalone mediator.
 			if (m_standaloneKeymap)
 			{
 				// Reparent to top sibling so the dialog renders ABOVE OptMain

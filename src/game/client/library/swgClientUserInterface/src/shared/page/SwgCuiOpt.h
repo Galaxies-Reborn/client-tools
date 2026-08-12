@@ -58,7 +58,7 @@ private:
 
 	bool                 m_keepSettings;
 
-	// Standalone keymap dialog. In NGE-retail the keymap UI lives at
+	// Standalone keymap dialog. In Publish 14 the keymap UI lives at
 	// /PDA.keymap rather than as a sub-tab of OptMain. We construct a
 	// SwgCuiOptKeymap pointing at it and pop it up when the Keymap tab is
 	// clicked.

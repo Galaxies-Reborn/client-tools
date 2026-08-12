@@ -92,7 +92,7 @@ public:
 //-----------------------------------------------------------------
 
 SwgCuiOptKeymap::SwgCuiOptKeymap (UIPage & page, Game::SceneType sceneType) :
-SwgCuiOptBase ("SwgCuiOptChat", page),
+SwgCuiOptBase ("SwgCuiOptKeymap", page),
 m_buttonDelete                (0),
 m_buttonRebind                (0),
 m_entryPage                   (0),
@@ -527,8 +527,7 @@ void SwgCuiOptKeymap::updateData ()
 	m_tableModelBinds->Attach (0);
 	m_tableBinds->SetTableModel (0);
 
-	// Fall back to "all" category when there's no tabBinds widget (NGE-retail
-	// UI doesn't ship a keymap page so we built one without category tabs).
+	// Fall back to "all" if a compatibility asset omits the category tabs.
 	std::string category = Categories::all;
 	if (m_tabBinds)
 	{

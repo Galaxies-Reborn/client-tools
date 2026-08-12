@@ -11,6 +11,17 @@ BUILDER_PROJECT = REPOSITORY_ROOT / (
     "src/engine/shared/application/TreeFileBuilder/build/win32/"
     "TreeFileBuilder.vcxproj"
 )
+BUNDLED_BUILDER = REPOSITORY_ROOT / "tools" / "TreeFileBuilder.exe"
+
+
+def read_pe_machine(path: Path) -> int:
+    data = path.read_bytes()
+    if data[:2] != b"MZ":
+        raise AssertionError(f"not a PE file: {path}")
+    pe_offset = int.from_bytes(data[0x3C:0x40], "little")
+    if data[pe_offset : pe_offset + 4] != b"PE\0\0":
+        raise AssertionError(f"invalid PE signature: {path}")
+    return int.from_bytes(data[pe_offset + 4 : pe_offset + 6], "little")
 
 
 class TreeFileBuilderX64Tests(unittest.TestCase):
@@ -57,6 +68,9 @@ class TreeFileBuilderX64Tests(unittest.TestCase):
             r"external\3rd\library\zlib\lib\win32",
             self.release_x64,
         )
+
+    def test_bundled_archive_builder_is_amd64(self):
+        self.assertEqual(read_pe_machine(BUNDLED_BUILDER), 0x8664)
 
 
 if __name__ == "__main__":

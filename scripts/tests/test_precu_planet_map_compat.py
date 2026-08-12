@@ -54,6 +54,9 @@ class Publish14PlanetMapSourceContractTests(unittest.TestCase):
         cls.setup_current_zone = function_body(
             cls.source, "void SwgCuiPlanetMap::setupCurrentZone"
         )
+        cls.setup_markers_for_type = function_body(
+            cls.source, "void SwgCuiPlanetMap::setupMarkersForType"
+        )
 
     def test_later_zoom_button_is_optional(self) -> None:
         self.assertIn(
@@ -71,6 +74,20 @@ class Publish14PlanetMapSourceContractTests(unittest.TestCase):
             "else if(m_zoomLevel == ZL_Planet && m_buttonZoom)",
             self.setup_current_zone,
         )
+
+    def test_missing_category_marker_sample_uses_generic_fallback(self) -> None:
+        self.assertIn(
+            "if (it !=  m_sampleButtonMap->end () && (*it).second)",
+            self.setup_markers_for_type,
+        )
+
+        missing_sample_guard = self.setup_markers_for_type.index(
+            "if (!sampleButton)"
+        )
+        first_sample_use = self.setup_markers_for_type.index(
+            "sampleButton->DuplicateObject"
+        )
+        self.assertLess(missing_sample_guard, first_sample_use)
 
 
 class Publish14PlanetMapAssetContractTests(unittest.TestCase):
@@ -107,6 +124,17 @@ class Publish14PlanetMapAssetContractTests(unittest.TestCase):
         self.assertIn("sliderZoom='comp.left.slider.slider'", properties)
         self.assertIn("buttonRefresh='comp.left.buttonRefresh'", properties)
         self.assertNotRegex(properties, r"(?i)buttonzoom=")
+
+    def test_publish14_contract_has_no_later_gcw_marker_sample(self) -> None:
+        code_data = re.search(
+            r"<Data\s+(.*?Name='CodeData'.*?)/>",
+            self.asset,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(code_data)
+        properties = code_data.group(1)
+        self.assertIn("buttonSampleGeneric='markers.generic'", properties)
+        self.assertNotRegex(properties, r"(?i)buttonsamplegcw=")
 
 
 if __name__ == "__main__":

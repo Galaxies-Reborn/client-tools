@@ -183,6 +183,24 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
         self.assertIn("precuAssetOverrideCount = 0", script)
         self.assertIn("precuAssetArchiveCount", script)
 
+    def test_precu_profile_enables_and_staging_enforces_juce_audio(self):
+        options = (PROFILE_ROOT / "options.cfg").read_text(encoding="utf-8")
+        client = CLIENT_CONFIG.read_text(encoding="utf-8")
+        script = STAGE_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertRegex(
+            options,
+            r"(?ms)^\[ClientAudio\].*?^\s*disableMiles\s*=\s*false\s*$",
+        )
+        self.assertGreater(client.rindex("[ClientAudio]"), client.index('.include "user.cfg"'))
+        self.assertRegex(
+            client[client.rindex("[ClientAudio]"):],
+            r"(?m)^\s*disableMiles\s*=\s*false\s*$",
+        )
+        self.assertIn("enable the JUCE audio backend", script)
+        self.assertIn("lock JUCE audio on after user.cfg", script)
+        self.assertIn("disableMiles=false", script)
+
     def test_client_build_uses_bounded_parallelism(self):
         script = BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn("[int]$MaxCpuCount = 4", script)

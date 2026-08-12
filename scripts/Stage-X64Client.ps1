@@ -88,8 +88,20 @@ if ($RuntimeProfile -eq "Precu") {
     }
 
     $profileOptions = Get-Content -LiteralPath (Join-Path $profileDirectory "options.cfg") -Raw
+    $profileClient = Get-Content -LiteralPath (Join-Path $profileDirectory "client.cfg") -Raw
     if ($profileOptions -notmatch '(?ms)^\[ClientGraphics\].*?^\s*rasterMajor\s*=\s*11\s*$') {
         throw "The Pre-CU runtime profile must select the DX11 renderer (rasterMajor=11)."
+    }
+
+    if ($profileOptions -notmatch '(?ms)^\[ClientAudio\].*?^\s*disableMiles\s*=\s*false\s*$') {
+        throw "The Pre-CU runtime profile must enable the JUCE audio backend (disableMiles=false)."
+    }
+
+    $userConfigInclude = $profileClient.IndexOf('.include "user.cfg"')
+    $audioOverride = $profileClient.LastIndexOf("[ClientAudio]")
+    if ($userConfigInclude -lt 0 -or $audioOverride -le $userConfigInclude -or
+        $profileClient.Substring($audioOverride) -notmatch '(?m)^\s*disableMiles\s*=\s*false\s*$') {
+        throw "The Pre-CU client profile must lock JUCE audio on after user.cfg."
     }
 
     foreach ($inputSetting in @("useKeyboard", "useMouse")) {
