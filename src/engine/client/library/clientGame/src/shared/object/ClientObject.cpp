@@ -114,6 +114,48 @@ namespace ClientObjectNamespace
 	Unicode::String s_invalidTargetString;
 	float const INVALID_TARGET_ENFORCE_DELAY = 0.1f;
 
+	struct PreCuObjectNameAlias
+	{
+		char const * const laterKey;
+		char const * const publish14Key;
+	};
+
+	// The later server templates distinguish the original instrument meshes
+	// with *_classic names.  Publish 14.1 used the unsuffixed obj_n keys for
+	// those same templates, and its authentic table has no *_classic entries.
+	// Route the replicated later keys back to their Publish 14.1 equivalents
+	// instead of requiring a post-PRE-CU obj_n.stf in the client.
+	PreCuObjectNameAlias const s_preCuObjectNameAliases[] =
+	{
+		{ "obj_bandfill_classic",        "obj_bandfill" },
+		{ "obj_chidinkalu_horn_classic", "obj_chidinkalu_horn" },
+		{ "obj_fanfar_classic",          "obj_fanfar" },
+		{ "obj_fizzz_classic",           "obj_fizzz" },
+		{ "obj_kloo_horn_classic",       "obj_kloo_horn" },
+		{ "obj_mandoviol_classic",       "obj_mandoviol" },
+		{ "obj_nalargon_classic",        "obj_nalargon" },
+		{ "obj_ommni_box_classic",       "obj_ommni_box" },
+		{ "obj_slitherhorn_classic",     "obj_slitherhorn" },
+		{ "obj_traz_classic",            "obj_traz" }
+	};
+
+	StringId getPreCuCompatibleObjectNameStringId(StringId const & source)
+	{
+		if (source.getTable() == "obj_n")
+		{
+			std::string const & sourceKey = source.getText();
+			size_t const aliasCount = sizeof(s_preCuObjectNameAliases) / sizeof(s_preCuObjectNameAliases[0]);
+			for (size_t i = 0; i != aliasCount; ++i)
+			{
+				PreCuObjectNameAlias const & alias = s_preCuObjectNameAliases[i];
+				if (sourceKey == alias.laterKey)
+					return StringId("obj_n", alias.publish14Key);
+			}
+		}
+
+		return source;
+	}
+
 	// ----------------------------------------------------------------------------
 	bool isAlpha(Unicode::unicode_char_t const character)
 	{
@@ -1242,8 +1284,9 @@ void ClientObject::updateLocalizedName () const
 	{
 		if (!m_nameStringId.get ().isInvalid ())
 		{
-			IGNORE_RETURN (LocalizationManager::getManager ().getLocalizedStringValue (m_nameStringId.get (), m_localizedName));
-			IGNORE_RETURN (LocalizationManager::getManager ().getLocalizedStringValue (m_nameStringId.get (), m_localizedEnglishName, true));
+			StringId const compatibleNameStringId = getPreCuCompatibleObjectNameStringId(m_nameStringId.get());
+			IGNORE_RETURN (LocalizationManager::getManager ().getLocalizedStringValue (compatibleNameStringId, m_localizedName));
+			IGNORE_RETURN (LocalizationManager::getManager ().getLocalizedStringValue (compatibleNameStringId, m_localizedEnglishName, true));
 			localizedNameSameAsEnglishLocalizedName = (m_localizedName == m_localizedEnglishName);
 		}
 		else

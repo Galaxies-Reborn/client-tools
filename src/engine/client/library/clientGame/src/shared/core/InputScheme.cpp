@@ -114,26 +114,13 @@ namespace
 
 	PlayerId    s_playerId;
 
-	const std::string s_groundInputMajorVersion = "swg3"; // changing the major version will cause a reset to the default keymap
-	const std::string s_groundInputMinorVersion1 = "minor1"; // update mapping of primaryActionAndAttack and secondaryAttack
-	const std::string s_groundInputMinorVersion2 = "minor2"; // update mapping of intended target changes
-	const std::string s_groundInputMinorVersionMostRecent = s_groundInputMinorVersion2;
-	std::string s_defaultGroundInputSchemeTypes[] =
-	{
-		s_groundInputMajorVersion + "_" + s_groundInputMinorVersionMostRecent + "_default",
-		s_groundInputMajorVersion + "_" + s_groundInputMinorVersionMostRecent + "_classic",
-		s_groundInputMajorVersion + "_" + s_groundInputMinorVersionMostRecent + "_modern"
-	};
-
-	std::string s_defaultSpaceInputSchemeTypes[] =
-	{
-		"space"
-	};
+	const std::string s_defaultGroundInputSchemeType = "swg";
+	const std::string s_defaultSpaceInputSchemeType  = "space";
 
 	std::string s_lastInputSchemeTypes[Game::ST_numTypes] = 
 	{
 		"",
-		s_defaultSpaceInputSchemeTypes[0]
+		s_defaultSpaceInputSchemeType
 	};
 
 	//----------------------------------------------------------------------
@@ -143,33 +130,41 @@ namespace
 		if (s_installed)
 			return;
 		
-		const Data swg_ground    (Game::ST_ground, "input/groundinputmap_swg.iff",         
-			InputScheme::F_modalChat 
-			| InputScheme::F_chaseCam 
-			| InputScheme::F_turnStrafes 
-			| InputScheme::F_canFireSecondariesFromToolbar
-			);
-		const Data swg_classic_ground    (Game::ST_ground, "input/groundinputmap_swg_classic.iff",         
-			InputScheme::F_modalChat 
-			| InputScheme::F_chaseCam 
-//			| InputScheme::F_mouseMode
-			| InputScheme::F_canFireSecondariesFromToolbar
-			);
-		const Data swg_modern_ground    (Game::ST_ground, "input/groundinputmap_swg_modern.iff",         
-			InputScheme::F_modalChat 
-			| InputScheme::F_chaseCam 
-			| InputScheme::F_turnStrafes 
+		// Publish 14.1 exposes these seven presets.  Their identifiers are also
+		// the suffixes of the matching ui:inputscheme_<type>_n string ids.
+		const Data swg_ground    (Game::ST_ground, "input/groundinputmap_swg.iff",     0);
+		const Data iso_ground    (Game::ST_ground, "input/groundinputmap_iso.iff",     InputScheme::F_mouseMode);
+		const Data mmo_ground    (Game::ST_ground, "input/groundinputmap_mmorpg.iff",
+			InputScheme::F_modalChat
 			| InputScheme::F_mouseMode
-			| InputScheme::F_canFireSecondariesFromToolbar
-			| InputScheme::F_mouseLeftAndRightMoves
-			);
+			| InputScheme::F_chaseCam
+			| InputScheme::F_turnStrafes);
+		const Data fps_ground    (Game::ST_ground, "input/groundinputmap_fps.iff",
+			InputScheme::F_modalChat
+			| InputScheme::F_chaseCam);
+		const Data ja101_ground  (Game::ST_ground, "input/groundinputmap_ja101.iff",   0);
+		const Data mmo2_ground   (Game::ST_ground, "input/groundinputmap_mmorpg2.iff",
+			InputScheme::F_modalChat
+			| InputScheme::F_mouseMode
+			| InputScheme::F_chaseCam
+			| InputScheme::F_turnStrafes
+			| InputScheme::F_modeless);
+		const Data swg2_ground   (Game::ST_ground, "input/groundinputmap_swg2.iff",
+			InputScheme::F_mouseMode
+			| InputScheme::F_chaseCam
+			| InputScheme::F_modeless
+			| InputScheme::F_swgMouseMap);
 
 		const Data space     (Game::ST_space,  "input/spaceinputmap_default.iff",      InputScheme::F_modalChat);
 		const Data spaceja101(Game::ST_space,  "input/spaceinputmap_ja101.iff",        InputScheme::F_modalChat);
 
-		s_dataMap[Game::ST_ground].insert (DataMap::value_type (s_defaultGroundInputSchemeTypes[0], swg_ground));
-		s_dataMap[Game::ST_ground].insert (DataMap::value_type (s_defaultGroundInputSchemeTypes[1], swg_classic_ground));
-		s_dataMap[Game::ST_ground].insert (DataMap::value_type (s_defaultGroundInputSchemeTypes[2], swg_modern_ground));
+		s_dataMap[Game::ST_ground].insert (DataMap::value_type ("swg",   swg_ground));
+		s_dataMap[Game::ST_ground].insert (DataMap::value_type ("iso",   iso_ground));
+		s_dataMap[Game::ST_ground].insert (DataMap::value_type ("mmo",   mmo_ground));
+		s_dataMap[Game::ST_ground].insert (DataMap::value_type ("fps",   fps_ground));
+		s_dataMap[Game::ST_ground].insert (DataMap::value_type ("ja101", ja101_ground));
+		s_dataMap[Game::ST_ground].insert (DataMap::value_type ("mmo2",  mmo2_ground));
+		s_dataMap[Game::ST_ground].insert (DataMap::value_type ("swg2",  swg2_ground));
 
 		s_dataMap[Game::ST_space].insert (DataMap::value_type ("space", space));
 		s_dataMap[Game::ST_space].insert (DataMap::value_type ("spaceja101", spaceja101));
@@ -197,89 +192,6 @@ namespace
 
 	//----------------------------------------------------------------------
 
-	struct RebindInfo
-	{
-		uint32 theShiftState;
-		InputMap::InputType theType;
-		int32 theValue;
-		const char *commandName;
-		RebindInfo(uint32 inTheShiftState, InputMap::InputType inTheType, int32 inTheValue, const char *inCommandName)
-		{
-			theShiftState = inTheShiftState;
-			theType = inTheType;
-			theValue = inTheValue;
-			commandName = inCommandName;
-		}
-	};
-
-
-	void updateToVersion1()
-	{
-		s_lastInputSchemeTypes[Game::ST_ground] = s_defaultGroundInputSchemeTypes[0];
-		InputMap::CommandBindInfoSet * cmdsBindInfoSets = 0;
-
-		{
-			const InputMap::Command * primaryActionAndAttackCommand = s_groundInputMap->findCommandByName("CMD_primaryActionAndAttack");
-			const InputMap::BindInfo leftMouseButton(0, InputMap::IT_MouseButton, 0);
-			if(primaryActionAndAttackCommand)
-			{
-				const uint32 numCmds = s_groundInputMap->getCommandBindings (cmdsBindInfoSets, primaryActionAndAttackCommand);
-				if(numCmds) 
-				{
-					const InputMap::CommandBindInfoSet & cbis = cmdsBindInfoSets[0];
-					if (cbis.numBinds == 0) // nothing is mapped to this command
-					{
-						s_groundInputMap->addBinding(leftMouseButton, primaryActionAndAttackCommand);
-					}
-					delete [] cmdsBindInfoSets;
-					cmdsBindInfoSets = 0;
-				}
-
-			}
-		}
-
-		{
-			const InputMap::Command * secondaryAttackCommand = s_groundInputMap->findCommandByName("CMD_secondaryAttack");
-			const InputMap::BindInfo rightMouseButton(0, InputMap::IT_MouseButton, 1);
-			if(secondaryAttackCommand)
-			{
-				const uint32 numCmds = s_groundInputMap->getCommandBindings (cmdsBindInfoSets, secondaryAttackCommand);
-				if(numCmds) 
-				{
-					const InputMap::CommandBindInfoSet & cbis = cmdsBindInfoSets[0];
-					if (cbis.numBinds == 0) // nothing is mapped to this command
-					{
-						s_groundInputMap->addBinding(rightMouseButton, secondaryAttackCommand);
-					}
-					delete [] cmdsBindInfoSets;
-					cmdsBindInfoSets = 0;
-				}
-			}
-		}
-	}
-
-	void updateVersion1ToVersion2()
-	{
-		s_lastInputSchemeTypes[Game::ST_ground] = s_defaultGroundInputSchemeTypes[0];
-
-		//we thought we were going to do something smart here, 
-		//		but decided not to... so this forever will be an empty version 
-		//		because it already had gone live on a public TestCenter :(
-	}
-
-	//----------------------------------------------------------------------
-
-	void writeUpdate(const std::string &filename)
-	{
-		if (!s_groundInputMap->write (0, false))
-		{
-			WARNING (true, ("InputScheme::fetchGroundInputMap() failed to write iff [%s]", filename.c_str ()));
-		}
-		LocalMachineOptionManager::save ();
-		CurrentUserOptionManager::save ();
-	}
-
-	//----------------------------------------------------------------------
 	// SDL device hot-plug: re-resolve which physical device feeds each binding
 	// slot of the live input map whenever controllers are attached/removed.
 
@@ -413,38 +325,20 @@ InputMap * InputScheme::fetchGroundInputMap()
 		}
 
 		const Data * data = findData (s_lastInputSchemeTypes[sceneType]);
-	
-		if(!data && sceneType == Game::ST_ground)
-		{
-			// try and regrab the data - it may just be a minor version change
-			if(s_lastInputSchemeTypes[Game::ST_ground].find(s_groundInputMajorVersion) != std::string::npos)
-			{
-				data = findData (s_defaultGroundInputSchemeTypes[0]);
-			}
-		}
+		bool const needsReset = !data;
 
-		bool needsReset = false;
-
-		bool shouldReset = !data;
-
-		if(!shouldReset && sceneType == Game::ST_ground) // look for a major version change in the ground input map
-		{
-			shouldReset = (s_lastInputSchemeTypes[Game::ST_ground].find(s_groundInputMajorVersion) == std::string::npos);
-		}
-
-		if(shouldReset)
+		if(needsReset)
 		{
 			if(sceneType == Game::ST_ground)
 			{
-				data = NON_NULL (findData (s_defaultGroundInputSchemeTypes[0]));
-				s_lastInputSchemeTypes[Game::ST_ground] = s_defaultGroundInputSchemeTypes[0];
+				data = NON_NULL (findData (s_defaultGroundInputSchemeType));
+				s_lastInputSchemeTypes[Game::ST_ground] = s_defaultGroundInputSchemeType;
 			}
 			else
 			{
-				data = NON_NULL (findData (s_defaultSpaceInputSchemeTypes[0]));
-				s_lastInputSchemeTypes[Game::ST_space] = s_defaultSpaceInputSchemeTypes[0];
+				data = NON_NULL (findData (s_defaultSpaceInputSchemeType));
+				s_lastInputSchemeTypes[Game::ST_space] = s_defaultSpaceInputSchemeType;
 			}
-			needsReset = true;
 		}
 
 		NOT_NULL (data);
@@ -453,25 +347,6 @@ InputMap * InputScheme::fetchGroundInputMap()
 
 		const std::string & customMap = pid.toPath ();
 		s_groundInputMap = new InputMap (data->groundInputMapName.c_str (), customMap.c_str (), 0);
-
-
-		// look for a minor version change
-		if(!needsReset && sceneType == Game::ST_ground)
-		{
-			bool isMinorVersion1 = (s_lastInputSchemeTypes[Game::ST_ground].find(s_groundInputMinorVersion1) != std::string::npos);
-			bool isMinorVersion2 = (s_lastInputSchemeTypes[Game::ST_ground].find(s_groundInputMinorVersion2) != std::string::npos);
-			if(!isMinorVersion1 && !isMinorVersion2)
-			{
-				updateToVersion1();
-				updateVersion1ToVersion2();
-				writeUpdate(data->groundInputMapName);
-			}
-			else if(!isMinorVersion2)
-			{
-				updateVersion1ToVersion2();
-				writeUpdate(data->groundInputMapName);
-			}
-		}
 
 		ClientMacroManager::synchronizeWithInputMap (s_groundInputMap);
 		s_resetCallback  = new Callback;
