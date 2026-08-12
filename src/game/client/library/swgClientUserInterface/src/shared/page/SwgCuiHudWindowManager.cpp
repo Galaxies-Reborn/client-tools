@@ -1094,6 +1094,34 @@ void SwgCuiHudWindowManager::spawnCharacterSheet (CreatureObject *creatureToExam
 
 //----------------------------------------------------------------------
 
+void SwgCuiHudWindowManager::spawnCharacterAppearanceSheet ()
+{
+	CuiMediator * mediator = m_workspace->findMediatorByType(typeid(SwgCuiCharacterSheet));
+	SwgCuiCharacterSheet * characterSheet = dynamic_cast<SwgCuiCharacterSheet *>(mediator);
+
+	if (!characterSheet)
+	{
+		characterSheet = SwgCuiCharacterSheet::createInto(m_workspace->getPage());
+		characterSheet->setExamineMode(0);
+		characterSheet->setSettingsAutoSizeLocation(true, true);
+		m_workspace->addMediator(*characterSheet);
+		characterSheet->activate();
+		characterSheet->setEnabled(true);
+	}
+	else
+	{
+		characterSheet->setExamineMode(0);
+		if (!characterSheet->isActive())
+			characterSheet->activate();
+		characterSheet->setEnabled(true);
+	}
+
+	characterSheet->showCharacterAppearance();
+	m_workspace->focusMediator(*characterSheet, true);
+}
+
+//----------------------------------------------------------------------
+
 void SwgCuiHudWindowManager::spawnPermissionList (const PermissionListCreateMessage& msg)
 {
 	SwgCuiPermissionList * mediator = safe_cast<SwgCuiPermissionList *>(m_workspace->findMediatorByType (typeid (SwgCuiPermissionList)));

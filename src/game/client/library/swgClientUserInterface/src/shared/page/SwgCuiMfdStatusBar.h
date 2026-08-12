@@ -21,6 +21,7 @@
 
 class UIPage;
 class UIText;
+class SwgCuiMfdStatusBarHamEnhanceState;
 
 //----------------------------------------------------------------------
 
@@ -93,6 +94,11 @@ private:
 	int                 m_rechargeDesired;
 	float               m_rechargeInterpolated;
 	float               m_rechargeUpdateMultiplier;
+
+	SwgCuiMfdStatusBarHamEnhanceState * m_hamEnhanceState;
+	bool                m_hamEnhanceApplied;
+
+	void                updateHamEnhanceLayout();
 };
 
 //======================================================================

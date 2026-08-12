@@ -31,6 +31,7 @@
 #include "swgClientUserInterface/SwgCuiOptCombat.h"
 #include "swgClientUserInterface/SwgCuiOptControls.h"
 #include "swgClientUserInterface/SwgCuiOptGraphics.h"
+#include "swgClientUserInterface/SwgCuiOptGalaxiesReborn.h"
 #include "swgClientUserInterface/SwgCuiOptKeymap.h"
 #include "swgClientUserInterface/SwgCuiOptMisc.h"
 #include "swgClientUserInterface/SwgCuiOptSound.h"
@@ -53,6 +54,7 @@ namespace SwgCuiOptNamespace
 		OT_combat,
 		OT_controls,
 		OT_graphics,
+		OT_galaxiesReborn,
 		OT_misc,
 		OT_sound,
 		OT_terrain,
@@ -117,6 +119,10 @@ m_standaloneKeymap (0)
 	optionPage = 0;
 	getCodeDataObject (TUIPage, optionPage,      "pageGraphics", true);
 	if (optionPage) (*m_optionPages) [OT_graphics] = new SwgCuiOptGraphics   (*optionPage);
+
+	optionPage = 0;
+	getCodeDataObject(TUIPage, optionPage, "pageGalaxiesReborn", true);
+	if (optionPage) (*m_optionPages)[OT_galaxiesReborn] = new SwgCuiOptGalaxiesReborn(*optionPage);
 
 	optionPage = 0;
 	getCodeDataObject (TUIPage, optionPage,      "pageMisc", true);
@@ -370,6 +376,9 @@ void SwgCuiOpt::OnTabbedPaneChanged (UIWidget * context)
 				if (parent)
 					parent->MoveChild(&keymapPage, UIBaseObject::Top);
 				m_standaloneKeymap->activate();
+				// Keep Controls selected beneath the standalone keymap. Closing
+				// the dialog must not reveal the intentionally target-less route.
+				m_tabs->SetActiveTab(9);
 			}
 			else
 			{

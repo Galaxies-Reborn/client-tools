@@ -289,14 +289,20 @@ class PrecuCharacterSheetSourceContractTests(unittest.TestCase):
                     f"{name!r} must be an optional {binding.ui_type} binding",
                 )
 
-    def test_source_uses_exactly_the_three_publish14_tabs(self) -> None:
+    def test_source_extends_the_three_publish14_tabs_with_appearance(self) -> None:
         enum_match = re.search(
             r"enum\s+TabPages\s*\{(?P<body>.*?)\}\s*;", self.source, re.DOTALL
         )
         self.assertIsNotNone(enum_match, "missing TabPages enum")
         identifiers = re.findall(r"\bTAB_[A-Za-z0-9_]+\b", enum_match.group("body"))
         self.assertEqual(
-            ["TAB_status", "TAB_personal", "TAB_factions", "TAB_numTabPages"],
+            [
+                "TAB_status",
+                "TAB_personal",
+                "TAB_factions",
+                "TAB_appearance",
+                "TAB_numTabPages",
+            ],
             identifiers,
         )
 

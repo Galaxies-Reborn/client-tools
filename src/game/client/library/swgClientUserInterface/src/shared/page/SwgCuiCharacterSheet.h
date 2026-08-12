@@ -23,6 +23,7 @@
 
 class CreatureObject;
 class PlayerObject;
+class SwgCuiAppearanceTab;
 class UIButton;
 class UIImage;
 class UITable;
@@ -62,8 +63,10 @@ public:
 public:
 	explicit             SwgCuiCharacterSheet(UIPage & page);
 	void                 OnButtonPressed(UIWidget * context);
+	void                 OnTabbedPaneChanged(UIWidget * context);
 	void                 receiveMessage(const MessageDispatch::Emitter & source, const MessageDispatch::MessageBase & message);
 	void                 setExamineMode(CreatureObject * playerToExamine);
+	void                 showCharacterAppearance();
 	bool                 isExaminingSelf() const;
 	CreatureObject *     getCreatureToExamine() const;
 
@@ -90,6 +93,8 @@ private:
 
 private:
 	UITabbedPane *        m_tabbedPane;
+	UIPage *              m_appearanceHost;
+	SwgCuiAppearanceTab * m_appearanceTab;
 	long                  m_lastActiveTab;
 	float                 m_updateTimer;
 

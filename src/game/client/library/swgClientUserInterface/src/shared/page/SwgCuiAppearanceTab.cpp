@@ -144,13 +144,17 @@ using namespace SwgCuiAppearanceTabNamespace;
 
 // ---------------------------------------------------------------------
 
-SwgCuiAppearanceTab::SwgCuiAppearanceTab (UIPage & page):
+SwgCuiAppearanceTab::SwgCuiAppearanceTab (UIPage & page, bool embeddedInCharacterSheet):
 CuiMediator            ("AppearanceTab", page),
 m_characterViewer (NULL),
 m_characterName (NULL),
 m_closeButton (NULL),
 m_showInventoryItems (NULL),
 m_viewerPage (NULL),
+m_layoutPage (NULL),
+m_embeddedInCharacterSheet(embeddedInCharacterSheet),
+m_embeddedWidth(0),
+m_embeddedHeight(0),
 m_lastDragItem( new CuiDragInfo ),
 m_dragTimer(1.0f)
 {
@@ -197,8 +201,11 @@ m_dragTimer(1.0f)
 	m_characterViewer->setCameraLodBias         (3.0f);
 	m_characterViewer->setCameraLodBiasOverride (true);
 	m_characterViewer->setCameraForceTarget   (true);
-	m_characterViewer->setObject              (Game::getClientPlayer());
-	m_characterViewer->recomputeZoom          ();
+	if (Game::getClientPlayer())
+	{
+		m_characterViewer->setObject            (Game::getClientPlayer());
+		m_characterViewer->recomputeZoom        ();
+	}
 	m_characterViewer->setRotationSlowsToStop (true);
 
 	m_characterViewer->setCameraForceTarget   (false);
@@ -207,17 +214,13 @@ m_dragTimer(1.0f)
 	m_characterViewer->setCameraZoomLookAtBone("head");
 
 
-	if(!ms_dupedCreatureNoAppearance)
-		ms_dupedCreatureNoAppearance = SwgCuiAvatarCreationHelper::duplicateCreatureWithClothesAndCustomization(*Game::getPlayerCreature(), false);
-
 	m_slotViewers.clear();
 	m_slotText.clear();
 	
 	{
-		UIPage* layoutPage = NULL;
-		getCodeDataObject(TUIPage, layoutPage, "layout");
+		getCodeDataObject(TUIPage, m_layoutPage, "layout");
 
-		const UIBaseObject::UIObjectList & olist = layoutPage->GetChildrenRef ();
+		const UIBaseObject::UIObjectList & olist = m_layoutPage->GetChildrenRef ();
 		
 		for (UIBaseObject::UIObjectList::const_iterator it = olist.begin (); it != olist.end (); ++it)
 		{
@@ -256,7 +259,7 @@ m_dragTimer(1.0f)
 			m_slotViewers.push_back      (objectListViewer);
 			m_slotText.push_back        (text);
 
-			registerMediatorObject(*viewer, true);
+			registerMediatorObject(*objectListViewer, true);
 		}	
 	}
 
@@ -277,6 +280,149 @@ m_dragTimer(1.0f)
 
 	getCodeDataObject(TUIPage, m_viewerPage, "viewerpage");
 	registerMediatorObject(*m_viewerPage, true);
+
+	if (m_embeddedInCharacterSheet)
+	{
+		getPage().SetUserMovable(false);
+		getPage().SetMinimumSize(UISize::zero);
+		getPage().SetMaximumSize(UISize(16000, 16000));
+
+		UIWidget * const background = safe_cast<UIWidget *>(getPage().GetChild("bg"));
+		background->SetVisible(false);
+		background->SetEnabled(false);
+		m_closeButton->SetVisible(false);
+		m_closeButton->SetEnabled(false);
+
+		UIWidget * const originalRunner = safe_cast<UIWidget *>(m_viewerPage->GetChild("original"));
+		originalRunner->SetVisible(false);
+		originalRunner->SetEnabled(false);
+		const UIBaseObject::UIObjectList & viewerChildren = m_viewerPage->GetChildrenRef();
+		for (UIBaseObject::UIObjectList::const_iterator it = viewerChildren.begin(); it != viewerChildren.end(); ++it)
+		{
+			UIWidget * const child = dynamic_cast<UIWidget *>(*it);
+			if (child && child->GetName() == "box")
+			{
+				child->SetVisible(false);
+				child->SetEnabled(false);
+			}
+		}
+
+		layoutForEmbeddedParent();
+	}
+}
+
+void SwgCuiAppearanceTab::layoutForEmbeddedParent()
+{
+	if (!m_embeddedInCharacterSheet)
+		return;
+
+	UIPage * const host = dynamic_cast<UIPage *>(getPage().GetParent());
+	if (!host)
+		return;
+
+	UISize const hostSize = host->GetSize();
+	if (hostSize.x == m_embeddedWidth && hostSize.y == m_embeddedHeight)
+		return;
+
+	m_embeddedWidth = hostSize.x;
+	m_embeddedHeight = hostSize.y;
+	// The Publish 14 sheet never reaches these floors, but keep every nested
+	// preview and loading widget positive if a custom skin supplies a tiny host.
+	long const width = hostSize.x < 280 ? 280 : hostSize.x;
+	long const height = hostSize.y < 252 ? 252 : hostSize.y;
+	long const slotWidth = 62;
+	long const slotHeight = height / 7;
+	long const lineHeight = slotHeight - 33;
+	long const viewerLeft = slotWidth * 2;
+	long const viewerWidth = width - (slotWidth * 4);
+
+	getPage().SetLocation(UIPoint::zero);
+	getPage().SetSize(UISize(width, height));
+	getPage().SetScrollExtent(UISize(width, height));
+	m_layoutPage->SetLocation(UIPoint::zero);
+	m_layoutPage->SetSize(UISize(width, height));
+	m_layoutPage->SetScrollExtent(UISize(width, height));
+
+	const UIBaseObject::UIObjectList & slots = m_layoutPage->GetChildrenRef();
+	size_t slotIndex = 0;
+	for (UIBaseObject::UIObjectList::const_iterator it = slots.begin(); it != slots.end(); ++it, ++slotIndex)
+	{
+		UIPage * const slot = safe_cast<UIPage *>(*it);
+		long column = 0;
+		long row = 0;
+		if (slotIndex < 7)
+		{
+			column = 0;
+			row = static_cast<long>(slotIndex);
+		}
+		else if (slotIndex < 13)
+		{
+			column = slotWidth;
+			row = static_cast<long>(slotIndex - 7);
+		}
+		else if (slotIndex < 19)
+		{
+			column = width - (slotWidth * 2);
+			row = static_cast<long>(slotIndex - 13);
+		}
+		else
+		{
+			column = width - slotWidth;
+			row = static_cast<long>(slotIndex - 19);
+		}
+
+		slot->SetMinimumSize(UISize::zero);
+		slot->SetMaximumSize(UISize(16000, 16000));
+		slot->SetLocation(UIPoint(column, row * slotHeight));
+		slot->SetSize(UISize(slotWidth, slotHeight));
+		slot->SetScrollExtent(UISize(slotWidth, slotHeight));
+
+		UIText * const text = m_slotText[slotIndex];
+		text->SetMinimumSize(UISize::zero);
+		text->SetLocation(UIPoint(1, 0));
+		text->SetSize(UISize(slotWidth - 2, 31));
+		text->SetScrollExtent(UISize(slotWidth - 2, 31));
+
+		UIPage * const line = safe_cast<UIPage *>(slot->GetChild("line"));
+		line->SetMinimumSize(UISize::zero);
+		line->SetMaximumSize(UISize(16000, 16000));
+		line->SetLocation(UIPoint(2, 31));
+		line->SetSize(UISize(slotWidth - 4, lineHeight));
+		line->SetScrollExtent(UISize(slotWidth - 4, lineHeight));
+
+		CuiWidget3dObjectListViewer * const slotViewer = m_slotViewers[slotIndex];
+		slotViewer->SetLocation(UIPoint(1, 1));
+		slotViewer->SetSize(UISize(slotWidth - 6, lineHeight - 2));
+		slotViewer->SetScrollExtent(UISize(slotWidth - 6, lineHeight - 2));
+
+		UIPage * const loading = safe_cast<UIPage *>(line->GetChild("loading"));
+		loading->SetLocation(UIPoint::zero);
+		loading->SetSize(UISize(slotWidth - 4, lineHeight));
+		loading->SetScrollExtent(UISize(slotWidth - 4, lineHeight));
+		UIWidget * const loadingText = safe_cast<UIWidget *>(loading->GetChild("text"));
+		loadingText->SetLocation(UIPoint::zero);
+		loadingText->SetSize(UISize(slotWidth - 4, lineHeight));
+		loadingText->SetScrollExtent(UISize(slotWidth - 4, lineHeight));
+		UIWidget * const loadingRunner = safe_cast<UIWidget *>(loading->GetChild("runner"));
+		loadingRunner->SetVisible(false);
+		loadingRunner->SetEnabled(false);
+	}
+
+	m_viewerPage->SetMinimumSize(UISize::zero);
+	m_viewerPage->SetMaximumSize(UISize(16000, 16000));
+	m_viewerPage->SetLocation(UIPoint(viewerLeft, 0));
+	m_viewerPage->SetSize(UISize(viewerWidth, height));
+	m_viewerPage->SetScrollExtent(UISize(viewerWidth, height));
+	m_characterViewer->SetLocation(UIPoint(8, 24));
+	m_characterViewer->SetSize(UISize(viewerWidth - 16, height - 54));
+	m_characterViewer->SetScrollExtent(UISize(viewerWidth - 16, height - 54));
+	m_characterName->SetMinimumSize(UISize::zero);
+	m_characterName->SetLocation(UIPoint(8, 4));
+	m_characterName->SetSize(UISize(viewerWidth - 16, 19));
+	m_characterName->SetScrollExtent(UISize(viewerWidth - 16, 19));
+	m_showInventoryItems->SetLocation(UIPoint(8, height - 26));
+	m_showInventoryItems->SetSize(UISize(viewerWidth - 16, 19));
+	m_showInventoryItems->SetScrollExtent(UISize(viewerWidth - 16, 19));
 }
 
 SwgCuiAppearanceTab::~SwgCuiAppearanceTab()
@@ -300,6 +446,7 @@ SwgCuiAppearanceTab::~SwgCuiAppearanceTab()
 void SwgCuiAppearanceTab::update(float delta)
 {
 	UNREF(delta);
+	layoutForEmbeddedParent();
 
 	CreatureObject * playerCreature = Game::getPlayerCreature();
 
@@ -397,7 +544,7 @@ void SwgCuiAppearanceTab::update(float delta)
 	{
 		CleanupDupedCreature();
 		
-		ms_dupedCreatureNoAppearance = SwgCuiAvatarCreationHelper::duplicateCreatureWithClothesAndCustomization(*Game::getPlayerCreature(), false);
+		ms_dupedCreatureNoAppearance = SwgCuiAvatarCreationHelper::duplicateCreatureWithClothesAndCustomization(*playerCreature, false);
 
 		if(m_showInventoryItems->IsChecked() && ms_dupedCreatureNoAppearance)
 		{
@@ -434,29 +581,38 @@ void SwgCuiAppearanceTab::update(float delta)
 
 void SwgCuiAppearanceTab::performActivate()
 {
-	CuiManager::requestPointer(true);
+	if (!m_embeddedInCharacterSheet)
+		CuiManager::requestPointer(true);
+	layoutForEmbeddedParent();
 	m_characterViewer->setPaused(false);
 	setIsUpdating(true);
 
-	if(m_characterViewer->getLastObject() != Game::getPlayerCreature() && m_characterViewer->getLastObject() != ms_dupedCreatureNoAppearance)
+	CreatureObject * const playerCreature = Game::getPlayerCreature();
+	if (!playerCreature)
+		return;
+
+	if(m_characterViewer->getLastObject() != playerCreature && m_characterViewer->getLastObject() != ms_dupedCreatureNoAppearance)
 	{
-		m_characterViewer->setObject(Game::getPlayerCreature());
+		m_characterViewer->setObject(playerCreature);
 		if(ms_dupedCreatureNoAppearance)
 			CleanupDupedCreature();
-		ms_dupedCreatureNoAppearance = SwgCuiAvatarCreationHelper::duplicateCreatureWithClothesAndCustomization(*Game::getPlayerCreature(), false);
 	}
+
+	if(!ms_dupedCreatureNoAppearance)
+		ms_dupedCreatureNoAppearance = SwgCuiAvatarCreationHelper::duplicateCreatureWithClothesAndCustomization(*playerCreature, false);
 }
 
 void SwgCuiAppearanceTab::performDeactivate()
 {
-	CuiManager::requestPointer(false);
+	if (!m_embeddedInCharacterSheet)
+		CuiManager::requestPointer(false);
 	m_characterViewer->setPaused(true);
 	setIsUpdating(false);
 }
 
 void SwgCuiAppearanceTab::OnButtonPressed(UIWidget *context)
 {
-	if(context == m_closeButton)
+	if(context == m_closeButton && !m_embeddedInCharacterSheet)
 		closeNextFrame();
 }
 

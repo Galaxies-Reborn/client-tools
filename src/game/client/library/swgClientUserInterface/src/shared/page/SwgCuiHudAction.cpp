@@ -74,7 +74,6 @@
 #include "sharedUtility/Callback.h"
 #include "sharedUtility/HttpGetEncoder.h"
 #include "swgClientUserInterface/SwgCuiActions.h"
-#include "swgClientUserInterface/SwgCuiAppearanceTab.h"
 #include "swgClientUserInterface/SwgCuiBiographyEdit.h"
 #include "swgClientUserInterface/SwgCuiBuffBuilderBuffee.h"
 #include "swgClientUserInterface/SwgCuiBuffBuilderBuffer.h"
@@ -1612,7 +1611,7 @@ bool  SwgCuiHudAction::performAction (const std::string & id, const Unicode::Str
 	//}
 	else if (id == CuiActions::appearanceTab)
 	{
-		CuiMediatorFactory::toggleInWorkspace(CuiMediatorTypes::WS_AppearanceTab);
+		m_mediator.m_windowManager->spawnCharacterAppearanceSheet();
 	}
 	else if (id == CuiActions::questBuilder)
 	{

@@ -935,6 +935,10 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
     </ClCompile>
+    <ClCompile Include="..\..\src\shared\page\SwgCuiOptGalaxiesReborn.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">MaxSpeed</Optimization>
+    </ClCompile>
     <ClCompile Include="..\..\src\shared\page\SwgCuiOptKeymap.cpp" />
     <ClCompile Include="..\..\src\shared\page\SwgCuiOptMisc.cpp">
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">MaxSpeed</Optimization>
@@ -1472,6 +1476,7 @@
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptCombat.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptControls.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptGraphics.h" />
+    <ClInclude Include="..\..\src\shared\page\SwgCuiOptGalaxiesReborn.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptKeymap.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptMisc.h" />
     <ClInclude Include="..\..\src\shared\page\SwgCuiOptSound.h" />

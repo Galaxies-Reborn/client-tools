@@ -29,7 +29,6 @@
 #include "clientUserInterface/CuiVehicleProto.h"
 #include "sharedDebug/DebugFlags.h"
 #include "sharedFoundation/Production.h"
-#include "swgClientUserInterface/SwgCuiAppearanceTab.h"
 #include "swgClientUserInterface/SwgCuiAuctionBid.h"
 #include "swgClientUserInterface/SwgCuiAuctionBuy.h"
 #include "swgClientUserInterface/SwgCuiAuctionDetails.h"
@@ -263,7 +262,6 @@ void SwgCuiMediatorFactorySetup::install ()
 	MAKE_SWG_CTOR_WS (VoiceActiveSpeakers,            "/Voice.VoiceActiveSpeakers");
 	MAKE_SWG_CTOR_WS (TcgWindow,                      "/pda.Tcg");
 	MAKE_SWG_CTOR_WS (Mahjong,                        "/pda.Mahjong");
-	MAKE_SWG_CTOR_WS (AppearanceTab,                  "/pda.AppearanceTab");
 	MAKE_SWG_CTOR_WS (QuestBuilder,					  "/pda.QuestBuilder");
 	MAKE_SWG_CTOR_WS (Rating,                         "/pda.ratingScreen");
 	MAKE_SWG_CTOR_WS (GalacticCivilWar,               "/pda.GCWInformation");

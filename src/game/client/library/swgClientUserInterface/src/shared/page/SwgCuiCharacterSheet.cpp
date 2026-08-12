@@ -9,6 +9,7 @@
 
 #include "swgClientUserInterface/FirstSwgClientUserInterface.h"
 #include "swgClientUserInterface/SwgCuiCharacterSheet.h"
+#include "swgClientUserInterface/SwgCuiAppearanceTab.h"
 
 #include "UIButton.h"
 #include "UIData.h"
@@ -64,6 +65,7 @@ namespace SwgCuiCharacterSheetNamespace
 		TAB_status,
 		TAB_personal,
 		TAB_factions,
+		TAB_appearance,
 		TAB_numTabPages
 	};
 
@@ -160,6 +162,8 @@ CuiMediator("SwgCuiCharacterSheet", page),
 UIEventCallback(),
 MessageDispatch::Receiver(),
 m_tabbedPane(0),
+m_appearanceHost(0),
+m_appearanceTab(0),
 m_lastActiveTab(TAB_status),
 m_updateTimer(0.0f),
 m_characterName(0),
@@ -197,6 +201,12 @@ m_playerObjectWatcher(new PlayerObjectWatcher),
 m_creatureObjectWatcher(new CreatureObjectWatcher)
 {
 	getCodeDataObject(TUITabbedPane, m_tabbedPane, "tabs");
+	registerMediatorObject(*m_tabbedPane, true);
+
+	getCodeDataObject(TUIPage, m_appearanceHost, "pageAppearance");
+	UIPage * const appearancePage = NON_NULL(UIPage::DuplicateInto(*m_appearanceHost, "/PDA.AppearanceTab"));
+	m_appearanceTab = new SwgCuiAppearanceTab(*appearancePage, true);
+	m_appearanceTab->fetch();
 	getCodeDataObject(TUIText, m_characterName, "textCharacterName");
 	getCodeDataObject(TUIText, m_rank, "rank");
 	getCodeDataObject(TUIText, m_pvpStatus, "factionPvPStatusText");
@@ -277,6 +287,17 @@ m_creatureObjectWatcher(new CreatureObjectWatcher)
 
 SwgCuiCharacterSheet::~SwgCuiCharacterSheet()
 {
+	if (m_appearanceTab)
+	{
+		m_appearanceTab->deactivate();
+		UIPage * const appearancePage = &m_appearanceTab->getPage();
+		if (m_appearanceHost && appearancePage->GetParent() == m_appearanceHost)
+			IGNORE_RETURN(m_appearanceHost->RemoveChild(appearancePage));
+		m_appearanceTab->release();
+		m_appearanceTab = 0;
+	}
+	m_appearanceHost = 0;
+
 	m_callBack->disconnect(*this, &SwgCuiCharacterSheet::onBiographyRetrieved, static_cast<PlayerCreatureController::Messages::BiographyRetrieved *>(0));
 
 	delete m_callBack;
@@ -297,6 +318,7 @@ void SwgCuiCharacterSheet::performActivate()
 
 	if (!m_creatureObjectWatcher->getPointer())
 		setExamineMode(0);
+	OnTabbedPaneChanged(m_tabbedPane);
 
 	connectToMessage(FactionResponseMessage::MessageType);
 	connectToMessage(GuildResponseMessage::MessageType);
@@ -328,6 +350,9 @@ void SwgCuiCharacterSheet::performActivate()
 
 void SwgCuiCharacterSheet::performDeactivate()
 {
+	if (m_appearanceTab)
+		m_appearanceTab->deactivate();
+
 	setIsUpdating(false);
 
 	disconnectFromMessage("CharacterSheetResponseResLoc");
@@ -463,6 +488,9 @@ void SwgCuiCharacterSheet::setExamineMode(CreatureObject * playerToExamine)
 	UIButton * const factionsTab = m_tabbedPane->GetTabButton(TAB_factions);
 	if (factionsTab)
 		factionsTab->SetVisible(examiningSelf);
+	UIButton * const appearanceTab = m_tabbedPane->GetTabButton(TAB_appearance);
+	if (appearanceTab)
+		appearanceTab->SetVisible(examiningSelf);
 
 	if (examiningSelf)
 	{
@@ -478,6 +506,8 @@ void SwgCuiCharacterSheet::setExamineMode(CreatureObject * playerToExamine)
 		m_imperialFaction->Clear();
 		updateFactionTable();
 	}
+
+	OnTabbedPaneChanged(m_tabbedPane);
 }
 
 //-----------------------------------------------------------------------
@@ -492,6 +522,27 @@ bool SwgCuiCharacterSheet::isExaminingSelf() const
 CreatureObject * SwgCuiCharacterSheet::getCreatureToExamine() const
 {
 	return m_creatureObjectWatcher->getPointer();
+}
+
+//-----------------------------------------------------------------------
+
+void SwgCuiCharacterSheet::showCharacterAppearance()
+{
+	if (isExaminingSelf())
+		m_tabbedPane->SetActiveTab(TAB_appearance);
+}
+
+//-----------------------------------------------------------------------
+
+void SwgCuiCharacterSheet::OnTabbedPaneChanged(UIWidget * context)
+{
+	if (context != m_tabbedPane || !m_appearanceTab)
+		return;
+
+	if (isActive() && isExaminingSelf() && m_tabbedPane->GetActiveTab() == TAB_appearance)
+		m_appearanceTab->activate();
+	else
+		m_appearanceTab->deactivate();
 }
 
 //-----------------------------------------------------------------------

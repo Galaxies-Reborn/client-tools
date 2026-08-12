@@ -19,9 +19,14 @@
 #include "UIRectangleStyle.h"
 #include "UIText.h"
 #include "UIWidgetRectangleStyles.h"
+#include "UIWidget.h"
+#include "UIBaseObject.h"
 #include "UnicodeUtils.h"
 #include "clientGame/ConfigClientGame.h"
+#include "clientUserInterface/CuiPreferences.h"
 #include "clientUserInterface/CuiWorkspaceIcon.h"
+
+#include <vector>
 
 //@todo: this include path is invalid
 #include "swgSharedUtility/Attributes.h"
@@ -32,6 +37,113 @@
 const UILowerString SwgCuiMfdStatusBar::Properties::Orientation = UILowerString ("Orientation");
 const UILowerString SwgCuiMfdStatusBar::Properties::RechargeUpdateMultiplier = UILowerString ("RechargeUpdateMultiplier");
 const UILowerString SwgCuiMfdStatusBar::Properties::CurrentUpdateMultiplier = UILowerString ("CurrentUpdateMultiplier");
+
+//----------------------------------------------------------------------
+
+namespace
+{
+	struct HamEnhanceWidgetState
+	{
+		UIWidget * widget;
+		UIPoint location;
+		UISize size;
+		UISize minimumSize;
+		UISize maximumSize;
+		UISize scrollExtent;
+	};
+
+	void collectHamEnhanceWidgets(UIBaseObject & object, std::vector<HamEnhanceWidgetState> & states)
+	{
+		if (object.IsA(TUIWidget))
+		{
+			UIWidget * const widget = static_cast<UIWidget *>(&object);
+			HamEnhanceWidgetState state;
+			state.widget = widget;
+			state.location = widget->GetLocation();
+			state.size = widget->GetSize();
+			state.minimumSize = widget->GetMinimumSize();
+			state.maximumSize = widget->GetMaximumSize();
+			widget->GetScrollExtent(state.scrollExtent);
+			states.push_back(state);
+		}
+
+		UIBaseObject::UIObjectList children;
+		object.GetChildren(children);
+		for (UIBaseObject::UIObjectList::iterator i = children.begin(); i != children.end(); ++i)
+			collectHamEnhanceWidgets(**i, states);
+	}
+}
+
+class SwgCuiMfdStatusBarHamEnhanceState
+{
+public:
+	explicit SwgCuiMfdStatusBarHamEnhanceState(UIPage & root) :
+		m_root(&root),
+		m_widgets()
+	{
+		collectHamEnhanceWidgets(root, m_widgets);
+	}
+
+	void apply(bool enabled, UIText * valueText)
+	{
+		if (m_widgets.empty())
+			return;
+
+		HamEnhanceWidgetState const & rootState = m_widgets.front();
+		long const enhancedHeight = rootState.size.y;
+		bool const compactOverheadBar = rootState.size.x == 123 && enhancedHeight == 16;
+		long const standardHeight = compactOverheadBar ? 4 : 6;
+
+		for (std::vector<HamEnhanceWidgetState>::const_iterator i = m_widgets.begin(); i != m_widgets.end(); ++i)
+		{
+			HamEnhanceWidgetState const & state = *i;
+			UIPoint location = state.location;
+			UISize size = state.size;
+			UISize minimumSize = state.minimumSize;
+			UISize scrollExtent = state.scrollExtent;
+
+			if (!enabled)
+			{
+				if (state.widget == m_root && enhancedHeight > 0)
+					location.y = (location.y / enhancedHeight) * standardHeight;
+
+				if (size.y == enhancedHeight)
+					size.y = standardHeight;
+				if (scrollExtent.y == enhancedHeight)
+					scrollExtent.y = standardHeight;
+				if (minimumSize.y == enhancedHeight)
+					minimumSize.y = (state.widget == m_root) ? 5 : standardHeight;
+
+				if (compactOverheadBar)
+				{
+					location.x = (location.x * 2) / 3;
+					size.x = (size.x * 2) / 3;
+					scrollExtent.x = (scrollExtent.x * 2) / 3;
+				}
+
+			}
+
+			state.widget->SetMinimumSize(minimumSize);
+			state.widget->SetMaximumSize(state.maximumSize);
+			state.widget->SetLocation(location);
+			state.widget->SetSize(size);
+			state.widget->SetScrollExtent(scrollExtent);
+			if (state.widget == valueText)
+				state.widget->SetVisible(enabled);
+		}
+
+		UIPage * const parent = dynamic_cast<UIPage *>(m_root->GetParent());
+		if (parent)
+		{
+			parent->SetPackDirty(true);
+			parent->ForcePackChildren();
+		}
+	}
+
+private:
+	UIPage * m_root;
+	std::vector<HamEnhanceWidgetState> m_widgets;
+};
 
 //----------------------------------------------------------------------
 
@@ -56,7 +168,9 @@ m_currentInterpolated     (0.0f),
 m_currentUpdateMultiplier (2.0f),
 m_rechargeDesired         (0),
 m_rechargeInterpolated    (0.0f),
-m_rechargeUpdateMultiplier(3.0f)
+m_rechargeUpdateMultiplier(3.0f),
+m_hamEnhanceState         (0),
+m_hamEnhanceApplied       (false)
 {
 	getCodeDataObject (TUIText, m_valueText,      "ValueText", true);
 	getCodeDataObject (TUIPage, m_currentPage,    "current");
@@ -98,6 +212,16 @@ m_rechargeUpdateMultiplier(3.0f)
 	{
 		getPage().GetPropertyFloat(Properties::RechargeUpdateMultiplier, m_rechargeUpdateMultiplier);
 	}
+
+	bool hamEnhanceEligible = false;
+	if (codeData)
+		codeData->GetPropertyBoolean(UILowerString("HamEnhanceEligible"), hamEnhanceEligible);
+	if (hamEnhanceEligible)
+	{
+		m_hamEnhanceState = new SwgCuiMfdStatusBarHamEnhanceState(getPage());
+		m_hamEnhanceApplied = !CuiPreferences::getHamEnhance();
+		updateHamEnhanceLayout();
+	}
 }
 
 //----------------------------------------------------------------------
@@ -105,6 +229,24 @@ m_rechargeUpdateMultiplier(3.0f)
 SwgCuiMfdStatusBar::~SwgCuiMfdStatusBar ()
 {	
 	deactivate ();
+	delete m_hamEnhanceState;
+	m_hamEnhanceState = 0;
+}
+
+//----------------------------------------------------------------------
+
+void SwgCuiMfdStatusBar::updateHamEnhanceLayout()
+{
+	if (!m_hamEnhanceState)
+		return;
+
+	bool const enabled = CuiPreferences::getHamEnhance();
+	if (enabled == m_hamEnhanceApplied)
+		return;
+
+	m_hamEnhanceState->apply(enabled, m_valueText);
+	m_hamEnhanceApplied = enabled;
+	m_currentDesired = -1;
 }
 
 //-----------------------------------------------------------------
@@ -125,6 +267,8 @@ void SwgCuiMfdStatusBar::performDeactivate()
 
 void SwgCuiMfdStatusBar::updateBar(int scaleMax, int normalMax, int currentMax, int current, bool showRecharge, int recharge, float deltaTimeSecs)
 {
+	updateHamEnhanceLayout();
+
 	int hamBarType = ConfigClientGame::getHamBarType();
 
 	const UISize & curSize = getPage ().GetSize ();

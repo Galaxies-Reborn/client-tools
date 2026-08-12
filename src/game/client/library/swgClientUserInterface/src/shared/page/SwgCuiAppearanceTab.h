@@ -29,7 +29,7 @@ class CuiDragInfo;
 class SwgCuiAppearanceTab: public CuiMediator, public UIEventCallback
 {
 public:
-	explicit SwgCuiAppearanceTab(UIPage & page);
+	explicit SwgCuiAppearanceTab(UIPage & page, bool embeddedInCharacterSheet = false);
 	~SwgCuiAppearanceTab();
 
 	virtual void update(float delta);
@@ -48,6 +48,8 @@ protected:
 	virtual void performDeactivate();
 
 private:
+	void layoutForEmbeddedParent();
+
 	//disabled
 	SwgCuiAppearanceTab(const SwgCuiAppearanceTab & rhs);
 	SwgCuiAppearanceTab & operator= (const SwgCuiAppearanceTab & rhs);
@@ -59,6 +61,10 @@ private:
 	UIButton*                     m_closeButton;
 	UICheckbox*					  m_showInventoryItems;
 	UIPage*                       m_viewerPage;
+	UIPage*                       m_layoutPage;
+	bool                          m_embeddedInCharacterSheet;
+	long                          m_embeddedWidth;
+	long                          m_embeddedHeight;
 
 	ViewerVector                  m_slotViewers;
 	TextVector                    m_slotText;

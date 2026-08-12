@@ -230,6 +230,9 @@ public:
 	// the function above LIES!!!
 	static bool                getActualUseModelessInterface();
 
+	static void                setHamEnhance(bool enabled);
+	static bool                getHamEnhance();
+
 	static void                setUseSwgMouseMap( bool b );
 	static bool                getUseSwgMouseMap();
 

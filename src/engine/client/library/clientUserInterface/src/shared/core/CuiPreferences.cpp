@@ -114,6 +114,7 @@ namespace
 	bool        ms_showRadarNPCs                    = true;
 	bool        ms_useModelessInterface             = false;
 	bool        ms_useSwgMouseMap                   = false;
+	bool        ms_hamEnhance                       = false;
 
 	// Increment defaultUiSettingsVersion to force a reset to latest defaults for all users.
 	const int   cms_defaultUiSettingsVersion          = 1;
@@ -783,6 +784,7 @@ void CuiPreferences::install ()
 	REGISTER_OPTION_USER(showObjectArrowsOnRadar);
 	REGISTER_OPTION_USER(showRadarNPCs);
 	REGISTER_OPTION_USER(useSwgMouseMap);
+	REGISTER_OPTION_USER(hamEnhance);
 
 	REGISTER_OPTION_USER(paletteName);
 	REGISTER_OPTION_USER(hudOpacity);
@@ -2819,6 +2821,20 @@ bool CuiPreferences::getUseModelessInterface()
 bool CuiPreferences::getActualUseModelessInterface()
 {
 	return ms_useModelessInterface;
+}
+
+//----------------------------------------------------------------------
+
+void CuiPreferences::setHamEnhance(bool enabled)
+{
+	ms_hamEnhance = enabled;
+}
+
+//----------------------------------------------------------------------
+
+bool CuiPreferences::getHamEnhance()
+{
+	return ms_hamEnhance;
 }
 
 //----------------------------------------------------------------------

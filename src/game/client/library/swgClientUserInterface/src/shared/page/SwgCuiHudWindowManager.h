@@ -90,6 +90,7 @@ public:
 	void                hueObjectTest                         (const NetworkId & id, int maxIndex1, int maxIndex2);
 
 	void                spawnCharacterSheet                   (CreatureObject *creatureObjectToExamine);
+	void                spawnCharacterAppearanceSheet         ();
 	void                spawnMissionDetails                   ();
 	void                spawnPermissionList                   (const PermissionListCreateMessage& msg);
 	void                spawnNewMacro                         (const Unicode::String& params);
