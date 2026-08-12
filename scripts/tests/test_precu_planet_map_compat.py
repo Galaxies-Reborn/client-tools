@@ -57,6 +57,7 @@ class Publish14PlanetMapSourceContractTests(unittest.TestCase):
         cls.setup_markers_for_type = function_body(
             cls.source, "void SwgCuiPlanetMap::setupMarkersForType"
         )
+        cls.reset = function_body(cls.source, "void SwgCuiPlanetMap::reset")
 
     def test_later_zoom_button_is_optional(self) -> None:
         self.assertIn(
@@ -88,6 +89,33 @@ class Publish14PlanetMapSourceContractTests(unittest.TestCase):
             "sampleButton->DuplicateObject"
         )
         self.assertLess(missing_sample_guard, first_sample_use)
+
+    def test_later_gcw_region_category_is_not_exposed_in_map_tree(self) -> None:
+        self.assertNotIn(
+            "sv.push_back (PlanetMapManager::getGCWRegionCategory", self.reset
+        )
+        self.assertIn(
+            "const uint8 gcwRegionCategory = "
+            "PlanetMapManager::getGCWRegionCategory ();",
+            self.reset,
+        )
+        self.assertRegex(
+            self.reset,
+            r"if\s*\(category\s*==\s*gcwRegionCategory\)\s*continue;",
+        )
+
+    def test_map_titles_use_authentic_publish14_planet_string_table(self) -> None:
+        self.assertEqual(
+            2,
+            len(
+                re.findall(
+                    r'StringId\s*\(\s*"planet_n"\s*,\s*zone(?:Name)?\s*\)',
+                    self.source,
+                )
+            ),
+        )
+        self.assertNotIn('StringId("zone_n", zone)', self.source)
+        self.assertNotIn('StringId ("zone_n", zoneName)', self.source)
 
 
 class Publish14PlanetMapAssetContractTests(unittest.TestCase):

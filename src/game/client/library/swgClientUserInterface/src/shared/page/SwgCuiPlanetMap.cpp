@@ -420,7 +420,7 @@ void SwgCuiPlanetMap::performActivate()
 					snprintf(buffer, sizeof(buffer)-1, " (R:%d%% I:%d%%)", (100 - iterFind->second), iterFind->second);
 					buffer[sizeof(buffer)-1] = '\0';
 
-					Unicode::String const windowTitle = StringId("zone_n", zone).localize() + Unicode::narrowToWide(buffer);
+					Unicode::String const windowTitle = StringId("planet_n", zone).localize() + Unicode::narrowToWide(buffer);
 					m_textPlanetName->SetLocalText(windowTitle);
 				}
 			}
@@ -1185,10 +1185,13 @@ void SwgCuiPlanetMap::reset()
 		PlanetMapManagerClient::CategoryVector sv;
 		PlanetMapManagerClient::getCategories (sv);	
 		sv.push_back (PlanetMapManager::getWaypointCategory ());
-		sv.push_back (PlanetMapManager::getGCWRegionCategory());
+		const uint8 gcwRegionCategory = PlanetMapManager::getGCWRegionCategory ();
 		for (PlanetMapManagerClient::CategoryVector::const_iterator it = sv.begin (); it != sv.end (); ++it)
 		{
 			const uint8 category = (*it);
+			if (category == gcwRegionCategory)
+				continue;
+
 			categoryMap.insert (std::make_pair (PlanetMapManagerClient::findCategoryString (category), category));
 		}
 	}
@@ -1759,7 +1762,7 @@ void SwgCuiPlanetMap::setupCurrentZone ()
 	if (ba)
 		zoneName = Game::getSceneId() + "__" + zoneName;
 
-	Unicode::String windowTitle = StringId ("zone_n", zoneName).localize ();
+	Unicode::String windowTitle = StringId ("planet_n", zoneName).localize ();
 
 	// include GCW planetary score in window title
 	{

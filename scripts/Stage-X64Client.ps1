@@ -93,15 +93,23 @@ if ($RuntimeProfile -eq "Precu") {
         throw "The Pre-CU runtime profile must select the DX11 renderer (rasterMajor=11)."
     }
 
-    if ($profileOptions -notmatch '(?ms)^\[ClientAudio\].*?^\s*disableMiles\s*=\s*false\s*$') {
-        throw "The Pre-CU runtime profile must enable the JUCE audio backend (disableMiles=false)."
+    $optionsAudioSection = [regex]::Match($profileOptions, '(?ms)^\[ClientAudio\]\s*$.*?(?=^\[|\z)').Value
+    if ([string]::IsNullOrWhiteSpace($optionsAudioSection) -or
+        $optionsAudioSection -notmatch '(?m)^\s*enabled\s*=\s*true\s*$' -or
+        $optionsAudioSection -notmatch '(?m)^\s*disableMiles\s*=\s*false\s*$') {
+        throw "The Pre-CU runtime profile must enable audio through the JUCE backend (enabled=true, disableMiles=false)."
     }
 
     $userConfigInclude = $profileClient.IndexOf('.include "user.cfg"')
     $audioOverride = $profileClient.LastIndexOf("[ClientAudio]")
+    $clientAudioOverride = if ($audioOverride -ge 0) {
+        [regex]::Match($profileClient.Substring($audioOverride), '(?ms)^\[ClientAudio\]\s*$.*?(?=^\[|\z)').Value
+    } else { "" }
     if ($userConfigInclude -lt 0 -or $audioOverride -le $userConfigInclude -or
-        $profileClient.Substring($audioOverride) -notmatch '(?m)^\s*disableMiles\s*=\s*false\s*$') {
-        throw "The Pre-CU client profile must lock JUCE audio on after user.cfg."
+        [string]::IsNullOrWhiteSpace($clientAudioOverride) -or
+        $clientAudioOverride -notmatch '(?m)^\s*enabled\s*=\s*true\s*$' -or
+        $clientAudioOverride -notmatch '(?m)^\s*disableMiles\s*=\s*false\s*$') {
+        throw "The Pre-CU client profile must lock enabled JUCE audio on after user.cfg."
     }
 
     foreach ($inputSetting in @("useKeyboard", "useMouse")) {

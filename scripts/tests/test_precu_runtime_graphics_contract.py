@@ -188,17 +188,38 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
         client = CLIENT_CONFIG.read_text(encoding="utf-8")
         script = STAGE_SCRIPT.read_text(encoding="utf-8")
 
+        def section(text, name, start=0):
+            match = re.search(
+                rf"(?ms)^\[{re.escape(name)}\]\s*$.*?(?=^\[|\Z)",
+                text[start:],
+            )
+            self.assertIsNotNone(match)
+            return match.group(0)
+
+        options_audio = section(options, "ClientAudio")
         self.assertRegex(
-            options,
-            r"(?ms)^\[ClientAudio\].*?^\s*disableMiles\s*=\s*false\s*$",
+            options_audio,
+            r"(?m)^\s*enabled\s*=\s*true\s*$",
         )
-        self.assertGreater(client.rindex("[ClientAudio]"), client.index('.include "user.cfg"'))
         self.assertRegex(
-            client[client.rindex("[ClientAudio]"):],
+            options_audio,
             r"(?m)^\s*disableMiles\s*=\s*false\s*$",
         )
-        self.assertIn("enable the JUCE audio backend", script)
-        self.assertIn("lock JUCE audio on after user.cfg", script)
+        self.assertGreater(client.rindex("[ClientAudio]"), client.index('.include "user.cfg"'))
+        client_audio = section(client, "ClientAudio", client.rindex("[ClientAudio]"))
+        self.assertRegex(
+            client_audio,
+            r"(?m)^\s*enabled\s*=\s*true\s*$",
+        )
+        self.assertRegex(
+            client_audio,
+            r"(?m)^\s*disableMiles\s*=\s*false\s*$",
+        )
+        invalid_audio_section = "[ClientAudio]\ndisableMiles=false\n[ClientGraphics]\nenabled=true\n"
+        self.assertNotRegex(section(invalid_audio_section, "ClientAudio"), r"(?m)^\s*enabled\s*=\s*true\s*$")
+        self.assertIn("enable audio through the JUCE backend", script)
+        self.assertIn("lock enabled JUCE audio on after user.cfg", script)
+        self.assertIn("enabled=true", script)
         self.assertIn("disableMiles=false", script)
 
     def test_client_build_uses_bounded_parallelism(self):

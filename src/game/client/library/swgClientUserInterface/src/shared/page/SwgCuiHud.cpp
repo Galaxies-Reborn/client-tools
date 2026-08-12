@@ -26,7 +26,6 @@
 #include "clientGame/GroundScene.h"
 #include "clientGame/GroupObject.h"
 #include "clientGame/ObjectAttributeManager.h"
-#include "clientGame/PlayerCreatureController.h"
 #include "clientGame/PlayerMoneyManagerClient.h"
 #include "clientGame/ShipObject.h"
 #include "clientGame/ShipStation.h"
@@ -1465,21 +1464,12 @@ void SwgCuiHud::update (float deltaTimeSecs)
 	
 	//----------------------------------------------------------------------
 	
-	UICursor * theCursor = 0;
-
-	const PlayerCreatureController *const playerController = safe_cast<const PlayerCreatureController*> (player->getController ());
-	NOT_NULL (playerController);
-
-
-	//setup default based on auto aim state
-	if ( CuiPreferences::getAutoAimToggle() )
-	{
-		theCursor = Cui::MenuInfoTypes::getIntendedAttackInactiveCursor();
-	}
-	else
-	{
-		theCursor = m_reticleDefault;
-	}
+	// Publish 14 has no intended_attack or intended_inactive cursor styles.
+	// Those later combat cursors resolve to null with the authentic UI and leave
+	// reticleImage showing whichever contextual action cursor was used last.
+	// Seed every mouse-look frame with the authored green ground reticle; the
+	// object-specific cursor below can still replace it while an object is aimed at.
+	UICursor * theCursor = m_reticleDefault;
 
 	if (foundObject && updateCursor)
 	{
@@ -1496,11 +1486,6 @@ void SwgCuiHud::update (float deltaTimeSecs)
 				theCursor = tmpCursor;
 			}
 			
-			if( Cui::MenuInfoTypes::isAttackCursor(theCursor) &&
-				CuiPreferences::getAutoAimToggle() )  // auto aim is on
-			{
-				theCursor = Cui::MenuInfoTypes::getIntendedAttackInactiveCursor();
-			}
 		}
 	}
 
@@ -2265,4 +2250,3 @@ CachedNetworkId const & SwgCuiHud::getHudAssistId()
 }
 
 //-----------------------------------------------------------------
-
