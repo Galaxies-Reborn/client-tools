@@ -74,6 +74,20 @@ namespace UIManagerNamespace
 	void drawWidgetRect(UICanvas & canvas, UIWidget * widget);
 	void drawWidgetBorders(UICanvas & canvas, UIWidget * widget);
 
+	float getCumulativeWidgetScale(UIWidget const & widget)
+	{
+		float scale = 1.0f;
+		UIWidget const * current = &widget;
+
+		while (current)
+		{
+			scale *= current->GetScale();
+			current = current->GetParentWidget();
+		}
+
+		return scale;
+	}
+
 	long const s_defaultToolTipCharacterWidth = 35;
 }
 
@@ -147,7 +161,7 @@ bool UIManager::ContextInfo::update (long Ticks)
 				UIMessage contextMessage;
 				contextMessage.Type        = UIMessage::ContextRequest;
 				contextMessage.Data        = requestData;
-				contextMessage.MouseCoords = requestPoint - activeWidget->GetWorldLocation ();
+				contextMessage.MouseCoords = activeWidget->GetLocalPointFromWorld(requestPoint);
 				
 				//-- see if this resulted in a popup context widget occuring
 				if (activeWidget->ProcessMessage (contextMessage))
@@ -289,6 +303,7 @@ mDraggedSource            (0),
 mLastWidgetUnderMouse     (0),
 mDragThreshold            (5.0f),
 mDragEchoOffset           (0,0),
+mDragEchoScale            (1.0f),
 mShowDragEcho             (true),
 mDragGood                 (false),
 mAttemptToDrag            (false),
@@ -604,7 +619,19 @@ void UIManager::Render( UICanvas &DestinationCanvas ) const
 		DestinationCanvas.Flush();
 
 		DestinationCanvas.PushState();
-		DestinationCanvas.Translate( mLastMouseCoord + mDragEchoOffset );
+		if (mDragEchoScale == 1.0f)
+		{
+			// Preserve the original translation-only path at the default scale.
+			DestinationCanvas.Translate( mLastMouseCoord + mDragEchoOffset );
+		}
+		else
+		{
+			// The offset is in echo-local coordinates.  Scaling it through the
+			// canvas keeps the original hotspot under the world-space cursor.
+			DestinationCanvas.Translate( mLastMouseCoord );
+			DestinationCanvas.Scale( mDragEchoScale, mDragEchoScale );
+			DestinationCanvas.Translate( mDragEchoOffset );
+		}
 		DestinationCanvas.Clip( UIRect( 0, 0, mDraggedControl->GetWidth(), mDraggedControl->GetHeight() ) );
 
 		DestinationCanvas.SetOpacity( 0.5f );
@@ -655,9 +682,8 @@ void UIManager::Render( UICanvas &DestinationCanvas ) const
 	
 	if (ObjectUnderCursor && (mCountdownToTooltip == 0 || ObjectUnderCursor->GetTooltipDelay() == false))
 	{
-		const UIPoint & worldLocation = ObjectUnderCursor->GetWorldLocation ();
-		UIPoint tooltipPt = mLastMouseCoord - worldLocation;
-		UIWidget * const TooltipObjectUnderCursor = ObjectUnderCursor->GetWidgetFromPoint (tooltipPt, false);
+		UIPoint const objectLocalPoint = ObjectUnderCursor->GetLocalPointFromWorld(mLastMouseCoord);
+		UIWidget * const TooltipObjectUnderCursor = ObjectUnderCursor->GetWidgetFromPoint (objectLocalPoint, false);
 
 		UIBaseObject   * ObjectToQuery = TooltipObjectUnderCursor;
 		UITooltipStyle * TooltipStyle	= 0;
@@ -670,8 +696,9 @@ void UIManager::Render( UICanvas &DestinationCanvas ) const
 			if( ObjectToQuery->IsA( TUIWidget ) )
 			{
 				UIWidget *WidgetToQuery = static_cast<UIWidget *>( ObjectToQuery );
+				UIPoint const tooltipPoint = WidgetToQuery->GetLocalPointFromWorld(mLastMouseCoord);
 
-				Tooltip = WidgetToQuery->GetLocalTooltip(tooltipPt);
+				Tooltip = WidgetToQuery->GetLocalTooltip(tooltipPoint);
 				if (Tooltip.empty () && mActionListener)
 					mActionListener->constructTooltipForObject (*WidgetToQuery, Tooltip);
 
@@ -683,7 +710,6 @@ void UIManager::Render( UICanvas &DestinationCanvas ) const
 				if( !Tooltip.empty() )
 					break;
 
-				tooltipPt += WidgetToQuery->GetLocation ();
 			}
 
 			ObjectToQuery = ObjectToQuery->GetParent();
@@ -847,7 +873,7 @@ bool UIManager::ProcessMessage (const UIMessage &Msg)
 					{
 						UIPoint dragWidgetOffset;
 
-						UIWidget * const customDragWidget = DraggedControl->GetCustomDragWidget (Msg.MouseCoords - DraggedControl->GetWorldLocation (), dragWidgetOffset);
+						UIWidget * const customDragWidget = DraggedControl->GetCustomDragWidget (DraggedControl->GetLocalPointFromWorld(Msg.MouseCoords), dragWidgetOffset);
 						
 						if (customDragWidget)
 						{							
@@ -858,7 +884,7 @@ bool UIManager::ProcessMessage (const UIMessage &Msg)
 
 								UIMessage NotificationMessage;
 								
-								NotificationMessage.MouseCoords = Msg.MouseCoords - parentWidget->GetWorldLocation ();
+								NotificationMessage.MouseCoords = parentWidget->GetLocalPointFromWorld(Msg.MouseCoords);
 								NotificationMessage.Type        = UIMessage::DragStart;
 								NotificationMessage.DragSource  = DraggedControl;
 								NotificationMessage.DragObject  = customDragWidget;
@@ -1232,6 +1258,8 @@ void UIManager::SetRootPage( UIPage *NewRootPage )
 		mDraggedSource = 0;
 	}
 
+	mDragEchoScale = 1.0f;
+
 	if( NewRootPage )
 		NewRootPage->Attach(0);
 
@@ -1409,6 +1437,11 @@ void UIManager::RefreshGraphics ()
 void UIManager::SetDragEcho( UIWidget * source, UIWidget *NewEcho, const UIPoint & offset )
 {
 	assert ((source && NewEcho) || (!source && !NewEcho));
+	// A default echo renders the source directly, so it inherits the source's
+	// complete hierarchy.  A distinct custom echo carries its own hierarchy
+	// (or just its own Scale after it has been detached).
+	UIWidget const * const scaleWidget = NewEcho == source ? source : NewEcho;
+	float const dragEchoScale = scaleWidget ? getCumulativeWidgetScale(*scaleWidget) : 1.0f;
 
 	if( source )
 	{
@@ -1434,6 +1467,7 @@ void UIManager::SetDragEcho( UIWidget * source, UIWidget *NewEcho, const UIPoint
 
 	mDraggedSource  = source;
 	mDraggedControl = NewEcho;
+	mDragEchoScale  = dragEchoScale;
 	mDragGood       = false;
 }
 
@@ -1472,7 +1506,7 @@ UIWidget *UIManager::GetDragTarget( const UIPoint &Ref, bool & dragOk )
 
 	if (DragTarget)
 	{
-		const UIPoint transformedPoint (Ref - DragTarget->GetWorldLocation ());
+		const UIPoint transformedPoint (DragTarget->GetLocalPointFromWorld(Ref));
 		dragOk = DragTarget->IsDropOk (*mDraggedControl, DragType, transformedPoint);
 	}
 

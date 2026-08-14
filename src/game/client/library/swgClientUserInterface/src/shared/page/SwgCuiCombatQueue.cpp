@@ -288,6 +288,13 @@ void SwgCuiCombatQueue::addCommand(uint32 const sequenceId, ClientCommandQueue::
 	UIImage * const icon = safe_cast<UIImage *>(commandPage->GetChild("Icon"));
 	UIText * const nameText = safe_cast<UIText *>(commandPage->GetChild("NameText"));
 
+	commandPage->Attach(0);
+	IGNORE_RETURN(m_volumePage->AddChild(commandPage));
+	// Link resolves the authored Text and Style properties and therefore must
+	// happen before replacing the sample's "xxx action name" and placeholder
+	// icon with the queued command presentation.
+	commandPage->Link();
+
 	CuiDragInfo dragInfo;
 	dragInfo.type = CuiDragInfoTypes::CDIT_command;
 	dragInfo.str = std::string("/") + entry.m_command->m_commandName;
@@ -300,9 +307,6 @@ void SwgCuiCombatQueue::addCommand(uint32 const sequenceId, ClientCommandQueue::
 		localizedCommandName = Unicode::narrowToWide(entry.m_command->m_commandName);
 	nameText->SetLocalText(localizedCommandName);
 
-	commandPage->Attach(0);
-	IGNORE_RETURN(m_volumePage->AddChild(commandPage));
-	commandPage->Link();
 	(*m_queuePages)[sequenceId] = commandPage;
 
 	if (wasAtBottom)

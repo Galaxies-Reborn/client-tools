@@ -447,6 +447,124 @@ namespace Direct3d11_ShaderSourceNamespace
 		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
 	}
 
+	bool isShaderWhitespace(char c)
+	{
+		return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+	}
+
+	bool isCubeSampledIdentifier(char const *source, int length, char const *identifier, int identifierLength)
+	{
+		char const texCube[] = "texCUBE";
+		int const texCubeLength = static_cast<int>(sizeof(texCube) - 1);
+
+		for (int i = 0; i + texCubeLength <= length; ++i)
+		{
+			if (memcmp(source + i, texCube, static_cast<size_t>(texCubeLength)) != 0 ||
+				(i > 0 && isIdentifierCharacter(source[i - 1])) ||
+				(i + texCubeLength < length && isIdentifierCharacter(source[i + texCubeLength])))
+			{
+				continue;
+			}
+
+			int argument = i + texCubeLength;
+			while (argument < length && isShaderWhitespace(source[argument]))
+				++argument;
+			if (argument >= length || source[argument] != '(')
+				continue;
+
+			++argument;
+			while (argument < length && isShaderWhitespace(source[argument]))
+				++argument;
+
+			if (argument + identifierLength <= length &&
+				memcmp(source + argument, identifier, static_cast<size_t>(identifierLength)) == 0 &&
+				(argument + identifierLength == length || !isIdentifierCharacter(source[argument + identifierLength])))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * D3D9's generic `sampler` declaration did not encode texture dimensionality.  The
+	 * legacy compiler inferred it from tex2D/texCUBE operations, but modern HLSL reflects
+	 * an unqualified sampler used by texCUBE as Texture3D.  D3D11 then rejects the draw
+	 * when the material correctly binds a cube map.  Preserve the source program's own
+	 * texCUBE declaration as the authority and specialize only the matching identifiers.
+	 */
+	char *patchCubeSamplerDeclarations(char const *source, int length, int &resultLength)
+	{
+		char const sampler[] = "sampler";
+		int const samplerLength = static_cast<int>(sizeof(sampler) - 1);
+		int patchCount = 0;
+
+		for (int i = 0; i + samplerLength < length; ++i)
+		{
+			if (memcmp(source + i, sampler, static_cast<size_t>(samplerLength)) != 0 ||
+				(i > 0 && isIdentifierCharacter(source[i - 1])) ||
+				!isShaderWhitespace(source[i + samplerLength]))
+			{
+				continue;
+			}
+
+			int identifierStart = i + samplerLength;
+			while (identifierStart < length && isShaderWhitespace(source[identifierStart]))
+				++identifierStart;
+			int identifierEnd = identifierStart;
+			while (identifierEnd < length && isIdentifierCharacter(source[identifierEnd]))
+				++identifierEnd;
+
+			if (identifierEnd > identifierStart &&
+				isCubeSampledIdentifier(source, length, source + identifierStart, identifierEnd - identifierStart))
+			{
+				++patchCount;
+			}
+		}
+
+		if (!patchCount)
+			return NULL;
+
+		int const cubeSuffixLength = 4;
+		char * const result = new char[length + patchCount * cubeSuffixLength];
+		char *destination = result;
+
+		for (int i = 0; i < length; )
+		{
+			bool patch = false;
+			if (i + samplerLength < length &&
+				memcmp(source + i, sampler, static_cast<size_t>(samplerLength)) == 0 &&
+				(i == 0 || !isIdentifierCharacter(source[i - 1])) &&
+				isShaderWhitespace(source[i + samplerLength]))
+			{
+				int identifierStart = i + samplerLength;
+				while (identifierStart < length && isShaderWhitespace(source[identifierStart]))
+					++identifierStart;
+				int identifierEnd = identifierStart;
+				while (identifierEnd < length && isIdentifierCharacter(source[identifierEnd]))
+					++identifierEnd;
+
+				patch = identifierEnd > identifierStart &&
+					isCubeSampledIdentifier(source, length, source + identifierStart, identifierEnd - identifierStart);
+			}
+
+			if (patch)
+			{
+				memcpy(destination, "samplerCUBE", static_cast<size_t>(samplerLength + cubeSuffixLength));
+				destination += samplerLength + cubeSuffixLength;
+				i += samplerLength;
+			}
+			else
+			{
+				*destination++ = source[i++];
+			}
+		}
+
+		resultLength = static_cast<int>(destination - result);
+		return result;
+	}
+
 	// ------------------------------------------------------------------
 	// Patch 8: the pixel epilogue -- the alpha test.
 	//
@@ -1218,6 +1336,19 @@ char *Direct3d11_ShaderSource::patchProgramSource(char const *name, char const *
 		{
 			current = replaced;
 			currentLength = replacedLength;
+		}
+	}
+
+	if (!isVertexProgram)
+	{
+		char const * const scanSource = current ? current : source;
+		int cubePatchedLength = 0;
+		char * const cubePatched = patchCubeSamplerDeclarations(scanSource, currentLength, cubePatchedLength);
+		if (cubePatched)
+		{
+			delete [] current;
+			current = cubePatched;
+			currentLength = cubePatchedLength;
 		}
 	}
 

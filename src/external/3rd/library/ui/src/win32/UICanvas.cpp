@@ -18,6 +18,104 @@ namespace
 {
 	static UIFloatPoint s_theVertices[4];
 	static UIFloatPoint s_theUVs[4];
+
+	void getTransformedBounds(UICanvas const & canvas, float const left, float const top, float const right, float const bottom, UIRect & bounds)
+	{
+		UIFloatPoint const points[4] =
+		{
+			canvas.TransformFP(left, top),
+			canvas.TransformFP(right, top),
+			canvas.TransformFP(left, bottom),
+			canvas.TransformFP(right, bottom)
+		};
+
+		float minimumX = points[0].x;
+		float minimumY = points[0].y;
+		float maximumX = points[0].x;
+		float maximumY = points[0].y;
+		for (int index = 1; index != 4; ++index)
+		{
+			minimumX = std::min(minimumX, points[index].x);
+			minimumY = std::min(minimumY, points[index].y);
+			maximumX = std::max(maximumX, points[index].x);
+			maximumY = std::max(maximumY, points[index].y);
+		}
+
+		bounds.left = static_cast<long>(std::floor(minimumX));
+		bounds.top = static_cast<long>(std::floor(minimumY));
+		bounds.right = static_cast<long>(std::ceil(maximumX));
+		bounds.bottom = static_cast<long>(std::ceil(maximumY));
+	}
+
+	UIFloatPoint interpolateQuad(UIFloatPoint const source[4], float const horizontalAmount, float const verticalAmount)
+	{
+		UIFloatPoint const top(
+			source[0].x + (source[1].x - source[0].x) * horizontalAmount,
+			source[0].y + (source[1].y - source[0].y) * horizontalAmount);
+		UIFloatPoint const bottom(
+			source[2].x + (source[3].x - source[2].x) * horizontalAmount,
+			source[2].y + (source[3].y - source[2].y) * horizontalAmount);
+
+		return UIFloatPoint(
+			top.x + (bottom.x - top.x) * verticalAmount,
+			top.y + (bottom.y - top.y) * verticalAmount);
+	}
+
+	bool clipAxisAlignedQuad(UIFloatPoint vertices[4], UIFloatPoint * const textureCoordinates, UIRect const & clippingRect)
+	{
+		float const epsilon = 0.001f;
+		if (std::fabs(vertices[0].y - vertices[1].y) > epsilon ||
+			std::fabs(vertices[2].y - vertices[3].y) > epsilon ||
+			std::fabs(vertices[0].x - vertices[2].x) > epsilon ||
+			std::fabs(vertices[1].x - vertices[3].x) > epsilon)
+		{
+			return true;
+		}
+
+		float const originalLeft = vertices[0].x;
+		float const originalTop = vertices[0].y;
+		float const originalRight = vertices[1].x;
+		float const originalBottom = vertices[2].y;
+		if (originalRight <= originalLeft || originalBottom <= originalTop)
+			return true;
+
+		float const clippedLeft = std::max(originalLeft, static_cast<float>(clippingRect.left));
+		float const clippedTop = std::max(originalTop, static_cast<float>(clippingRect.top));
+		float const clippedRight = std::min(originalRight, static_cast<float>(clippingRect.right));
+		float const clippedBottom = std::min(originalBottom, static_cast<float>(clippingRect.bottom));
+		if (clippedRight <= clippedLeft || clippedBottom <= clippedTop)
+			return false;
+
+		float const inverseWidth = 1.0f / (originalRight - originalLeft);
+		float const inverseHeight = 1.0f / (originalBottom - originalTop);
+		float const leftAmount = (clippedLeft - originalLeft) * inverseWidth;
+		float const topAmount = (clippedTop - originalTop) * inverseHeight;
+		float const rightAmount = (clippedRight - originalLeft) * inverseWidth;
+		float const bottomAmount = (clippedBottom - originalTop) * inverseHeight;
+
+		vertices[0] = UIFloatPoint(clippedLeft, clippedTop);
+		vertices[1] = UIFloatPoint(clippedRight, clippedTop);
+		vertices[2] = UIFloatPoint(clippedLeft, clippedBottom);
+		vertices[3] = UIFloatPoint(clippedRight, clippedBottom);
+
+		if (textureCoordinates)
+		{
+			UIFloatPoint const originalTextureCoordinates[4] =
+			{
+				textureCoordinates[0],
+				textureCoordinates[1],
+				textureCoordinates[2],
+				textureCoordinates[3]
+			};
+
+			textureCoordinates[0] = interpolateQuad(originalTextureCoordinates, leftAmount, topAmount);
+			textureCoordinates[1] = interpolateQuad(originalTextureCoordinates, rightAmount, topAmount);
+			textureCoordinates[2] = interpolateQuad(originalTextureCoordinates, leftAmount, bottomAmount);
+			textureCoordinates[3] = interpolateQuad(originalTextureCoordinates, rightAmount, bottomAmount);
+		}
+
+		return true;
+	}
 }
 
 //----------------------------------------------------------------------
@@ -219,6 +317,9 @@ void UICanvas::BltFrom( const UICanvas * const src, const UIPoint &Source, const
 		s_theUVs[3].y	= s_theUVs[2].y;
 	}
 
+	if (!mState.TranslationOnly && !clipAxisAlignedQuad(s_theVertices, src ? s_theUVs : 0, mState.ClippingRect))
+		return;
+
 	RenderQuad( src, s_theVertices, s_theUVs );
 }
 
@@ -398,12 +499,99 @@ bool UICanvas::Clip( UIScalar left, UIScalar top, UIScalar right, UIScalar botto
 {
 //	PerformShearing (left,  top,    mState.mShear);
 //	PerformShearing (right, bottom, mState.mShear);
+	if (!mState.TranslationOnly)
+	{
+		UIRect transformedBounds;
+		getTransformedBounds(*this, static_cast<float>(left), static_cast<float>(top), static_cast<float>(right), static_cast<float>(bottom), transformedBounds);
+		return UIUtils::ClipRect(mState.ClippingRect, transformedBounds);
+	}
 
 	return UIUtils::ClipRect( mState.ClippingRect, 
 		left   + mState.Translation.x,
 		top    + mState.Translation.y,
 		right  + mState.Translation.x,
 		bottom + mState.Translation.y);
+}
+
+//----------------------------------------------------------------------
+
+void UICanvas::SetClip(UIRect const & in)
+{
+	if (mState.TranslationOnly)
+	{
+		mState.ClippingRect.top = in.top + mState.Translation.y;
+		mState.ClippingRect.left = in.left + mState.Translation.x;
+		mState.ClippingRect.bottom = in.bottom + mState.Translation.y;
+		mState.ClippingRect.right = in.right + mState.Translation.x;
+		return;
+	}
+
+	getTransformedBounds(*this,
+		static_cast<float>(in.left),
+		static_cast<float>(in.top),
+		static_cast<float>(in.right),
+		static_cast<float>(in.bottom),
+		mState.ClippingRect);
+}
+
+//----------------------------------------------------------------------
+
+void UICanvas::GetClip(UIRect & out) const
+{
+	if (mState.TranslationOnly)
+	{
+		out.top = mState.ClippingRect.top - mState.Translation.y;
+		out.left = mState.ClippingRect.left - mState.Translation.x;
+		out.bottom = mState.ClippingRect.bottom - mState.Translation.y;
+		out.right = mState.ClippingRect.right - mState.Translation.x;
+		return;
+	}
+
+	float const shearX = mState.mShear.x;
+	float const shearY = mState.mShear.y;
+	float const a = mState.TransformationMatrix[0][0] + mState.TransformationMatrix[0][1] * shearY;
+	float const b = mState.TransformationMatrix[0][0] * shearX + mState.TransformationMatrix[0][1];
+	float const c = mState.TransformationMatrix[0][2];
+	float const d = mState.TransformationMatrix[1][0] + mState.TransformationMatrix[1][1] * shearY;
+	float const e = mState.TransformationMatrix[1][0] * shearX + mState.TransformationMatrix[1][1];
+	float const f = mState.TransformationMatrix[1][2];
+	float const determinant = a * e - b * d;
+
+	if (std::fabs(determinant) < 0.000001f)
+	{
+		out = mState.ClippingRect;
+		return;
+	}
+
+	float const inverseDeterminant = 1.0f / determinant;
+	UIFloatPoint points[4];
+	UIRect const & clip = mState.ClippingRect;
+	float const physicalX[4] = { static_cast<float>(clip.left), static_cast<float>(clip.right), static_cast<float>(clip.left), static_cast<float>(clip.right) };
+	float const physicalY[4] = { static_cast<float>(clip.top), static_cast<float>(clip.top), static_cast<float>(clip.bottom), static_cast<float>(clip.bottom) };
+	for (int index = 0; index != 4; ++index)
+	{
+		float const translatedX = physicalX[index] - c;
+		float const translatedY = physicalY[index] - f;
+		points[index].x = (e * translatedX - b * translatedY) * inverseDeterminant;
+		points[index].y = (-d * translatedX + a * translatedY) * inverseDeterminant;
+	}
+
+	float minimumX = points[0].x;
+	float minimumY = points[0].y;
+	float maximumX = points[0].x;
+	float maximumY = points[0].y;
+	for (int index = 1; index != 4; ++index)
+	{
+		minimumX = std::min(minimumX, points[index].x);
+		minimumY = std::min(minimumY, points[index].y);
+		maximumX = std::max(maximumX, points[index].x);
+		maximumY = std::max(maximumY, points[index].y);
+	}
+
+	out.left = static_cast<long>(std::floor(minimumX));
+	out.top = static_cast<long>(std::floor(minimumY));
+	out.right = static_cast<long>(std::ceil(maximumX));
+	out.bottom = static_cast<long>(std::ceil(maximumY));
 }
 
 //----------------------------------------------------------------------
@@ -569,6 +757,9 @@ void UICanvas::BltFromNoScaleOrRotate( const UICanvas * const src, const UIPoint
 		s_theUVs[3].x = s_theUVs[1].x;
 		s_theUVs[3].y = s_theUVs[2].y;
 	}
+
+	if (!mState.TranslationOnly && !clipAxisAlignedQuad(s_theVertices, src ? s_theUVs : 0, mState.ClippingRect))
+		return;
 
 	RenderQuad( src, s_theVertices, s_theUVs );
 }

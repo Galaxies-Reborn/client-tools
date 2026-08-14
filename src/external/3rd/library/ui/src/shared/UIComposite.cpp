@@ -548,6 +548,17 @@ void UIComposite::Pack()
 
 	UIPage::Pack();
 
+	// UIPage's DoNotPackChildren contract must also suppress the composite's
+	// orientation/spacing pass.  Without this, explicitly positioned children
+	// are still resized by PackFill/PackConstant whenever visibility dirties the
+	// page.  Authored HAM rows use this mode so standard and enhanced layouts
+	// remain exact instead of expanding Health and clipping Mind.
+	if (GetDoNotPackChildren())
+	{
+		mInPacking = false;
+		return;
+	}
+
 	switch(mSpacingType) 
 	{
 	case ST_fill:

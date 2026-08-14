@@ -72,6 +72,8 @@
 #include "UIUtils.h"
 #include "UIVolumePage.h"
 
+#include <vector>
+
 
 //========================================================================
 
@@ -112,6 +114,12 @@ namespace SwgCuiStatusGroundNamespace
 	}
 
 	const std::string IconFocusName = "IconFocus";
+
+	bool isFactionalCombatCreature(CreatureObject const & creature)
+	{
+		uint32 const faction = creature.getPvpFaction();
+		return PvpData::isImperialFactionId(faction) || PvpData::isRebelFactionId(faction);
+	}
 
 	namespace PopupIds
 	{
@@ -463,6 +471,213 @@ namespace SwgCuiStatusGroundNamespace
 
 using namespace SwgCuiStatusGroundNamespace;
 
+namespace
+{
+	const UILowerString s_hamEnhanceLayoutRoot("HamEnhanceLayoutRoot");
+	const UILowerString s_hamEnhanceHideStates("HamEnhanceHideStates");
+
+	struct HamEnhancePropertyPair
+	{
+		UILowerString standardName;
+		UILowerString enhancedName;
+		UILowerString targetName;
+	};
+
+	const HamEnhancePropertyPair s_hamEnhancePropertyPairs[] =
+	{
+		{ UILowerString("HamStandardMinimumSize"), UILowerString("HamEnhancedMinimumSize"), UIWidget::PropertyName::MinimumSize },
+		{ UILowerString("HamStandardMaximumSize"), UILowerString("HamEnhancedMaximumSize"), UIWidget::PropertyName::MaximumSize },
+		{ UILowerString("HamStandardSize"), UILowerString("HamEnhancedSize"), UIWidget::PropertyName::Size },
+		{ UILowerString("HamStandardScrollExtent"), UILowerString("HamEnhancedScrollExtent"), UIWidget::PropertyName::ScrollExtent },
+		// Location must follow Size. SetLocation() captures far-edge packing
+		// metadata from the widget's current dimensions; capturing it before a
+		// target HAM width transition makes the next parent pack move the HAM.
+		{ UILowerString("HamStandardLocation"), UILowerString("HamEnhancedLocation"), UIWidget::PropertyName::Location },
+		{ UILowerString("HamStandardPackSize"), UILowerString("HamEnhancedPackSize"), UIWidget::PropertyName::PackSize }
+	};
+
+	bool isRuntimeSizedHamWidget(UIWidget const & widget)
+	{
+		// These leaves are resized every update from the live HAM values.  Their
+		// containing row/NormalMax/inner pages own the toggle geometry; restoring
+		// an authored width here would replace the actual fill percentage.
+		return widget.IsName("Current") ||
+			widget.IsName("CurrentMax") ||
+			widget.IsName("RecentCurrent") ||
+			widget.IsName("CurrentTick");
+	}
+
+	UIPage * findHamEnhanceLayoutRoot(UIPage & page)
+	{
+		UIBaseObject * object = &page;
+		while (object)
+		{
+			UIPage * const candidate = dynamic_cast<UIPage *>(object);
+			bool isLayoutRoot = false;
+			if (candidate && candidate->GetPropertyBoolean(s_hamEnhanceLayoutRoot, isLayoutRoot) && isLayoutRoot)
+				return candidate;
+			object = object->GetParent();
+		}
+		return 0;
+	}
+
+	void collectHamEnhanceLayoutWidgets(UIBaseObject & object, std::vector<UIWidget *> & widgets)
+	{
+		UIWidget * const widget = dynamic_cast<UIWidget *>(&object);
+		if (widget && !isRuntimeSizedHamWidget(*widget))
+		{
+			std::string ignored;
+			for (size_t i = 0; i < sizeof(s_hamEnhancePropertyPairs) / sizeof(s_hamEnhancePropertyPairs[0]); ++i)
+			{
+				if (widget->GetPropertyNarrow(s_hamEnhancePropertyPairs[i].standardName, ignored))
+				{
+					widgets.push_back(widget);
+					break;
+				}
+			}
+		}
+
+		UIBaseObject::UIObjectList children;
+		object.GetChildren(children);
+		for (UIBaseObject::UIObjectList::iterator i = children.begin(); i != children.end(); ++i)
+			collectHamEnhanceLayoutWidgets(**i, widgets);
+	}
+}
+
+class SwgCuiStatusGroundHamEnhanceState
+{
+public:
+	explicit SwgCuiStatusGroundHamEnhanceState(UIPage & root) :
+		m_root(&root),
+		m_widgets(),
+		m_layoutProbes()
+	{
+		collectHamEnhanceLayoutWidgets(root, m_widgets);
+
+		// The imported standard/enhanced layouts contain exact geometry for the
+		// status root and its H/A/M(/F) rows. Keep the outer root out of the legacy
+		// packing passes while locating the immediate HAM composite below.
+		m_root->SetDoNotPackChildren(true);
+		m_layoutProbes = m_widgets;
+
+		UIPage * hamPage = 0;
+		for (std::vector<UIWidget *>::iterator widgetIterator = m_widgets.begin(); widgetIterator != m_widgets.end(); ++widgetIterator)
+		{
+			UIPage * const page = dynamic_cast<UIPage *>(*widgetIterator);
+			if (page && page->IsName("ham"))
+			{
+				hamPage = page;
+				break;
+			}
+		}
+
+		if (hamPage)
+		{
+			// Protect the full container chain, not only the immediate HAM page.
+			// Target has status/composite ancestors whose horizontal Fill pass is
+			// dirtied whenever the buff/state volume changes visibility. Letting
+			// either ancestor pack would resize the authored target column after an
+			// off/on/off cycle; target-of-target duplicates the same hierarchy.
+			for (UIBaseObject * boundary = hamPage; boundary && boundary != m_root; boundary = boundary->GetParent())
+			{
+				UIPage * const boundaryPage = dynamic_cast<UIPage *>(boundary);
+				if (boundaryPage)
+					boundaryPage->SetDoNotPackChildren(true);
+			}
+		}
+	}
+
+	bool isLayoutApplied(bool enabled) const
+	{
+		// Validate every structural pair in both axes.  A horizontal shrink-wrap
+		// can leave all Y values correct while collapsing the rows back to their
+		// retail width; a vertical shrink-wrap clips Mind.  Runtime-sized fill
+		// leaves are excluded from m_layoutProbes so their live percentages remain
+		// authoritative.
+		for (std::vector<UIWidget *>::const_iterator widgetIterator = m_layoutProbes.begin(); widgetIterator != m_layoutProbes.end(); ++widgetIterator)
+		{
+			UIWidget const * const widget = *widgetIterator;
+			for (size_t i = 0; i < sizeof(s_hamEnhancePropertyPairs) / sizeof(s_hamEnhancePropertyPairs[0]); ++i)
+			{
+				HamEnhancePropertyPair const & propertyPair = s_hamEnhancePropertyPairs[i];
+				UILowerString const & sourceName = enabled ? propertyPair.enhancedName : propertyPair.standardName;
+				if (i < 5)
+				{
+					UIPoint expected;
+					if (!widget->GetPropertyPoint(sourceName, expected))
+						continue;
+
+					UIPoint actual;
+					if (!widget->GetPropertyPoint(propertyPair.targetName, actual) || actual != expected)
+						return false;
+				}
+				else
+				{
+					std::string expected;
+					if (!widget->GetPropertyNarrow(sourceName, expected))
+						continue;
+
+					std::string actual;
+					if (!widget->GetPropertyNarrow(propertyPair.targetName, actual) || _stricmp(actual.c_str(), expected.c_str()) != 0)
+						return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	void apply(bool enabled)
+	{
+		for (std::vector<UIWidget *>::iterator widgetIterator = m_widgets.begin(); widgetIterator != m_widgets.end(); ++widgetIterator)
+		{
+			UIWidget * const widget = *widgetIterator;
+			std::string minimumSize;
+			std::string maximumSize;
+			UILowerString const & minimumSourceName = enabled ? s_hamEnhancePropertyPairs[0].enhancedName : s_hamEnhancePropertyPairs[0].standardName;
+			UILowerString const & maximumSourceName = enabled ? s_hamEnhancePropertyPairs[1].enhancedName : s_hamEnhancePropertyPairs[1].standardName;
+			bool const hasMinimumSize = widget->GetPropertyNarrow(minimumSourceName, minimumSize);
+			bool const hasMaximumSize = widget->GetPropertyNarrow(maximumSourceName, maximumSize);
+
+			// Minimum and maximum setters clamp each other. Neutralize the old
+			// minimum before changing a paired maximum so expanding and shrinking
+			// transitions both reach the exact authored target constraints.
+			if (hasMaximumSize)
+			{
+				UISize const unchangedMinimumSize = widget->GetMinimumSize();
+				widget->SetMinimumSize(UISize(0, 0));
+				IGNORE_RETURN(widget->SetPropertyNarrow(UIWidget::PropertyName::MaximumSize, maximumSize));
+				if (hasMinimumSize)
+					IGNORE_RETURN(widget->SetPropertyNarrow(UIWidget::PropertyName::MinimumSize, minimumSize));
+				else
+					widget->SetMinimumSize(unchangedMinimumSize);
+			}
+			else if (hasMinimumSize)
+				IGNORE_RETURN(widget->SetPropertyNarrow(UIWidget::PropertyName::MinimumSize, minimumSize));
+
+			// Size precedes Location in this table so far/center anchored widgets
+			// capture packing metadata from their final dimensions. This order is
+			// required for exact repeated standard/enhanced transitions.
+			for (size_t i = 2; i < sizeof(s_hamEnhancePropertyPairs) / sizeof(s_hamEnhancePropertyPairs[0]); ++i)
+			{
+				HamEnhancePropertyPair const & propertyPair = s_hamEnhancePropertyPairs[i];
+				std::string value;
+				UILowerString const & sourceName = enabled ? propertyPair.enhancedName : propertyPair.standardName;
+				if (widget->GetPropertyNarrow(sourceName, value))
+					IGNORE_RETURN(widget->SetPropertyNarrow(propertyPair.targetName, value));
+			}
+		}
+
+		m_root->SetPackDirty(true);
+		m_root->ForcePackChildren();
+	}
+
+private:
+	UIPage * m_root;
+	std::vector<UIWidget *> m_widgets;
+	std::vector<UIWidget *> m_layoutProbes;
+};
+
 //------------------------------------------------------------------------
 
 SwgCuiStatusGround::SwgCuiStatusGround(UIPage & page, StatusType statusType) :
@@ -513,7 +728,10 @@ m_eliteRightPage(0),
 m_compositePage(0),
 m_debuffStates(0),
 m_speakingIcon(0),
-m_buffIconSettingsChangedCallback(0)
+m_buffIconSettingsChangedCallback(0),
+m_hamEnhanceState(0),
+m_individualUiScaleRoot(0),
+m_hamEnhanceApplied(false)
 {
 	setMediatorDebugName(s_statusTypeNames[statusType]);
 
@@ -728,7 +946,21 @@ m_buffIconSettingsChangedCallback(0)
 
 	m_buffIconSettingsChangedCallback = new BuffIconSettingsChangedCallback (*this);
 
-	page.ForcePackChildren();
+	UIPage * const hamEnhanceLayoutRoot = findHamEnhanceLayoutRoot(page);
+	if (hamEnhanceLayoutRoot)
+	{
+		m_hamEnhanceState = new SwgCuiStatusGroundHamEnhanceState(*hamEnhanceLayoutRoot);
+		std::string individualUiScaleCategory;
+		if (hamEnhanceLayoutRoot->GetPropertyNarrow(UILowerString("IndividualUiScale"), individualUiScaleCategory) &&
+			_stricmp(individualUiScaleCategory.c_str(), "ham") == 0)
+			m_individualUiScaleRoot = hamEnhanceLayoutRoot;
+		// Defer the first authored transition until update() has completed the
+		// legacy visibility and shrink-wrap pass.  Applying here lets the first
+		// update immediately overwrite the restored height before it is rendered.
+		m_hamEnhanceApplied = !CuiPreferences::getHamEnhance();
+	}
+	else
+		page.ForcePackChildren();
 }
 
 //------------------------------------------------------------------------
@@ -742,6 +974,10 @@ SwgCuiStatusGround::~SwgCuiStatusGround()
 	
 	delete m_buffIconSettingsChangedCallback;
 	m_buffIconSettingsChangedCallback = 0;
+
+	delete m_hamEnhanceState;
+	m_hamEnhanceState = 0;
+	m_individualUiScaleRoot = 0;
 
 	for(i = 0; i < SwgCuiStatusGround::HAMBarPageCount; ++i)
 	{
@@ -888,14 +1124,14 @@ bool SwgCuiStatusGround::OnMessage(UIWidget * context, const UIMessage & msg)
 	}
 	if (msg.Type == UIMessage::RightMouseUp)
 	{
-		UIPoint mouse = getPage().GetWorldLocation() + msg.MouseCoords;
+		UIPoint const mouse = context->GetWorldPointFromLocal(msg.MouseCoords);
 		bool overBuffs = false;
 
 		if (m_volumeStates)
 		{
-			UISize const size = m_volumeStates->GetSize();
-			UIPoint const min = m_volumeStates->GetLocation() + getPage().GetWorldLocation();
-			UIPoint const max = min + size;
+			UIRect const worldRect = m_volumeStates->GetWorldRect();
+			UIPoint const min(worldRect.left, worldRect.top);
+			UIPoint const max(worldRect.right, worldRect.bottom);
 			overBuffs = (mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y) && m_volumeStates->GetCellCount().y;
 
 			if (overBuffs)
@@ -904,9 +1140,9 @@ bool SwgCuiStatusGround::OnMessage(UIWidget * context, const UIMessage & msg)
 
 		if (m_debuffStates)
 		{
-			UISize const size = m_debuffStates->GetSize();
-			UIPoint const min = m_debuffStates->GetLocation() + getPage().GetWorldLocation();
-			UIPoint const max = min + size;
+			UIRect const worldRect = m_debuffStates->GetWorldRect();
+			UIPoint const min(worldRect.left, worldRect.top);
+			UIPoint const max(worldRect.right, worldRect.bottom);
 			overBuffs = (mouse.x >= min.x && mouse.x <= max.x && mouse.y >= min.y && mouse.y <= max.y) && m_debuffStates->GetCellCount().y;
 
 			if (overBuffs)
@@ -923,7 +1159,7 @@ bool SwgCuiStatusGround::OnMessage(UIWidget * context, const UIMessage & msg)
 		Object * const obj = NetworkIdManager::getObjectById(m_objectId);
 		if (obj && m_objectId != player->getNetworkId())
 		{
-			CuiMenuInfoHelper * menuHelper = CuiRadialMenuManager::createMenu(*obj, context->GetWorldLocation() + msg.MouseCoords, pop);
+			CuiMenuInfoHelper * menuHelper = CuiRadialMenuManager::createMenu(*obj, context->GetWorldPointFromLocal(msg.MouseCoords), pop);
 
 			if (menuHelper)
 			{
@@ -935,7 +1171,7 @@ bool SwgCuiStatusGround::OnMessage(UIWidget * context, const UIMessage & msg)
 
 				menuHelper->updatePopupMenu (*pop, got);
 
-				pop->SetLocation(context->GetWorldLocation() + msg.MouseCoords);
+				pop->SetLocation(context->GetWorldPointFromLocal(msg.MouseCoords));
 				UIManager::gUIManager().PushContextWidget(*pop);
 				pop->AddCallback(this);
 
@@ -1020,7 +1256,7 @@ bool SwgCuiStatusGround::OnMessage(UIWidget * context, const UIMessage & msg)
 		
 		appendPopupOptions(pop);
 	 
-		pop->SetLocation(context->GetWorldLocation() + msg.MouseCoords);
+		pop->SetLocation(context->GetWorldPointFromLocal(msg.MouseCoords));
 		UIManager::gUIManager().PushContextWidget(*pop);
 		pop->AddCallback(this);
 	}
@@ -1223,7 +1459,7 @@ void SwgCuiStatusGround::update(float deltaTimeSecs)
 					m_isPlayerMounted = creature &&(creature->getRiderDriverCreature() == player);
 
 					// Don't show the ham if the object can't be damaged or is dead.
-					if(shouldShowHam && !creature->isInvulnerable() && creature->getMaxHitPoints() > 0)
+					if(shouldShowHam && (!creature->isInvulnerable() || isFactionalCombatCreature(*creature)) && creature->getMaxHitPoints() > 0)
 					{
 						// Hack for Vehicles having Action and Mind.
 						if(m_isVehicle)
@@ -1299,10 +1535,47 @@ void SwgCuiStatusGround::update(float deltaTimeSecs)
 		}
 	}
 
-	if (m_compositePage) 
+	if (m_compositePage && !m_hamEnhanceState)
 	{
 		m_compositePage->WrapChildren();
 	}
+
+	// Visibility changes and the legacy shrink-wrap pass above can repack the
+	// status hierarchy.  Apply the selected authored HAM layout last so a
+	// standard/enhanced transition cannot be overwritten in the same frame and
+	// clip the final Mind row.  This also makes the runtime-duplicated
+	// target-of-target obey the same final geometry as the primary target.
+	updateHamEnhanceLayout();
+
+	UIPage * const individualUiScaleRoot = getIndividualUiScaleRoot();
+	if (individualUiScaleRoot)
+	{
+		float const uiScale = CuiPreferences::getHamUiScale();
+		if (individualUiScaleRoot->GetScale() != uiScale)
+			individualUiScaleRoot->SetScale(uiScale);
+	}
+}
+
+//------------------------------------------------------------------------
+
+void SwgCuiStatusGround::updateHamEnhanceLayout()
+{
+	if (!m_hamEnhanceState)
+		return;
+
+	bool const enabled = CuiPreferences::getHamEnhance();
+	if (enabled == m_hamEnhanceApplied && m_hamEnhanceState->isLayoutApplied(enabled))
+		return;
+
+	m_hamEnhanceState->apply(enabled);
+	m_hamEnhanceApplied = enabled;
+}
+
+//------------------------------------------------------------------------
+
+UIPage * SwgCuiStatusGround::getIndividualUiScaleRoot() const
+{
+	return m_individualUiScaleRoot;
 }
 //------------------------------------------------------------------------
 
@@ -1361,10 +1634,20 @@ void SwgCuiStatusGround::updateCreatureBuffs(CreatureObject const & creature)
 		if (!m_debuffStates)
 		{
 			bool const hasStatusIcons = (buffStates & (SwgCuiBuffUtils::UBRT_hasBuffs | SwgCuiBuffUtils::UBRT_hasDebufs)) != 0;
-			bool const visibilityChanged = pageSetVisible(m_volumeStates, hasStatusIcons);
-			if (!hasStatusIcons)
+			bool suppressInlineStates = false;
+			if (CuiPreferences::getHamEnhance() && m_individualUiScaleRoot)
+				IGNORE_RETURN(m_individualUiScaleRoot->GetPropertyBoolean(s_hamEnhanceHideStates, suppressInlineStates));
+
+			// Enhanced Target uses the complete 229-pixel backing. Its legacy state
+			// volume occupies the left 114 pixels in the standard layout, so keep the
+			// volume's contents current but do not draw it over the enhanced bars.
+			// Target-of-target duplicates the marked Target root and follows the same
+			// path. Turning enhancement off restores the current icon-driven state on
+			// this very update rather than waiting for another BuffsChanged message.
+			bool const visibilityChanged = pageSetVisible(m_volumeStates, hasStatusIcons && !suppressInlineStates);
+			if (!hasStatusIcons || suppressInlineStates)
 			{
-				if (visibilityChanged)
+				if (visibilityChanged && !suppressInlineStates)
 					getPage().ForcePackChildren();
 				return;
 			}
@@ -1566,22 +1849,12 @@ bool SwgCuiStatusGround::updateTargetHam(CreatureObject const & creature, float 
 	}
 	else
 	{
-		if(creature.isAttackable() || m_isPlayerControlled || (m_statusType == ST_target && creature.getForceShowHam()))
+		if(creature.isAttackable() || isFactionalCombatCreature(creature) || m_isPlayerControlled || (m_statusType == ST_target && creature.getForceShowHam()))
 		{
-			// Publish 14 targets always expose all three combat pools.  Some
-			// restored creatures arrive with an exhausted or not-yet-replicated
-			// Action/Mind current value; that must not collapse their target frame
-			// to the later single-health presentation.
-			if(m_isLookAtTarget ||
-				(creature.getAttribute(Attributes::Action) > 0 &&
-				 creature.getAttribute(Attributes::Mind) > 0))
-			{
-				pageStyle = PS_ham;
-			}
-			else
-			{
-				pageStyle = PS_healthOnly;
-			}
+			// Publish 14 creature targets and overheads always expose all three
+			// combat pools.  Zero or delayed Action/Mind replication must not
+			// switch the mediator to the later single-health presentation.
+			pageStyle = PS_ham;
 		}
 		else
 			pageStyle = PS_greyHealth;

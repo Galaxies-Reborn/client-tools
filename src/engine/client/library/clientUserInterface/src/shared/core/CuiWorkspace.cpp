@@ -28,6 +28,7 @@
 #include <typeinfo>
 #include <vector>
 #include <list>
+#include <cmath>
 
 //----------------------------------------------------------------------
 
@@ -37,6 +38,153 @@ namespace
 	//-- workspace edge attraction
 	
 	const long EDGE_ATTRACTION_THRESHOLD = 4;
+
+	struct WorkspaceFloatPoint
+	{
+		float x;
+		float y;
+
+		WorkspaceFloatPoint (float newX, float newY) : x (newX), y (newY) {}
+	};
+
+	long roundWorkspaceCoordinate (float value)
+	{
+		return static_cast<long> (value >= 0.0f ? std::floor (value + 0.5f) : std::ceil (value - 0.5f));
+	}
+
+	bool transformWidgetParentPointToWorkspace (
+		const UIPage & workspace,
+		const UIWidget & widget,
+		WorkspaceFloatPoint & point)
+	{
+		const UIWidget * current = widget.GetParentWidget ();
+		if (!current)
+			return false;
+
+		while (current && current != &workspace)
+		{
+			const float scale = current->GetScale ();
+			point.x = static_cast<float> (current->GetLocation ().x) + scale *
+				(point.x - static_cast<float> (current->GetScrollLocation ().x));
+			point.y = static_cast<float> (current->GetLocation ().y) + scale *
+				(point.y - static_cast<float> (current->GetScrollLocation ().y));
+			current = current->GetParentWidget ();
+		}
+
+		if (current != &workspace)
+			return false;
+
+		// Workspace coordinates describe the visible viewport, not its scrolled
+		// content.  Ancestors (including a scaled workspace) cancel here.
+		point.x -= static_cast<float> (workspace.GetScrollLocation ().x);
+		point.y -= static_cast<float> (workspace.GetScrollLocation ().y);
+		return true;
+	}
+
+	bool transformWorkspacePointToWidgetParent (
+		const UIPage & workspace,
+		const UIWidget & widget,
+		WorkspaceFloatPoint & point)
+	{
+		typedef std::vector<const UIWidget *> WidgetPath;
+		WidgetPath path;
+
+		const UIWidget * current = widget.GetParentWidget ();
+		while (current && current != &workspace)
+		{
+			path.push_back (current);
+			current = current->GetParentWidget ();
+		}
+
+		if (current != &workspace)
+			return false;
+
+		point.x += static_cast<float> (workspace.GetScrollLocation ().x);
+		point.y += static_cast<float> (workspace.GetScrollLocation ().y);
+
+		for (WidgetPath::const_reverse_iterator iterator = path.rbegin (); iterator != path.rend (); ++iterator)
+		{
+			const UIWidget & parent = **iterator;
+			const float scale = parent.GetScale ();
+			if (scale <= 0.0f)
+				return false;
+
+			point.x = (point.x - static_cast<float> (parent.GetLocation ().x)) / scale +
+				static_cast<float> (parent.GetScrollLocation ().x);
+			point.y = (point.y - static_cast<float> (parent.GetLocation ().y)) / scale +
+				static_cast<float> (parent.GetScrollLocation ().y);
+		}
+
+		return true;
+	}
+
+	UIRect getVisualWorkspaceRect (
+		const UIPage & workspace,
+		const UIWidget & widget,
+		const UIRect & logicalRect)
+	{
+		const float widgetScale = widget.GetScale ();
+		WorkspaceFloatPoint topLeft (
+			static_cast<float> (logicalRect.left),
+			static_cast<float> (logicalRect.top));
+		WorkspaceFloatPoint bottomRight (
+			static_cast<float> (logicalRect.left) + widgetScale * static_cast<float> (logicalRect.Width ()),
+			static_cast<float> (logicalRect.top) + widgetScale * static_cast<float> (logicalRect.Height ()));
+
+		if (!transformWidgetParentPointToWorkspace (workspace, widget, topLeft) ||
+			!transformWidgetParentPointToWorkspace (workspace, widget, bottomRight))
+		{
+			return logicalRect;
+		}
+
+		return UIRect (
+			static_cast<long> (std::floor (topLeft.x)),
+			static_cast<long> (std::floor (topLeft.y)),
+			static_cast<long> (std::ceil (bottomRight.x)),
+			static_cast<long> (std::ceil (bottomRight.y)));
+	}
+
+	UIRect getLogicalWidgetRect (
+		const UIPage & workspace,
+		const UIWidget & widget,
+		const UIRect & visualRect,
+		const UIRect & originalLogicalRect,
+		const UIRect & originalVisualRect)
+	{
+		WorkspaceFloatPoint topLeft (
+			static_cast<float> (visualRect.left),
+			static_cast<float> (visualRect.top));
+		WorkspaceFloatPoint bottomRight (
+			static_cast<float> (visualRect.right),
+			static_cast<float> (visualRect.bottom));
+
+		if (!transformWorkspacePointToWidgetParent (workspace, widget, topLeft) ||
+			!transformWorkspacePointToWidgetParent (workspace, widget, bottomRight))
+		{
+			return visualRect;
+		}
+
+		UISize logicalSize (originalLogicalRect.Size ());
+		const float widgetScale = widget.GetScale ();
+		if (widgetScale > 0.0f)
+		{
+			// A snap is a move, so retain the exact logical size instead of
+			// round-tripping it through display scale.  Squash is the one path
+			// that intentionally changes a dimension.
+			if (visualRect.Width () != originalVisualRect.Width ())
+			{
+				logicalSize.x = std::max (0L, roundWorkspaceCoordinate ((bottomRight.x - topLeft.x) / widgetScale));
+			}
+			if (visualRect.Height () != originalVisualRect.Height ())
+			{
+				logicalSize.y = std::max (0L, roundWorkspaceCoordinate ((bottomRight.y - topLeft.y) / widgetScale));
+			}
+		}
+
+		return UIRect (
+			UIPoint (roundWorkspaceCoordinate (topLeft.x), roundWorkspaceCoordinate (topLeft.y)),
+			logicalSize);
+	}
 }
 
 //-----------------------------------------------------------------
@@ -695,11 +843,13 @@ const UIRect CuiWorkspace::findClosestWidgetEdges  (const UIWidget * context, co
 	for (MediatorSet::iterator it = m_mediators->begin (); it != m_mediators->end (); ++it)
 	{
 		const UIPage & page = (*it)->getPage ();
-		
-		if (!page.IsVisible () || !page.GetsInput () || page.GetSize () == workspaceSize || &page == context)
+
+		if (!page.IsVisible () || !page.GetsInput () || &page == context)
 			continue;
-		
-		const UIRect rect (page.GetRect ());
+
+		const UIRect rect (getVisualWorkspaceRect (m_page, page, page.GetRect ()));
+		if (rect.Size () == workspaceSize)
+			continue;
 		
 		if ((rect.left < targetRect.right && rect.right > targetRect.left) ||
 			(rect.right > targetRect.left && rect.left < targetRect.right))
@@ -770,27 +920,31 @@ const UIRect CuiWorkspace::pushRectToWindowEdges (const UIRect & targetRect, con
 
 const UIRect CuiWorkspace::autoPositionMovingRect (UIWidget * context, const UIRect & targetRect, bool squash) const
 {
-	const UIRect & closestEdges = findClosestWidgetEdges (context, targetRect);
-	const UIRect & finalRect    = pushRectToWindowEdges  (targetRect, closestEdges);
+	const UIRect visualTargetRect (context ? getVisualWorkspaceRect (m_page, *context, targetRect) : targetRect);
+	const UIRect & closestEdges = findClosestWidgetEdges (context, visualTargetRect);
+	const UIRect & finalRect    = pushRectToWindowEdges  (visualTargetRect, closestEdges);
 	UIRect resultRect (finalRect);
 
 	if (squash)
 	{
-		resultRect.left   = std::max (finalRect.left,   targetRect.left);
-		resultRect.top    = std::max (finalRect.top,    targetRect.top);
-		resultRect.right  = std::min (finalRect.right,  targetRect.right);
-		resultRect.bottom = std::min (finalRect.bottom, targetRect.bottom);
+		resultRect.left   = std::max (finalRect.left,   visualTargetRect.left);
+		resultRect.top    = std::max (finalRect.top,    visualTargetRect.top);
+		resultRect.right  = std::min (finalRect.right,  visualTargetRect.right);
+		resultRect.bottom = std::min (finalRect.bottom, visualTargetRect.bottom);
 	}
 	else
 		resultRect = finalRect;
 
 	if (context)
 	{
-		context->SetRect (resultRect);
-		UIRect actualRect = context->GetRect ();
-
-
-		context->SetRect (actualRect);
+		const UIRect logicalResultRect (getLogicalWidgetRect (
+			m_page,
+			*context,
+			resultRect,
+			targetRect,
+			visualTargetRect));
+		context->SetRect (logicalResultRect);
+		resultRect = context->GetRect ();
 
 		if (m_mediatorFocused && &m_mediatorFocused->getPage () == context)
 			updateGlowRect ();
@@ -1031,7 +1185,9 @@ void CuiWorkspace::positionMediator     (CuiMediator & mediator, const UIPoint &
 
 void CuiWorkspace::positionMediator     (CuiMediator & mediator)
 {
-	positionMediator (mediator, UIManager::gUIManager ().GetLastMouseCoord ());
+	const UIPoint workspacePoint = m_page.GetLocalPointFromWorld (UIManager::gUIManager ().GetLastMouseCoord ()) +
+		m_page.GetScrollLocation ();
+	positionMediator (mediator, workspacePoint);
 }
 
 //----------------------------------------------------------------------

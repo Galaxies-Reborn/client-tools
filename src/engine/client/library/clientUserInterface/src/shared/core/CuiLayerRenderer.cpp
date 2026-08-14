@@ -49,8 +49,9 @@ namespace CuiLayerRendereNamespace
 	bool                      s_installed;
 	DynamicVertexBuffer *     s_vertexBuffer = 0;
 
-	//-- Why the queue flushed. Each flush is a draw call, and the three reasons need different
-	//   fixes, so counting them decides which fix is worth building.
+	//-- Why the queue flushed. This is deliberately a debug-only diagnostic: the reporting path
+	//   synchronously flushes warning.log and can stall the main/render thread in a Release client.
+#if defined(_DEBUG)
 	int s_flushShaderChange;
 	int s_flushVertexType;
 	int s_flushBufferFull;
@@ -97,6 +98,15 @@ namespace CuiLayerRendereNamespace
 		else
 			++s_flushOther;
 	}
+#else
+	inline void noteFlushShader (void const *)
+	{
+	}
+
+	inline void noteFlushReason (bool, bool, bool)
+	{
+	}
+#endif
 	VertexBufferWriteIterator s_vertexBufferWriteIterator;
 	int                       s_numberOfVertices;
 	int                       s_maxNumberOfVertices;
@@ -528,7 +538,11 @@ void CuiLayerRenderer::renderTriangles (const Shader * shader, int numTris, cons
 	}
 
 	const real pixOffset = CuiManager::getPixelOffset ();
-	const float uiScale = Graphics::getUiCanvasScale(); // see renderPointsGeneric for rationale
+	// UIPie is the only triangle producer.  It sends vertices through
+	// UICanvas::Transform first, so these coordinates already include both
+	// global and individual widget scale and are physical render-target
+	// pixels.  Applying Graphics::getUiCanvasScale here a second time makes
+	// cooldown wedges detach from scaled toolbar slots.
 
 	uint32 const color32 = color.convertToUint32NoClamp();
 
@@ -537,7 +551,7 @@ void CuiLayerRenderer::renderTriangles (const Shader * shader, int numTris, cons
 		const UITriangle & tri = tris  [i];
 		const UITriangle & uv  = uvs   [i];
 
-		s_vertexBufferWriteIterator.setPosition((tri.p1.x + pixOffset) * uiScale, (tri.p1.y + pixOffset) * uiScale, s_z);
+		s_vertexBufferWriteIterator.setPosition(tri.p1.x + pixOffset, tri.p1.y + pixOffset, s_z);
 		s_vertexBufferWriteIterator.setOoz(s_ooz);
 		s_vertexBufferWriteIterator.setColor0(color32);
 		s_vertexBufferWriteIterator.setTextureCoordinates(0, uv.p1.x, uv.p1.y);
@@ -545,7 +559,7 @@ void CuiLayerRenderer::renderTriangles (const Shader * shader, int numTris, cons
 		++s_numberOfVertices;
 
 
-		s_vertexBufferWriteIterator.setPosition((tri.p2.x + pixOffset) * uiScale, (tri.p2.y + pixOffset) * uiScale, s_z);
+		s_vertexBufferWriteIterator.setPosition(tri.p2.x + pixOffset, tri.p2.y + pixOffset, s_z);
 		s_vertexBufferWriteIterator.setOoz(s_ooz);
 		s_vertexBufferWriteIterator.setColor0(color32);
 		s_vertexBufferWriteIterator.setTextureCoordinates(0, uv.p2.x, uv.p2.y);
@@ -553,7 +567,7 @@ void CuiLayerRenderer::renderTriangles (const Shader * shader, int numTris, cons
 		++s_numberOfVertices;
 
 
-		s_vertexBufferWriteIterator.setPosition((tri.p3.x + pixOffset) * uiScale, (tri.p3.y + pixOffset) * uiScale, s_z);
+		s_vertexBufferWriteIterator.setPosition(tri.p3.x + pixOffset, tri.p3.y + pixOffset, s_z);
 		s_vertexBufferWriteIterator.setOoz(s_ooz);
 		s_vertexBufferWriteIterator.setColor0(color32);
 		s_vertexBufferWriteIterator.setTextureCoordinates(0, uv.p3.x, uv.p3.y);
@@ -620,8 +634,9 @@ void CuiLayerRenderer::flushRenderQueueQuads ()
 	DEBUG_FATAL(!s_vertexBuffer, ("not installed"));
 	DEBUG_FATAL (s_numberOfVertices == 0, ("vertex info is empty\n"));
 
-	//-- Every flush here is a draw call. Report what caused them, because a buffer-full flush is
-	//   fixed by a bigger buffer while a shader-change flush needs an atlas or a draw-order change.
+	//-- Every flush here is a draw call. Keep the profiling report out of Release builds: WARNING
+	//   performs synchronous file I/O and this function can execute hundreds of times per frame.
+#if defined(_DEBUG)
 	if (++s_flushReportFrames >= 600)
 	{
 		const int total = s_flushShaderChange + s_flushVertexType + s_flushBufferFull + s_flushOther;
@@ -643,6 +658,7 @@ void CuiLayerRenderer::flushRenderQueueQuads ()
 		s_flushOther = 0;
 		s_flushReportFrames = 0;
 	}
+#endif
 
 #if PRODUCTION == 0
 	++s_metrics.quadCallCount;

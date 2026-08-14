@@ -35,6 +35,7 @@
 #include "clientSkeletalAnimation/SkeletalAppearance2.h"
 #include "clientUserInterface/CuiActionManager.h"
 #include "clientUserInterface/CuiActions.h"
+#include "clientUserInterface/CuiIconManager.h"
 #include "clientUserInterface/CuiIconManagerObjectProperties.h"
 #include "clientUserInterface/CuiInventoryManager.h"
 #include "clientUserInterface/CuiPreferences.h"
@@ -307,7 +308,12 @@ void SwgCuiInventoryInfo::setInfoObject (Object * object, bool requestAttributeU
 			m_viewer->setCameraPitch          (m_defaultViewerPitch);
 
 		m_viewer->setCameraForceTarget   (true);
-		m_viewer->setObject              (object);
+		m_viewer->clearObjects();
+		if (object)
+		{
+			Object * const renderObject = CuiIconManager::getObjectPreviewRenderObject(*object);
+			m_viewer->addObject(*object, *renderObject);
+		}
 
 		if (changingObject)
 		{
@@ -517,6 +523,17 @@ void SwgCuiInventoryInfo::update (float)
 	ClientObject * const clientObject = m_watcher->getPointer ()->asClientObject ();	
 	if (!clientObject)
 		return;
+
+	if (m_viewer && m_viewer->getLastObject() == clientObject)
+	{
+		Object * const renderObject = CuiIconManager::getObjectPreviewRenderObject(*clientObject);
+		if (renderObject != m_viewer->getLastRenderObject())
+		{
+			m_viewer->clearObjects();
+			m_viewer->addObject(*clientObject, *renderObject);
+			m_viewer->recomputeZoom();
+		}
+	}
 
 	if (m_objectProperties->updateAndCompareFromObject (*clientObject))
 		setInfoObject (clientObject, true);

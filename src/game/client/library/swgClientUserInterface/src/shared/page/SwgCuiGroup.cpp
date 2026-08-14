@@ -13,6 +13,7 @@
 #include "clientGame/Game.h"
 #include "clientGame/GroupObject.h"
 #include "clientUserInterface/CuiRadialMenuManager.h"
+#include "clientUserInterface/CuiPreferences.h"
 #include "clientUserInterface/CuiSettings.h"
 #include "clientUserInterface/CuiStringIdsGroup.h"
 #include "clientUserInterface/CuiWorkspace.h"
@@ -37,6 +38,7 @@
 #include "UIUtils.h"
 
 #include <algorithm>
+#include <vector>
 
 //======================================================================
 
@@ -76,9 +78,61 @@ namespace SwgCuiGroupNamespace
 	
 	UIScalar const s_maxGroupSize = 8;
 	UIScalar const s_minGroupSize = 1;
+	UIScalar const s_groupWindowChromeHeight = 5;
 
 	Unicode::String s_timerString;
 	bool s_groupPickupTimerActive = false;
+
+	const UILowerString s_hamEnhanceLayoutRoot("HamEnhanceLayoutRoot");
+
+	struct HamEnhancePropertyPair
+	{
+		UILowerString standardName;
+		UILowerString enhancedName;
+		UILowerString targetName;
+	};
+
+	const HamEnhancePropertyPair s_hamEnhancePropertyPairs[] =
+	{
+		{ UILowerString("HamStandardMinimumSize"), UILowerString("HamEnhancedMinimumSize"), UIWidget::PropertyName::MinimumSize },
+		{ UILowerString("HamStandardMaximumSize"), UILowerString("HamEnhancedMaximumSize"), UIWidget::PropertyName::MaximumSize },
+		{ UILowerString("HamStandardLocation"), UILowerString("HamEnhancedLocation"), UIWidget::PropertyName::Location },
+		{ UILowerString("HamStandardSize"), UILowerString("HamEnhancedSize"), UIWidget::PropertyName::Size },
+		{ UILowerString("HamStandardScrollExtent"), UILowerString("HamEnhancedScrollExtent"), UIWidget::PropertyName::ScrollExtent },
+		{ UILowerString("HamStandardPackSize"), UILowerString("HamEnhancedPackSize"), UIWidget::PropertyName::PackSize },
+		{ UILowerString("HamStandardSizeIncrement"), UILowerString("HamEnhancedSizeIncrement"), UIWidget::PropertyName::SizeIncrement }
+	};
+
+	void collectGroupHamEnhanceLayoutWidgets(UIBaseObject & object, std::vector<UIWidget *> & widgets, bool const isRoot)
+	{
+		UIWidget * const widget = dynamic_cast<UIWidget *>(&object);
+		if (widget)
+		{
+			bool isMemberLayoutRoot = false;
+			if (!isRoot && widget->GetPropertyBoolean(s_hamEnhanceLayoutRoot, isMemberLayoutRoot) && isMemberLayoutRoot)
+				return;
+
+			std::string ignored;
+			for (size_t i = 0; i < sizeof(s_hamEnhancePropertyPairs) / sizeof(s_hamEnhancePropertyPairs[0]); ++i)
+			{
+				if (widget->GetPropertyNarrow(s_hamEnhancePropertyPairs[i].standardName, ignored))
+				{
+					widgets.push_back(widget);
+					break;
+				}
+			}
+		}
+
+		UIBaseObject::UIObjectList children;
+		object.GetChildren(children);
+		for (UIBaseObject::UIObjectList::iterator i = children.begin(); i != children.end(); ++i)
+			collectGroupHamEnhanceLayoutWidgets(**i, widgets, false);
+	}
+
+	bool compareGroupMemberVerticalPosition(UIPage const * lhs, UIPage const * rhs)
+	{
+		return lhs->GetLocation().y < rhs->GetLocation().y;
+	}
 }
 
 //======================================================================
@@ -99,6 +153,88 @@ using namespace SwgCuiGroupNamespace;
 
 //======================================================================
 
+class SwgCuiGroupHamEnhanceState
+{
+public:
+	explicit SwgCuiGroupHamEnhanceState(UIPage & root) :
+		m_root(&root),
+		m_widgets()
+	{
+		collectGroupHamEnhanceLayoutWidgets(root, m_widgets, true);
+	}
+
+	void apply(bool const enabled)
+	{
+		for (std::vector<UIWidget *>::iterator widgetIterator = m_widgets.begin(); widgetIterator != m_widgets.end(); ++widgetIterator)
+		{
+			UIWidget * const widget = *widgetIterator;
+			std::string minimumSize;
+			std::string maximumSize;
+			std::string sizeIncrement;
+			UILowerString const & minimumSourceName = enabled ? s_hamEnhancePropertyPairs[0].enhancedName : s_hamEnhancePropertyPairs[0].standardName;
+			UILowerString const & maximumSourceName = enabled ? s_hamEnhancePropertyPairs[1].enhancedName : s_hamEnhancePropertyPairs[1].standardName;
+			HamEnhancePropertyPair const & sizeIncrementPair = s_hamEnhancePropertyPairs[sizeof(s_hamEnhancePropertyPairs) / sizeof(s_hamEnhancePropertyPairs[0]) - 1];
+			UILowerString const & sizeIncrementSourceName = enabled ? sizeIncrementPair.enhancedName : sizeIncrementPair.standardName;
+			bool const hasMinimumSize = widget->GetPropertyNarrow(minimumSourceName, minimumSize);
+			bool const hasMaximumSize = widget->GetPropertyNarrow(maximumSourceName, maximumSize);
+			bool const hasSizeIncrement = widget->GetPropertyNarrow(sizeIncrementSourceName, sizeIncrement);
+
+			// SetSize() quantizes against the current SizeIncrement.  The authored
+			// standard/enhanced party heights differ by 30 pixels while their row
+			// increments differ by the same amount, so neither transition is exact
+			// if the old increment remains active.  Temporarily use unit increments,
+			// apply all geometry, then restore the target authored increment last.
+			if (hasSizeIncrement)
+				widget->SetSizeIncrement(UISize(1, 1));
+
+			if (hasMaximumSize)
+			{
+				UISize const unchangedMinimumSize = widget->GetMinimumSize();
+				widget->SetMinimumSize(UISize(0, 0));
+				IGNORE_RETURN(widget->SetPropertyNarrow(UIWidget::PropertyName::MaximumSize, maximumSize));
+				if (hasMinimumSize)
+					IGNORE_RETURN(widget->SetPropertyNarrow(UIWidget::PropertyName::MinimumSize, minimumSize));
+				else
+					widget->SetMinimumSize(unchangedMinimumSize);
+			}
+			else if (hasMinimumSize)
+			{
+				// A one-row group can have a runtime maximum smaller than the
+				// enhanced authored minimum.  Open the upper bound while applying
+				// the minimum, then restore it; SetMaximumSize keeps it at least as
+				// large as the new minimum until resizeGroupWindow sets the exact
+				// row-stack height.
+				UISize const unchangedMaximumSize = widget->GetMaximumSize();
+				widget->SetMaximumSize(UISize(16384, 16384));
+				IGNORE_RETURN(widget->SetPropertyNarrow(UIWidget::PropertyName::MinimumSize, minimumSize));
+				widget->SetMaximumSize(unchangedMaximumSize);
+			}
+
+			size_t const propertyPairCount = sizeof(s_hamEnhancePropertyPairs) / sizeof(s_hamEnhancePropertyPairs[0]);
+			for (size_t i = 2; i < propertyPairCount - 1; ++i)
+			{
+				HamEnhancePropertyPair const & propertyPair = s_hamEnhancePropertyPairs[i];
+				std::string value;
+				UILowerString const & sourceName = enabled ? propertyPair.enhancedName : propertyPair.standardName;
+				if (widget->GetPropertyNarrow(sourceName, value))
+					IGNORE_RETURN(widget->SetPropertyNarrow(propertyPair.targetName, value));
+			}
+
+			if (hasSizeIncrement)
+				IGNORE_RETURN(widget->SetPropertyNarrow(sizeIncrementPair.targetName, sizeIncrement));
+		}
+
+		m_root->SetPackDirty(true);
+		m_root->ForcePackChildren();
+	}
+
+private:
+	UIPage * m_root;
+	std::vector<UIWidget *> m_widgets;
+};
+
+//======================================================================
+
 SwgCuiGroup::SwgCuiGroup(UIPage & page) :
 SwgCuiLockableMediator("SwgCuiGroup", page),
 m_sample(0),
@@ -110,7 +246,9 @@ m_heightManuallySet(false),
 m_sceneType(static_cast<int>(Game::getHudSceneType())),
 m_timerPage(NULL),
 m_timerText(NULL),
-m_timerBar(NULL)
+m_timerBar(NULL),
+m_hamEnhanceState(NULL),
+m_hamEnhanceApplied(false)
 {
 	{
 		UIPage * sample = 0;
@@ -126,6 +264,10 @@ m_timerBar(NULL)
 			getPage().RemoveChild(sample);
 		}
 	}
+
+	m_hamEnhanceState = new SwgCuiGroupHamEnhanceState(getPage());
+	m_hamEnhanceApplied = !CuiPreferences::getHamEnhance();
+	updateHamEnhanceLayout();
 
 	m_callback->connect(*this, &SwgCuiGroup::onMembersChanged, static_cast<GroupObject::Messages::MembersChanged*>(0));
 	m_callback->connect(*this, &SwgCuiGroup::onMemberAdded, static_cast<GroupObject::Messages::MemberAdded*>(0));
@@ -163,6 +305,9 @@ SwgCuiGroup::~SwgCuiGroup()
 	m_timerPage = 0;
 	m_timerBar = 0;
 	m_timerText = 0;
+
+	delete m_hamEnhanceState;
+	m_hamEnhanceState = 0;
 
 	delete m_mfds;
 	m_mfds = 0;
@@ -238,6 +383,12 @@ void SwgCuiGroup::performDeactivate()
 
 void SwgCuiGroup::update(float deltaTimeSecs)
 {
+	updateHamEnhanceLayout();
+
+	float const uiScale = CuiPreferences::getPartyUiScale();
+	if (getPage().GetScale() != uiScale)
+		getPage().SetScale(uiScale);
+
 	CuiMediator::update(deltaTimeSecs);
 
 	bool const showPage = !m_mfds->empty();
@@ -429,7 +580,7 @@ bool SwgCuiGroup::OnMessage(UIWidget * context, const UIMessage & msg)
 			
 			appendPopupOptions (pop);
 
-			pop->SetLocation(context->GetWorldLocation() + msg.MouseCoords);
+			pop->SetLocation(context->GetWorldPointFromLocal(msg.MouseCoords));
 			UIManager::gUIManager().PushContextWidget(*pop);
 			pop->AddCallback(this);
 			return false;
@@ -711,7 +862,8 @@ void SwgCuiGroup::resizeGroupWindow(int numElements)
 {
 	// RLS TODO - Fix composite code so we can use a composite here.
 	UIScalar const windowSize = clamp(s_minGroupSize, static_cast<UIScalar>(numElements), s_maxGroupSize);
-	UIScalar const height = getPage().GetSizeIncrement().y * windowSize;
+	UISize const sizeIncrement = getPage().GetSizeIncrement();
+	UIScalar const height = sizeIncrement.y * windowSize + s_groupWindowChromeHeight;
 
 	UISize maxSize = getPage().GetMaximumSize();
 	
@@ -728,9 +880,41 @@ void SwgCuiGroup::resizeGroupWindow(int numElements)
 		maxSize.y += m_timerPage->GetSize().y;
 	}
 
+	// SetSize quantizes relative to the current SizeIncrement.  Use unit
+	// increments while applying the exact authored row stack plus the five
+	// pixel window chrome, then restore the standard/enhanced row increment.
+	getPage().SetSizeIncrement(UISize(1, 1));
 	getPage().SetMaximumSize(maxSize);
 	getPage().SetSize(maxSize);
+	getPage().SetSizeIncrement(sizeIncrement);
 	getPage().SetPackDirty(true);
+}
+
+//----------------------------------------------------------------------
+
+void SwgCuiGroup::updateHamEnhanceLayout()
+{
+	if (!m_hamEnhanceState)
+		return;
+
+	bool const enabled = CuiPreferences::getHamEnhance();
+	if (enabled == m_hamEnhanceApplied)
+		return;
+
+	std::vector<UIPage *> memberPages;
+	memberPages.reserve(m_mfds->size());
+	for (MfdStatusVector::iterator i = m_mfds->begin(); i != m_mfds->end(); ++i)
+		memberPages.push_back(&i->second->getPage());
+	std::sort(memberPages.begin(), memberPages.end(), compareGroupMemberVerticalPosition);
+
+	m_hamEnhanceState->apply(enabled);
+	m_hamEnhanceApplied = enabled;
+
+	UIScalar const rowHeight = getPage().GetSizeIncrement().y;
+	for (size_t i = 0; i < memberPages.size(); ++i)
+		memberPages[i]->SetLocation(0, static_cast<UIScalar>(i) * rowHeight);
+
+	resizeGroupWindow(static_cast<int>(memberPages.size()));
 }
 
 //----------------------------------------------------------------------

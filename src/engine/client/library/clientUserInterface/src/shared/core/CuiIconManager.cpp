@@ -20,6 +20,7 @@
 #include "clientGame/MoodManagerClient.h"
 #include "clientGame/ObjectAttributeManager.h"
 #include "clientGame/ResourceContainerObject.h"
+#include "clientGraphics/RenderWorld.h"
 #include "clientObject/SpriteAppearance.h"
 #include "clientUserInterface/CuiCombatManager.h"
 #include "clientUserInterface/CuiDragInfo.h"
@@ -31,16 +32,25 @@
 #include "clientUserInterface/CuiSocialsManager.h"
 #include "clientUserInterface/CuiWidget3dObjectListViewer.h"
 #include "sharedFoundation/Crc.h"
+#include "sharedFoundation/ConstCharCrcString.h"
+#include "sharedFoundation/Watcher.h"
 #include "sharedGame/Command.h"
 #include "sharedGame/CommandTable.h"
 #include "sharedGame/GameObjectTypes.h"
 #include "sharedGame/MoodManager.h"
 #include "sharedGame/ObjectUsabilityManager.h"
 #include "sharedGame/SharedMissionObjectTemplate.h"
+#include "sharedGame/SharedObjectTemplate.h"
 #include "sharedGame/SharedResourceContainerObjectTemplate.h"
 #include "sharedGame/SharedWaypointObjectTemplate.h"
 #include "sharedGame/SocialsManager.h"
 #include "sharedObject/ContainedByProperty.h"
+#include "sharedObject/CustomizationData.h"
+#include "sharedObject/CustomizationDataProperty.h"
+#include "sharedObject/CustomizationVariable.h"
+#include "sharedObject/NetworkIdManager.h"
+#include "sharedObject/ObjectTemplateList.h"
+#include "sharedObject/RangedIntCustomizationVariable.h"
 #include "sharedObject/VolumeContainer.h" 
 #include "sharedUtility/CurrentUserOptionManager.h"
 
@@ -131,6 +141,7 @@ namespace CuiIconManagerNamespace
 		bool                             minimalTooltip;
 		bool                             lastInsured;
 		CuiIconManagerObjectProperties   objectProperties;
+		std::string                      lastPreviewCustomization;
 
 
 		explicit ObjectInfo (CuiIconManagerCallback * _callback = 0, bool _minimalTooltip = true, bool _lastInsured = false): 
@@ -143,7 +154,8 @@ namespace CuiIconManagerNamespace
 		lastContent2        (-1),
 		minimalTooltip      (_minimalTooltip),
 		lastInsured         (_lastInsured),
-		objectProperties    ()
+		objectProperties    (),
+		lastPreviewCustomization()
 		{
 		}
 
@@ -157,7 +169,8 @@ namespace CuiIconManagerNamespace
 		lastContent2        (-1),
 		minimalTooltip      (_minimalTooltip),
 		lastInsured         (_lastInsured),
-		objectProperties    ()
+		objectProperties    (),
+		lastPreviewCustomization()
 		{
 			ContainedByProperty * const containedByProp = obj.getContainedByProperty ();
 			if (containedByProp)
@@ -178,7 +191,8 @@ namespace CuiIconManagerNamespace
 		lastContent2        (-1),
 		minimalTooltip      (rhs.minimalTooltip),
 		lastInsured         (rhs.lastInsured),
-		objectProperties    (rhs.objectProperties)
+		objectProperties    (rhs.objectProperties),
+		lastPreviewCustomization(rhs.lastPreviewCustomization)
 		{
 		}
 
@@ -196,6 +210,7 @@ namespace CuiIconManagerNamespace
 				minimalTooltip     = rhs.minimalTooltip;
 				lastInsured        = rhs.lastInsured;
 				objectProperties   = rhs.objectProperties;
+				lastPreviewCustomization = rhs.lastPreviewCustomization;
 			}
 			return *this;
 		}
@@ -209,6 +224,230 @@ namespace CuiIconManagerNamespace
 	ImageStyleCache & GetImageStyleCache()
 	{
 		return s_imageStyleCache[CuiIconManager::getActiveStyleMapIndex()];
+	}
+
+	char const * const cs_previewCustomizationAttribute = "gr_internal_preview_customization";
+	char const * const cs_shipPreviewIdAttribute = "gr_internal_ship_preview_id";
+	char const * const cs_shipPreviewTemplateAttribute = "gr_internal_ship_preview_template";
+	char const * const cs_shipPreviewCustomizationAttribute = "gr_internal_ship_preview_customization";
+	typedef std::map<NetworkId, Watcher<Object> > DatapadShipPreviewCache;
+	DatapadShipPreviewCache s_datapadShipPreviewCache;
+
+	struct DatapadShipFallback
+	{
+		DatapadShipFallback() : object(0), templateName(), customization() {}
+		Object * object;
+		std::string templateName;
+		std::string customization;
+	};
+
+	typedef std::map<NetworkId, DatapadShipFallback> DatapadShipFallbackCache;
+	DatapadShipFallbackCache s_datapadShipFallbackCache;
+
+	void deleteDatapadShipFallback(DatapadShipFallback & fallback)
+	{
+		delete fallback.object;
+		fallback.object = 0;
+		fallback.templateName.clear();
+		fallback.customization.clear();
+	}
+
+	void clearDatapadShipFallbackCache()
+	{
+		for (DatapadShipFallbackCache::iterator iterator = s_datapadShipFallbackCache.begin(); iterator != s_datapadShipFallbackCache.end(); ++iterator)
+			deleteDatapadShipFallback(iterator->second);
+		s_datapadShipFallbackCache.clear();
+	}
+
+	Object * getOrCreateDatapadShipFallback(NetworkId const & logicalId, std::string const & templateName, std::string const & customization)
+	{
+		DatapadShipFallbackCache::iterator const found = s_datapadShipFallbackCache.find(logicalId);
+		if (found != s_datapadShipFallbackCache.end() &&
+			found->second.object &&
+			found->second.templateName == templateName &&
+			found->second.customization == customization)
+			return found->second.object;
+
+		DatapadShipFallback & fallback = s_datapadShipFallbackCache[logicalId];
+		deleteDatapadShipFallback(fallback);
+
+		ConstCharCrcString const templateCrc = ObjectTemplateList::lookUp(templateName.c_str());
+		Object * const object = ObjectTemplateList::createObject(templateCrc);
+		ClientObject * const clientObject = object ? object->asClientObject() : 0;
+		if (!clientObject || !clientObject->asShipObject())
+		{
+			delete object;
+			s_datapadShipFallbackCache.erase(logicalId);
+			return 0;
+		}
+
+		CustomizationDataProperty * const property = dynamic_cast<CustomizationDataProperty *>(
+			clientObject->getProperty(CustomizationDataProperty::getClassPropertyId()));
+		CustomizationData * const customizationData = property ? property->fetchCustomizationData() : 0;
+		if (customizationData)
+		{
+			customizationData->loadLocalDataFromString(customization);
+			Appearance * const appearance = clientObject->getAppearance();
+			if (appearance)
+				appearance->setCustomizationData(customizationData);
+			customizationData->release();
+		}
+		clientObject->endBaselines();
+		RenderWorld::addObjectNotifications(*object);
+
+		// This object intentionally keeps an invalid NetworkId and is never added
+		// to World: it is owned solely by this cache and can only be a render proxy.
+		fallback.object = object;
+		fallback.templateName = templateName;
+		fallback.customization = customization;
+		return object;
+	}
+
+	Object * getDatapadRenderObject(Object & logicalObject)
+	{
+		ClientObject * const clientObject = logicalObject.asClientObject();
+		if (!clientObject || clientObject->getGameObjectType() != SharedObjectTemplate::GOT_data_ship_control_device)
+			return &logicalObject;
+
+		Container const * const container = ContainerInterface::getContainer(logicalObject);
+		if (container)
+		{
+			for (ContainerConstIterator iterator = container->begin(); iterator != container->end(); ++iterator)
+			{
+				Object * const containedObject = (*iterator).getObject();
+				ClientObject * const containedClientObject = containedObject ? containedObject->asClientObject() : 0;
+				if (containedClientObject && containedClientObject->asShipObject())
+				{
+					s_datapadShipPreviewCache[logicalObject.getNetworkId()] = Watcher<Object>(containedObject);
+					return containedObject;
+				}
+			}
+		}
+
+		// A called ship is no longer physically contained by its control device.
+		// Resolve the persistent link sent as a private attribute so the datapad
+		// can continue rendering the real (and therefore correctly painted) ship.
+		std::string previewTemplate;
+		std::string previewCustomization;
+		ObjectAttributeManager::AttributeVector attributes;
+		if (ObjectAttributeManager::getAttributes(logicalObject.getNetworkId(), attributes, false))
+		{
+			ObjectAttributeManager::AttributePair * const previewIdAttribute =
+				ObjectAttributeManager::findAttribute(attributes, cs_shipPreviewIdAttribute);
+			if (previewIdAttribute)
+			{
+				std::string const shipIdString = Unicode::wideToNarrow(previewIdAttribute->second);
+				if (!shipIdString.empty())
+				{
+					Object * const linkedObject = NetworkIdManager::getObjectById(NetworkId(shipIdString));
+					ClientObject * const linkedClientObject = linkedObject ? linkedObject->asClientObject() : 0;
+					if (linkedClientObject && linkedClientObject->asShipObject())
+					{
+						s_datapadShipPreviewCache[logicalObject.getNetworkId()] = Watcher<Object>(linkedObject);
+						return linkedObject;
+					}
+				}
+			}
+
+			ObjectAttributeManager::AttributePair * const previewTemplateAttribute =
+				ObjectAttributeManager::findAttribute(attributes, cs_shipPreviewTemplateAttribute);
+			if (previewTemplateAttribute)
+				previewTemplate = Unicode::wideToNarrow(previewTemplateAttribute->second);
+
+			ObjectAttributeManager::AttributePair * const previewCustomizationAttribute =
+				ObjectAttributeManager::findAttribute(attributes, cs_shipPreviewCustomizationAttribute);
+			if (previewCustomizationAttribute)
+				previewCustomization = Unicode::wideToNarrow(previewCustomizationAttribute->second);
+		}
+
+		DatapadShipPreviewCache::iterator const cached = s_datapadShipPreviewCache.find(logicalObject.getNetworkId());
+		if (cached != s_datapadShipPreviewCache.end())
+		{
+			Object * const cachedObject = cached->second.getPointer();
+			ClientObject * const cachedClientObject = cachedObject ? cachedObject->asClientObject() : 0;
+			if (cachedClientObject && cachedClientObject->asShipObject())
+				return cachedObject;
+			s_datapadShipPreviewCache.erase(cached);
+		}
+
+		if (!previewTemplate.empty())
+		{
+			Object * const fallback = getOrCreateDatapadShipFallback(
+				logicalObject.getNetworkId(), previewTemplate, previewCustomization);
+			if (fallback)
+				return fallback;
+		}
+
+		DatapadShipFallbackCache::iterator const fallback = s_datapadShipFallbackCache.find(logicalObject.getNetworkId());
+		if (fallback != s_datapadShipFallbackCache.end() && fallback->second.object)
+			return fallback->second.object;
+
+		return &logicalObject;
+	}
+
+	void applyDatapadPreviewCustomization(ClientObject & object, std::string & lastCustomization)
+	{
+		int const gameObjectType = object.getGameObjectType();
+		if (gameObjectType != SharedObjectTemplate::GOT_data_vehicle_control_device &&
+			gameObjectType != SharedObjectTemplate::GOT_data_pet_control_device &&
+			gameObjectType != SharedObjectTemplate::GOT_data_droid_control_device)
+			return;
+
+		ObjectAttributeManager::AttributeVector attributes;
+		if (!ObjectAttributeManager::getAttributes(object.getNetworkId(), attributes, false))
+			return;
+
+		ObjectAttributeManager::AttributePair * const previewAttribute =
+			ObjectAttributeManager::findAttribute(attributes, cs_previewCustomizationAttribute);
+		if (!previewAttribute)
+			return;
+
+		std::string const customization = Unicode::wideToNarrow(previewAttribute->second);
+		if (customization == lastCustomization)
+			return;
+
+		Appearance * const appearance = object.getAppearance();
+		if (!appearance)
+			return;
+
+		CustomizationDataProperty * property = dynamic_cast<CustomizationDataProperty *>(
+			object.getProperty(CustomizationDataProperty::getClassPropertyId()));
+		if (!property)
+		{
+			property = new CustomizationDataProperty(object);
+			object.addProperty(*property);
+		}
+
+		CustomizationData * const customizationData = property->fetchCustomizationData();
+		if (!customizationData)
+			return;
+
+		appearance->addCustomizationVariables(*customizationData);
+		appearance->setCustomizationData(customizationData);
+
+		size_t begin = 0;
+		while (begin < customization.size())
+		{
+			size_t const end = customization.find('\n', begin);
+			std::string const entry = customization.substr(begin, end == std::string::npos ? std::string::npos : end - begin);
+			size_t const separator = entry.find('=');
+			if (separator != std::string::npos)
+			{
+				std::string const variableName = entry.substr(0, separator);
+				int const value = atoi(entry.substr(separator + 1).c_str());
+				CustomizationVariable * const variable = customizationData->findVariable(variableName);
+				RangedIntCustomizationVariable * const rangedVariable = dynamic_cast<RangedIntCustomizationVariable *>(variable);
+				if (rangedVariable)
+					IGNORE_RETURN(rangedVariable->setValue(value));
+			}
+
+			if (end == std::string::npos)
+				break;
+			begin = end + 1;
+		}
+
+		customizationData->release();
+		lastCustomization = customization;
 	}
 
 
@@ -421,6 +660,8 @@ void CuiIconManager::remove ()
 			fallbackStyle->Detach(0);
 	}
 	s_fallback.clear();
+	s_datapadShipPreviewCache.clear();
+	clearDatapadShipFallbackCache();
 	
 
 	for(FallbackButtonStyleMap::iterator itFallbackButton = s_fallbackButton.begin(); itFallbackButton != s_fallbackButton.end(); ++itFallbackButton)
@@ -752,6 +993,13 @@ CuiWidget3dObjectListViewer * CuiIconManager::createObjectIcon (ClientObject & o
 
 //----------------------------------------------------------------------
 
+Object * CuiIconManager::getObjectPreviewRenderObject(Object & logicalObject)
+{
+	return getDatapadRenderObject(logicalObject);
+}
+
+//----------------------------------------------------------------------
+
 CuiWidget3dObjectListViewer * CuiIconManager::createObjectIcon (Object & obj, const char * const dragType)
 {
 	UIPage * const root = NON_NULL (UIManager::gUIManager ().GetRootPage ());
@@ -784,7 +1032,8 @@ CuiWidget3dObjectListViewer * CuiIconManager::createObjectIcon (Object & obj, co
 	viewer->SetBackgroundTint    (UIColor::white);
 
 	viewer->setAlterObjects (false);
-	viewer->addObject                (obj);
+	Object * const renderObject = getObjectPreviewRenderObject(obj);
+	viewer->addObject(obj, *renderObject);
 	viewer->setCameraPitch           (0.4f);
 	viewer->setCameraLookAtCenter    (true);
 	viewer->setDragYawOk             (false);
@@ -815,7 +1064,7 @@ CuiWidget3dObjectListViewer * CuiIconManager::createObjectIcon (Object & obj, co
 		dragWidget->SetParent   (0);
 		
 		dragWidget->setAlterObjects (false);
-		dragWidget->addObject               (obj);
+		dragWidget->addObject(obj, *renderObject);
 		dragWidget->SetLocation             (UIPoint::zero);
 		dragWidget->SetSize                 (UISize (64L, 64L));
 		dragWidget->setPaused               (false);
@@ -913,6 +1162,16 @@ void CuiIconManager::update (float deltaTimeSecs)
 
 		if (clientObject)
 		{
+			applyDatapadPreviewCustomization(*clientObject, info.lastPreviewCustomization);
+
+			Object * const renderObject = getObjectPreviewRenderObject(*obj);
+			if (renderObject != viewer->getLastRenderObject())
+			{
+				viewer->clearObjects();
+				viewer->addObject(*obj, *renderObject);
+				viewer->recomputeZoom();
+			}
+
 			tangible = clientObject->asTangibleObject ();
 
 			if (clientObject->getObjectType () == SharedResourceContainerObjectTemplate::SharedResourceContainerObjectTemplate_tag)

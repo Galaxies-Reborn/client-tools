@@ -36,6 +36,7 @@
 namespace OsNamespace
 {
 	void   applyWindowChanges();
+	void   updateFocusState(bool focused);
 	void   updateMousePosition(int x, int y);
 
 	const int PROGRAM_NAME_SIZE = 512;
@@ -992,6 +993,42 @@ bool Os::isNumPadChar(unsigned char asciiChar)
 }
 
 // ----------------------------------------------------------------------
+
+void OsNamespace::updateFocusState(bool focused)
+{
+	if (focused)
+	{
+		if (ms_clickToMove)
+			ms_clickToMove = false;
+		ms_mouseMoveInClient = true;
+		ms_wasFocusLost = true;
+
+		// Windows normally sends both WM_ACTIVATEAPP and WM_ACTIVATE for one
+		// foreground transition.  Update the input hooks only on the actual
+		// state edge so the paired messages do not acquire or release twice.
+		if (!ms_focused)
+		{
+			ms_focused = true;
+			if (ms_acquiredFocusHookFunction)
+				ms_acquiredFocusHookFunction();
+			if (ms_acquiredFocusHookFunction2)
+				ms_acquiredFocusHookFunction2();
+		}
+	}
+	else
+	{
+		ClipCursor(NULL);
+
+		if (ms_focused)
+		{
+			ms_focused = false;
+			if (ms_lostFocusHookFunction)
+				ms_lostFocusHookFunction();
+		}
+	}
+}
+
+// ----------------------------------------------------------------------
 /**
  * Handle window messages.
  * 
@@ -1214,38 +1251,15 @@ LRESULT CALLBACK Os::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 
 		case WM_ACTIVATE:
 			if (hwnd == ms_window)
-			{
-				if (wParam != WA_INACTIVE)
-				{
-					if (ms_clickToMove)
-						ms_clickToMove = false;
-					ms_mouseMoveInClient = true;
-					ms_focused = true;
-					ms_wasFocusLost = true;
-
-					if (ms_acquiredFocusHookFunction)
-						ms_acquiredFocusHookFunction();
-					if (ms_acquiredFocusHookFunction2)
-						ms_acquiredFocusHookFunction2();
-				}
-				else
-				{
-					ClipCursor(NULL);
-					ms_focused = false;
-					if (ms_lostFocusHookFunction)
-						ms_lostFocusHookFunction();
-				}
-			}
+				updateFocusState(LOWORD(wParam) != WA_INACTIVE);
 			break;
 			
 		case WM_ACTIVATEAPP:
+			// WM_ACTIVATEAPP can arrive before this particular window is active.
+			// Release input here, but let WM_ACTIVATE perform acquisition after the
+			// client HWND has actually become active so cursor confinement is timely.
 			if (wParam == FALSE)
-			{
-				ClipCursor(NULL);
-				ms_focused = false;
-				if (ms_lostFocusHookFunction)
-					ms_lostFocusHookFunction();
-			}
+				updateFocusState(false);
 			break;
 
 		case WM_DISPLAYCHANGE:

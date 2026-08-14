@@ -424,26 +424,6 @@ inline bool UICanvas::ClipRight( UIScalar Right )
 
 //----------------------------------------------------------------------
 
-inline void UICanvas::SetClip( const UIRect & In)
-{
-	mState.ClippingRect.top    = In.top     + mState.Translation.y;
-	mState.ClippingRect.left   = In.left    + mState.Translation.x;
-	mState.ClippingRect.bottom = In.bottom  + mState.Translation.y;
-	mState.ClippingRect.right  = In.right   + mState.Translation.x; 
-}
-
-//----------------------------------------------------------------------
-
-inline void UICanvas::GetClip( UIRect &Out ) const
-{
-	Out.top    = mState.ClippingRect.top    - mState.Translation.y;
-	Out.left   = mState.ClippingRect.left   - mState.Translation.x;
-	Out.bottom = mState.ClippingRect.bottom - mState.Translation.y;
-	Out.right  = mState.ClippingRect.right  - mState.Translation.x;
-}
-
-//----------------------------------------------------------------------
-
 inline void UICanvas::SetColor( const UIColor &NewColor )
 {
 	mState.Color.r = NewColor.r;

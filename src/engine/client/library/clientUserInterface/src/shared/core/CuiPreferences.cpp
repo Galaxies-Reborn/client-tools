@@ -114,7 +114,24 @@ namespace
 	bool        ms_showRadarNPCs                    = true;
 	bool        ms_useModelessInterface             = false;
 	bool        ms_useSwgMouseMap                   = false;
-	bool        ms_hamEnhance                       = false;
+	bool        ms_hamEnhance                       = true;
+	float       ms_skillBarUiScale                  = 1.0f;
+	float       ms_hamUiScale                       = 1.0f;
+	float       ms_partyUiScale                     = 1.0f;
+	float       ms_chatUiScale                      = 1.0f;
+	float       ms_menuUiScale                      = 1.0f;
+	float const cms_individualUiScaleMinimum        = 0.75f;
+	float const cms_individualUiScaleMaximum        = 1.50f;
+
+	float clampIndividualUiScale(float const scale)
+	{
+		// CurrentUserOptionManager writes directly into the registered float,
+		// bypassing the public setter.  Treat NaN as the safe default and bound
+		// hand-edited or stale preference values before they reach UIWidget.
+		if (scale != scale)
+			return 1.0f;
+		return std::max(cms_individualUiScaleMinimum, std::min(scale, cms_individualUiScaleMaximum));
+	}
 
 	// Increment defaultUiSettingsVersion to force a reset to latest defaults for all users.
 	const int   cms_defaultUiSettingsVersion          = 1;
@@ -785,6 +802,20 @@ void CuiPreferences::install ()
 	REGISTER_OPTION_USER(showRadarNPCs);
 	REGISTER_OPTION_USER(useSwgMouseMap);
 	REGISTER_OPTION_USER(hamEnhance);
+	// HAM Enhanced is the supported HUD layout for this restoration.  Keep the
+	// persisted option for profile compatibility, but override older profiles
+	// that saved the incomplete compact layout.
+	ms_hamEnhance = true;
+	REGISTER_OPTION_USER(skillBarUiScale);
+	REGISTER_OPTION_USER(hamUiScale);
+	REGISTER_OPTION_USER(partyUiScale);
+	REGISTER_OPTION_USER(chatUiScale);
+	REGISTER_OPTION_USER(menuUiScale);
+	setSkillBarUiScale(ms_skillBarUiScale);
+	setHamUiScale(ms_hamUiScale);
+	setPartyUiScale(ms_partyUiScale);
+	setChatUiScale(ms_chatUiScale);
+	setMenuUiScale(ms_menuUiScale);
 
 	REGISTER_OPTION_USER(paletteName);
 	REGISTER_OPTION_USER(hudOpacity);
@@ -2827,14 +2858,99 @@ bool CuiPreferences::getActualUseModelessInterface()
 
 void CuiPreferences::setHamEnhance(bool enabled)
 {
-	ms_hamEnhance = enabled;
+	UNREF(enabled);
+	ms_hamEnhance = true;
 }
 
 //----------------------------------------------------------------------
 
 bool CuiPreferences::getHamEnhance()
 {
-	return ms_hamEnhance;
+	return true;
+}
+
+//----------------------------------------------------------------------
+
+void CuiPreferences::setSkillBarUiScale(float scale)
+{
+	ms_skillBarUiScale = clampIndividualUiScale(scale);
+}
+
+//----------------------------------------------------------------------
+
+float CuiPreferences::getSkillBarUiScale()
+{
+	return clampIndividualUiScale(ms_skillBarUiScale);
+}
+
+//----------------------------------------------------------------------
+
+void CuiPreferences::setHamUiScale(float scale)
+{
+	ms_hamUiScale = clampIndividualUiScale(scale);
+}
+
+//----------------------------------------------------------------------
+
+float CuiPreferences::getHamUiScale()
+{
+	return clampIndividualUiScale(ms_hamUiScale);
+}
+
+//----------------------------------------------------------------------
+
+void CuiPreferences::setPartyUiScale(float scale)
+{
+	ms_partyUiScale = clampIndividualUiScale(scale);
+}
+
+//----------------------------------------------------------------------
+
+float CuiPreferences::getPartyUiScale()
+{
+	return clampIndividualUiScale(ms_partyUiScale);
+}
+
+//----------------------------------------------------------------------
+
+void CuiPreferences::setChatUiScale(float scale)
+{
+	ms_chatUiScale = clampIndividualUiScale(scale);
+}
+
+//----------------------------------------------------------------------
+
+float CuiPreferences::getChatUiScale()
+{
+	return clampIndividualUiScale(ms_chatUiScale);
+}
+
+//----------------------------------------------------------------------
+
+void CuiPreferences::setMenuUiScale(float scale)
+{
+	ms_menuUiScale = clampIndividualUiScale(scale);
+}
+
+//----------------------------------------------------------------------
+
+float CuiPreferences::getMenuUiScale()
+{
+	return clampIndividualUiScale(ms_menuUiScale);
+}
+
+//----------------------------------------------------------------------
+
+float CuiPreferences::getIndividualUiScaleMinimum()
+{
+	return cms_individualUiScaleMinimum;
+}
+
+//----------------------------------------------------------------------
+
+float CuiPreferences::getIndividualUiScaleMaximum()
+{
+	return cms_individualUiScaleMaximum;
 }
 
 //----------------------------------------------------------------------

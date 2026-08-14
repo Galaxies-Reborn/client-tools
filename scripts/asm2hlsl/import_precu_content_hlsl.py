@@ -8,6 +8,7 @@ import csv
 import hashlib
 import json
 import re
+import struct
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +28,23 @@ VERTEX_INCLUDE_PAIR = re.compile(
     rb'#include\s+"vertex_program/include/vertex_shader_constants\.inc"[\r\n]+'
     rb'#include\s+"vertex_program/include/functions\.inc"'
 )
+PIXEL_CUBE_SAMPLER = re.compile(rb"(?m)^sampler(?P<spacing>[ \t]+)envMap(?P<tail>[ \t]*:[ \t]*register\(s2\);)")
+PIXEL_CUBE_PROGRAMS = {
+    "pixel_program/a_alpha_envmask_ps20.psh",
+    "pixel_program/a_envmask_specmap_ps20.psh",
+    "pixel_program/h_color2_envmask_specmap_ps20.psh",
+}
+PIXEL_HEMISPHERIC_CALL = re.compile(rb"(?<![A-Za-z0-9_])calculateHemisphericLighting\(")
+PIXEL_HEMISPHERIC_HELPER = b'''float3 grPrecuCalculateHemisphericLighting(float3 direction, float3 normal, float3 vertexDiffuse)
+{
+\tfloat dotProduct = dot(direction, normal);
+\tfloat3 light = vertexDiffuse + dot3LightTangentMinusDiffuseColor + dot3LightDiffuseColor
+\t\t+ (-max(0.0, dotProduct) * dot3LightTangentMinusDiffuseColor);
+\tlight += min(0.0, dotProduct) * dot3LightTangentMinusBackColor;
+\treturn saturate(light);
+}
+
+'''
 VERTEX_DX11_PROLOGUE = b'''#include "vertex_program/include/asm_constants.inc"
 
 #define objectWorldCameraProjectionMatrix float4x4(c[0], c[1], c[2], c[3])
@@ -114,7 +132,79 @@ def require_hlsl(name: str, payload: bytes) -> None:
         raise ImportError(f"refusing non-HLSL program from clean source: {name}")
 
 
+def rewrite_iff_chunks(payload: bytes, transform) -> bytes:
+    """Rebuild an IFF while allowing a leaf chunk payload to grow."""
+
+    output = bytearray()
+    offset = 0
+    while offset + 8 <= len(payload):
+        tag = payload[offset : offset + 4]
+        length = int.from_bytes(payload[offset + 4 : offset + 8], "big")
+        body_start = offset + 8
+        body_end = body_start + length
+        if body_end > len(payload):
+            raise ImportError("shader IFF contains a truncated chunk")
+        body = payload[body_start:body_end]
+        if tag == b"FORM":
+            if len(body) < 4:
+                raise ImportError("shader IFF contains a truncated FORM")
+            body = body[:4] + rewrite_iff_chunks(body[4:], transform)
+        else:
+            body = transform(tag, body)
+        output.extend(tag)
+        output.extend(struct.pack(">I", len(body)))
+        output.extend(body)
+        offset = body_end
+    if offset != len(payload):
+        raise ImportError("shader IFF contains trailing partial chunk data")
+    return bytes(output)
+
+
 def adapt_dx11(name: str, payload: bytes) -> bytes:
+    if name in PIXEL_CUBE_PROGRAMS:
+        sampler_replacements = 0
+        call_replacements = 0
+        helper_insertions = 0
+
+        def transform(tag: bytes, body: bytes) -> bytes:
+            nonlocal sampler_replacements, call_replacements, helper_insertions
+            if tag != b"PSRC":
+                return body
+            output, count = PIXEL_CUBE_SAMPLER.subn(
+                rb"samplerCUBE\g<spacing>envMap\g<tail>", body
+            )
+            sampler_replacements += count
+            output, count = PIXEL_HEMISPHERIC_CALL.subn(
+                b"grPrecuCalculateHemisphericLighting(", output
+            )
+            call_replacements += count
+            sampler_start = output.find(b"sampler ")
+            if sampler_start < 0:
+                raise ImportError(f"could not locate sampler declarations in {name}")
+            output = (
+                output[:sampler_start]
+                + PIXEL_HEMISPHERIC_HELPER
+                + output[sampler_start:]
+            )
+            helper_insertions += 1
+            return output
+
+        output = rewrite_iff_chunks(payload, transform)
+        if sampler_replacements != 1:
+            raise ImportError(
+                f"expected one envMap cube sampler declaration in {name}, "
+                f"found {sampler_replacements}"
+            )
+        if call_replacements != 1 or helper_insertions != 1:
+            raise ImportError(
+                f"expected one hemispheric-light call and helper insertion in {name}, "
+                f"found calls={call_replacements}, helpers={helper_insertions}"
+            )
+        return output
+
+    if name.startswith("pixel_program/"):
+        return payload
+
     if not name.startswith("vertex_program/"):
         return payload
     # D3D9 HLSL allowed both a semantic and register(vN) on an input-struct

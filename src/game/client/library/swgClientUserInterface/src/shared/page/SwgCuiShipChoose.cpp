@@ -160,6 +160,8 @@ void SwgCuiShipChoose::OnButtonPressed(UIWidget * const context)
 
 void SwgCuiShipChoose::setTerminal(NetworkId const & nid)
 {
+	m_parkingDataReceived = false;
+
 	Object const * const o = NetworkIdManager::getObjectById(nid);
 	ClientObject const * const co = o ? o->asClientObject() : NULL;
 	if(co && (co->getGameObjectType() == SharedObjectTemplate::GOT_terminal_space))
@@ -368,6 +370,9 @@ void SwgCuiShipChoose::onShipParkingDataReceived(PlayerCreatureController::Messa
 	for(; i != data.end(); ++i)
 	{
 		NetworkId const & shipId = i->first;
+		std::string const & shipParkingLocation = i->second;
+		bool const parkedHere = shipParkingLocation.empty() || terminalLocation.empty() || shipParkingLocation == terminalLocation;
+		bool const canSelect = PlayerObject::isAdmin() || !ConfigClientGame::getValidateShipParkingLocation() || parkedHere;
 
 		std::map<NetworkId, UIComposite *>::iterator j = ms_shipCompPages.find(shipId);
 		if(j != ms_shipCompPages.end())
@@ -383,9 +388,17 @@ void SwgCuiShipChoose::onShipParkingDataReceived(PlayerCreatureController::Messa
 					UIText * const parkingLocationText = safe_cast<UIText *>(baseObject);
 					if(parkingLocationText)
 					{
-						selectButton->SetEnabled(true);
-						selectButton->SetLocalText(CuiStringIdsShipChoose::select.localize());
+						parkingLocationText->SetPreLocalized(true);
+						if (PlayerObject::isAdmin())
+							parkingLocationText->SetLocalText(CuiStringIdsShipChoose::godparking.localize());
+						else if (parkedHere)
+							parkingLocationText->SetLocalText(CuiStringIdsShipChoose::here.localize());
+						else
+							parkingLocationText->SetLocalText(CuiStringIdsShipChoose::not_parked_here.localize());
 					}
+
+					selectButton->SetEnabled(canSelect);
+					selectButton->SetLocalText(CuiStringIdsShipChoose::select.localize());
 				}
 			}
 		}

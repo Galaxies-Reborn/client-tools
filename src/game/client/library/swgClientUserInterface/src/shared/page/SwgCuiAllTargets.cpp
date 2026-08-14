@@ -478,7 +478,12 @@ void SwgCuiAllTargets::update(const Camera & camera)
 				UIPage & statusPage = status->getPage();
 				{
 					statusPage.PackIfDirty();
-					statusPage.WrapChildren();
+					// Authored HAM Enhanced status roots own complete standard and
+					// enhanced geometry.  Shrink-wrapping the duplicate here happens
+					// after SwgCuiStatusGround restores that geometry and clips the
+					// overhead Action and Mind rows back to a health-only rectangle.
+					if (!statusPage.GetDoNotPackChildren())
+						statusPage.WrapChildren();
 
 					if (m_sceneType == Game::ST_space) 
 						parentHeadPt -= screenCenterOffset;

@@ -378,6 +378,9 @@ m_flags                     (F_alterObjects | F_paused | F_dragYawOk | F_cameraL
 m_lastMousePoint            (),
 m_fieldOfView               (PI_OVER_8), // 22.5 degrees default
 m_viewport                  (),
+m_controlToPhysicalOrigin   (),
+m_controlToPhysicalBasisX   (1.0f, 0.0f),
+m_controlToPhysicalBasisY   (0.0f, 1.0f),
 m_fitRect                   (0, 0, 100, 100),
 m_cameraLookAtBone          (),
 m_cameraZoomLookAtBone      (),
@@ -582,28 +585,69 @@ void CuiWidget3dObjectListViewer::RenderStart   (UICanvas & canvas) const
 
 	CuiLayerRenderer::flushRenderQueue (); //-- do not use UICanvas::flush (), it is ignored by the Cui
 
-	UIPoint canvasTranslation(canvas.GetTranslation());
 	UISize const widgetSize(GetSize());
-	UIFloatPoint const widgetCenter(widgetSize / 2);
+
+	UIFloatPoint transformedCorners[4] =
+	{
+		canvas.TransformFP(0.0f, 0.0f),
+		canvas.TransformFP(static_cast<float>(widgetSize.x), 0.0f),
+		canvas.TransformFP(0.0f, static_cast<float>(widgetSize.y)),
+		canvas.TransformFP(static_cast<float>(widgetSize.x), static_cast<float>(widgetSize.y))
+	};
+
+	// Match ordinary UI quad ordering: clip the fully canvas-transformed
+	// rectangle before applying any queued deformer.  The deformer may move
+	// that clipped surface outside the original clip, which is exactly what
+	// EngineCanvas::RenderQuad does after UICanvas::BltFrom has clipped it.
+	float preDeformLeft = transformedCorners[0].x;
+	float preDeformTop = transformedCorners[0].y;
+	float preDeformRight = transformedCorners[0].x;
+	float preDeformBottom = transformedCorners[0].y;
+	for (int cornerIndex = 1; cornerIndex != 4; ++cornerIndex)
+	{
+		preDeformLeft = std::min(preDeformLeft, transformedCorners[cornerIndex].x);
+		preDeformTop = std::min(preDeformTop, transformedCorners[cornerIndex].y);
+		preDeformRight = std::max(preDeformRight, transformedCorners[cornerIndex].x);
+		preDeformBottom = std::max(preDeformBottom, transformedCorners[cornerIndex].y);
+	}
+
+	UIRect const & clip = canvas.GetCurrentState().ClippingRect;
+	float const clippedLeft = std::max(preDeformLeft, static_cast<float>(clip.left));
+	float const clippedTop = std::max(preDeformTop, static_cast<float>(clip.top));
+	float const clippedRight = std::min(preDeformRight, static_cast<float>(clip.right));
+	float const clippedBottom = std::min(preDeformBottom, static_cast<float>(clip.bottom));
+	if (clippedRight <= clippedLeft || clippedBottom <= clippedTop)
+		return;
+
+	UIFloatPoint viewportCorners[4] =
+	{
+		UIFloatPoint(clippedLeft, clippedTop),
+		UIFloatPoint(clippedRight, clippedTop),
+		UIFloatPoint(clippedLeft, clippedBottom),
+		UIFloatPoint(clippedRight, clippedBottom)
+	};
 
 	bool renderCameraScene = true;
-
 	if (canvas.IsDeforming())
 	{
 		const_cast<CuiWidget3dObjectListViewer *>(this)->setFlags(F_sizeChanged);
-		
-		UIFloatPoint oldTranslation(UIFloatPoint(canvasTranslation) + widgetCenter);
-		UIFloatPoint newTranslation;
-		canvas.Deform(&oldTranslation, &newTranslation, 1);
+		UIFloatPoint allCorners[8];
+		for (int cornerIndex = 0; cornerIndex != 4; ++cornerIndex)
+		{
+			allCorners[cornerIndex] = transformedCorners[cornerIndex];
+			allCorners[cornerIndex + 4] = viewportCorners[cornerIndex];
+		}
+		UIFloatPoint deformedCorners[8];
+		canvas.Deform(allCorners, deformedCorners, 8);
+		for (int cornerIndex = 0; cornerIndex != 4; ++cornerIndex)
+		{
+			transformedCorners[cornerIndex] = deformedCorners[cornerIndex];
+			viewportCorners[cornerIndex] = deformedCorners[cornerIndex + 4];
+		}
 
 		UIFloatPoint widgetScale;
 		canvas.GetDeformScale(widgetScale);
 		m_fitScale.set(widgetScale.x, widgetScale.y, 1.0f);
-
-		canvasTranslation.Set(static_cast<UIScalar>(newTranslation.x - widgetCenter.x),
-								static_cast<UIScalar>(newTranslation.y - widgetCenter.y));
-
-		// Don't render the 3D objects until the viewport is 50% of its original size.
 		renderCameraScene = (m_fitScale.x > 0.5f) && (m_fitScale.y > 0.5f);
 	}
 	else
@@ -611,18 +655,31 @@ void CuiWidget3dObjectListViewer::RenderStart   (UICanvas & canvas) const
 		m_fitScale = Vector::xyz111;
 	}
 
-	m_viewport.Set(UIPoint::zero, widgetSize);
+	m_controlToPhysicalOrigin = transformedCorners[0];
+	m_controlToPhysicalBasisX = widgetSize.x != 0
+		? (transformedCorners[1] - transformedCorners[0]) / static_cast<float>(widgetSize.x)
+		: UIFloatPoint(1.0f, 0.0f);
+	m_controlToPhysicalBasisY = widgetSize.y != 0
+		? (transformedCorners[2] - transformedCorners[0]) / static_cast<float>(widgetSize.y)
+		: UIFloatPoint(0.0f, 1.0f);
 
-	UIRect clip;
-	canvas.GetClip (clip);
+	float transformedLeft = viewportCorners[0].x;
+	float transformedTop = viewportCorners[0].y;
+	float transformedRight = viewportCorners[0].x;
+	float transformedBottom = viewportCorners[0].y;
+	for (int cornerIndex = 1; cornerIndex != 4; ++cornerIndex)
+	{
+		transformedLeft = std::min(transformedLeft, viewportCorners[cornerIndex].x);
+		transformedTop = std::min(transformedTop, viewportCorners[cornerIndex].y);
+		transformedRight = std::max(transformedRight, viewportCorners[cornerIndex].x);
+		transformedBottom = std::max(transformedBottom, viewportCorners[cornerIndex].y);
+	}
 
-
-	if (!UIUtils::ClipRect (m_viewport, clip))
-		return;
-
-	DEBUG_FATAL (m_viewport.Width () <= 0 || m_viewport.Height () <= 0, ("cliprect fubar'd\n"));
-
-	m_viewport += canvasTranslation;
+	m_viewport.Set(
+		static_cast<UIScalar>(std::floor(transformedLeft)),
+		static_cast<UIScalar>(std::floor(transformedTop)),
+		static_cast<UIScalar>(std::ceil(transformedRight)),
+		static_cast<UIScalar>(std::ceil(transformedBottom)));
 
 	if (!UIUtils::ClipRect (m_viewport, UIRect (0, 0, Graphics::getCurrentRenderTargetWidth (), Graphics::getCurrentRenderTargetHeight ())))
 		return;
@@ -637,37 +694,14 @@ void CuiWidget3dObjectListViewer::RenderStart   (UICanvas & canvas) const
 		m_lastViewportSize = viewportSize;
 	}
 
-	// UI scale (2026-05-16): m_viewport above is in LOGICAL canvas coords
-	// (built from widgetSize + canvasTranslation). m_camera->setViewport
-	// expects PHYSICAL render-target pixels because the 3D scene is drawn
-	// to the actual backbuffer. Multiply by uiCanvasScale here so the 3D
-	// model preview lands at the same physical pixel as the widget frame
-	// (which renders through the canvas Scale transform). Without this the
-	// preview/portrait/inventory icons floated at the un-scaled position
-	// in the upper-left at uiScale != 1.0.
-	const float uiScale = Graphics::getUiCanvasScale();
-	if (canvas.IsDeforming())
-	{
-		UIScalar const viewportWidth = m_viewport.Width();
-		UIScalar const viewportHeight = m_viewport.Height();
-
-		UIScalar const diffx = clamp(static_cast<UIScalar>(1), static_cast<UIScalar>(widgetCenter.x * (1.0f - m_fitScale.x)), static_cast<UIScalar>(viewportWidth - 1));
-		UIScalar const diffy = clamp(static_cast<UIScalar>(1), static_cast<UIScalar>(widgetCenter.y * (1.0f - m_fitScale.y)), static_cast<UIScalar>(viewportHeight - 1));
-
-		m_camera->setViewport(
-			static_cast<int>((m_viewport.left + diffx) * uiScale),
-			static_cast<int>((m_viewport.top  + diffy) * uiScale),
-			static_cast<int>((viewportWidth  - diffx) * uiScale),
-			static_cast<int>((viewportHeight - diffy) * uiScale));
-	}
-	else
-	{
-		m_camera->setViewport(
-			static_cast<int>(m_viewport.left * uiScale),
-			static_cast<int>(m_viewport.top  * uiScale),
-			static_cast<int>(m_viewport.Width()  * uiScale),
-			static_cast<int>(m_viewport.Height() * uiScale));
-	}
+	// TransformFP and ClippingRect already include both the global canvas
+	// scale and this widget's individual scale.  m_viewport is therefore in
+	// physical render-target pixels, exactly what Camera::setViewport needs.
+	m_camera->setViewport(
+		static_cast<int>(m_viewport.left),
+		static_cast<int>(m_viewport.top),
+		static_cast<int>(m_viewport.Width()),
+		static_cast<int>(m_viewport.Height()));
 
 	UISize visibleSize(m_viewport.Size());
 
@@ -882,11 +916,10 @@ void CuiWidget3dObjectListViewer::RenderText(UICanvas & canvas) const
 
 				if (m_camera->projectInWorldSpace(text3d->m_location, &screen2d.x, &screen2d.y, &screen2d.z, false))
 				{
-					const UIPoint gpt = m_viewport.Location ();
-					screen2d.x -= gpt.x;
-					screen2d.y -= gpt.y;
-
-					UIPoint location2d(static_cast<int>(screen2d.x), static_cast<int>(screen2d.y));
+					UIFloatPoint const localPoint = physicalToControl(UIFloatPoint(screen2d.x, screen2d.y));
+					UIPoint location2d(
+						static_cast<long>(localPoint.x),
+						static_cast<long>(localPoint.y));
 
 					UIText uiText3d;
 					uiText3d.SetTextColor(text3d->m_color);
@@ -2478,6 +2511,32 @@ Vector CuiWidget3dObjectListViewer::getCameraFrame_k() const
 
 //----------------------------------------------------------------------
 
+UIFloatPoint CuiWidget3dObjectListViewer::controlToPhysical(UIFloatPoint const & point) const
+{
+	return UIFloatPoint(
+		m_controlToPhysicalOrigin.x + m_controlToPhysicalBasisX.x * point.x + m_controlToPhysicalBasisY.x * point.y,
+		m_controlToPhysicalOrigin.y + m_controlToPhysicalBasisX.y * point.x + m_controlToPhysicalBasisY.y * point.y);
+}
+
+//----------------------------------------------------------------------
+
+UIFloatPoint CuiWidget3dObjectListViewer::physicalToControl(UIFloatPoint const & point) const
+{
+	float const determinant = m_controlToPhysicalBasisX.x * m_controlToPhysicalBasisY.y -
+		m_controlToPhysicalBasisY.x * m_controlToPhysicalBasisX.y;
+	if (std::fabs(determinant) < 0.000001f)
+		return UIFloatPoint::zero;
+
+	float const inverseDeterminant = 1.0f / determinant;
+	float const x = point.x - m_controlToPhysicalOrigin.x;
+	float const y = point.y - m_controlToPhysicalOrigin.y;
+	return UIFloatPoint(
+		(m_controlToPhysicalBasisY.y * x - m_controlToPhysicalBasisY.x * y) * inverseDeterminant,
+		(-m_controlToPhysicalBasisX.y * x + m_controlToPhysicalBasisX.x * y) * inverseDeterminant);
+}
+
+//----------------------------------------------------------------------
+
 bool CuiWidget3dObjectListViewer::findWorldLocation(UIPoint const & pointLocalToControl, Vector & begin_w, Vector & end_w) const
 {
 	long const viewportWidth = m_viewport.Width();
@@ -2488,22 +2547,19 @@ bool CuiWidget3dObjectListViewer::findWorldLocation(UIPoint const & pointLocalTo
 		return false;
 	}
 
-	UIPoint const globalPoint(pointLocalToControl + m_viewport.Location ());
+	UIFloatPoint const physicalPoint = controlToPhysical(UIFloatPoint(pointLocalToControl));
 
-	// UI scale: setViewport + reverseProjectInScreenSpace both operate in
-	// PHYSICAL render-target pixels (the actual D3D viewport). m_viewport
-	// and globalPoint are in LOGICAL canvas coords. Scale both up.
-	const float uiScale = Graphics::getUiCanvasScale();
+	// m_viewport and reverseProjectInScreenSpace coordinates are physical.
 	m_camera->setViewport(
-		static_cast<int>(m_viewport.left * uiScale),
-		static_cast<int>(m_viewport.top  * uiScale),
-		static_cast<int>(viewportWidth   * uiScale),
-		static_cast<int>(viewportHeight  * uiScale));
+		static_cast<int>(m_viewport.left),
+		static_cast<int>(m_viewport.top),
+		static_cast<int>(viewportWidth),
+		static_cast<int>(viewportHeight));
 
 	begin_w = m_camera->getPosition_w();
 	end_w = begin_w + (10000.0f * m_camera->rotate_o2w(m_camera->reverseProjectInScreenSpace (
-		static_cast<int>(globalPoint.x * uiScale),
-		static_cast<int>(globalPoint.y * uiScale))));
+		static_cast<int>(physicalPoint.x),
+		static_cast<int>(physicalPoint.y))));
 
 	Graphics::setViewport(0, 0, Graphics::getCurrentRenderTargetWidth (), Graphics::getCurrentRenderTargetHeight ());
 
@@ -2628,16 +2684,14 @@ bool CuiWidget3dObjectListViewer::findScreenLocation (const ClientObject & obj, 
 		if (m_viewport.Width () <= 0 || m_viewport.Height () <= 0)
 			return 0;
 
-		// UI scale: setViewport + projectInWorldSpace operate in PHYSICAL
-		// pixels. m_viewport is in LOGICAL coords. Scale up for the camera
-		// op, then scale screenVect back to logical when computing
-		// widget-local screenLocation (caller expects logical).
-		const float uiScale = Graphics::getUiCanvasScale();
+		// m_viewport and projectInWorldSpace are physical; convert the
+		// projected result back through global and per-widget transforms for
+		// the logical widget-local result expected by callers.
 		m_camera->setViewport (
-			static_cast<int>(m_viewport.left   * uiScale),
-			static_cast<int>(m_viewport.top    * uiScale),
-			static_cast<int>(m_viewport.Width () * uiScale),
-			static_cast<int>(m_viewport.Height() * uiScale));
+			static_cast<int>(m_viewport.left),
+			static_cast<int>(m_viewport.top),
+			static_cast<int>(m_viewport.Width ()),
+			static_cast<int>(m_viewport.Height()));
 
 		Vector screenVect;
 		const Vector parentLocation (obj.rotateTranslate_o2w (objectLocation));
@@ -2646,14 +2700,9 @@ bool CuiWidget3dObjectListViewer::findScreenLocation (const ClientObject & obj, 
 
 		if (retval)
 		{
-			const UIPoint gpt = m_viewport.Location ();
-			// screenVect is in PHYSICAL pixels (from projectInWorldSpace),
-			// gpt is in LOGICAL. Convert screenVect to logical so the
-			// resulting widget-local screenLocation matches the rest of
-			// the UI's coordinate system.
-			const float invScale = (uiScale != 0.0f) ? (1.0f / uiScale) : 1.0f;
-			screenLocation.x = static_cast<long>(screenVect.x * invScale - gpt.x);
-			screenLocation.y = static_cast<long>(screenVect.y * invScale - gpt.y);
+			UIFloatPoint const localPoint = physicalToControl(UIFloatPoint(screenVect.x, screenVect.y));
+			screenLocation.x = static_cast<long>(localPoint.x);
+			screenLocation.y = static_cast<long>(localPoint.y);
 			return true;
 		}
 
@@ -2738,23 +2787,28 @@ void CuiWidget3dObjectListViewer::clearObjects ()
 
 void CuiWidget3dObjectListViewer::addObject    (Object & obj)
 {
-	Object * const renderObject = &obj;
+	addObject(obj, obj);
+}
 
-	m_objectVector->push_back (ObjectPair (Watcher<Object>(&obj), Watcher<Object>(renderObject)));
+//----------------------------------------------------------------------
 
-	m_objectWatcherList->addObject (*renderObject);
+void CuiWidget3dObjectListViewer::addObject(Object & logicalObject, Object & renderObject)
+{
+	m_objectVector->push_back(ObjectPair(Watcher<Object>(&logicalObject), Watcher<Object>(&renderObject)));
+
+	m_objectWatcherList->addObject(renderObject);
 	setCameraLookAtBoneDirty (true);
 	setViewDirty (true);
 
 	if (hasFlags (F_alterObjects))
 	{
-		if (obj.isInitialized() && !obj.isInWorld() && (obj.alter(Clock::frameTime()) != AlterResult::cms_kill))
+		if (renderObject.isInitialized() && !renderObject.isInWorld() && (renderObject.alter(Clock::frameTime()) != AlterResult::cms_kill))
 		{
-			obj.conclude();
+			renderObject.conclude();
 		}
 	}
 
-	if (dynamic_cast<const CreatureObject *>(&obj))
+	if (dynamic_cast<const CreatureObject *>(&renderObject))
 		++m_numCreatures;
 
 	updateObjectName ();
@@ -3075,9 +3129,13 @@ void CuiWidget3dObjectListViewer::recomputeZoom ()
 		m_cameraYawPitchZoomTarget.z = m_fitDistanceFactor;
 	}
 
-	UIPoint      fitRect_center = m_viewport.Location ();
-	fitRect_center.x += static_cast<long>(static_cast<float>((m_fitRect.right  + m_fitRect.left) * GetWidth  ()) * 0.01f * 0.5f);
-	fitRect_center.y += static_cast<long>(static_cast<float>((m_fitRect.bottom + m_fitRect.top)  * GetHeight ()) * 0.01f * 0.5f);
+	UIFloatPoint const fitRectLocalCenter(
+		static_cast<float>((m_fitRect.right  + m_fitRect.left) * GetWidth ()) * 0.01f * 0.5f,
+		static_cast<float>((m_fitRect.bottom + m_fitRect.top)  * GetHeight()) * 0.01f * 0.5f);
+	UIFloatPoint const fitRectPhysicalCenter = controlToPhysical(fitRectLocalCenter);
+	UIPoint const fitRect_center(
+		static_cast<long>(fitRectPhysicalCenter.x),
+		static_cast<long>(fitRectPhysicalCenter.y));
 
 	const Vector targetVector = m_camera->reverseProjectInScreenSpace (fitRect_center.x, fitRect_center.y);
 

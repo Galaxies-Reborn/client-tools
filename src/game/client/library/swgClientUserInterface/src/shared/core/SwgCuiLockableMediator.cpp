@@ -94,7 +94,7 @@ void SwgCuiLockableMediator::generateLockablePopup  (UIWidget * context, const U
 		pop->AddItem(PopupIds::unlock_window, Cui::MenuInfoTypes::getLocalizedLabel(Cui::MenuInfoTypes::WINDOW_UNLOCK, 0));
 	}
 
-	pop->SetLocation(context->GetWorldLocation() + msg.MouseCoords);
+	pop->SetLocation(context->GetWorldPointFromLocal(msg.MouseCoords));
 	UIManager::gUIManager().PushContextWidget(*pop);
 	pop->AddCallback(getCallbackObject());
 }

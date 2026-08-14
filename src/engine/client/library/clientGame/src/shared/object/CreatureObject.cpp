@@ -1229,6 +1229,22 @@ void CreatureObject::containedByModified(NetworkId const &oldValue, NetworkId co
 		else if (ShipStation::isGunnerStation(shipStationBefore))
 			onLeftGunnerStation(oldValue, ShipStation::getWeaponIndexForGunnerStation(shipStationBefore));
 
+		// A cross-server scene handoff can deliver the new container while the
+		// player's replicated arrangement already names the same ship station.
+		// In that case arrangementModified() has no edge to report, so the old
+		// containment-only implementation updated m_shipStation but never ran the
+		// mount/controller/camera callback.  Handle the entering half here as well;
+		// the normal two-phase -1 -> ship arrangement path still enters exclusively
+		// through arrangementModified().
+		if (shipStationNow == ShipStation::ShipStation_Pilot)
+			onEnteredPilotStation();
+		else if (shipStationNow == ShipStation::ShipStation_Droid)
+			onEnteredDroidStation();
+		else if (shipStationNow == ShipStation::ShipStation_Operations)
+			onEnteredOperationsStation();
+		else if (ShipStation::isGunnerStation(shipStationNow))
+			onEnteredGunnerStation(ShipStation::getWeaponIndexForGunnerStation(shipStationNow));
+
 		// clear out target on station change
 		setLookAtTarget(NetworkId::cms_invalid);
 	}

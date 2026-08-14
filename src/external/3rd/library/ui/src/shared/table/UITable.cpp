@@ -1785,9 +1785,9 @@ UIWidget * UITable::GetCustomDragWidget  (const UIPoint & point, UIPoint & offse
 			if (dragWidget)
 			{
 				if (dragWidget->GetParent () == 0)
-					offset -= (dragWidget->GetSize () / 2L);
+					offset = -(dragWidget->GetSize () / 2L);
 				else
-					offset -= (dragWidget->GetWorldLocation () + (dragWidget->GetSize () / 2L)) - GetWorldLocation ();
+					offset = -dragWidget->GetLocalPointFromWorld(GetWorldPointFromLocal(point));
 
 				//-- offsets for custom widgets must be negative
 				offset.x = std::min (0L, offset.x);

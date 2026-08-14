@@ -120,6 +120,7 @@ public:
 	static void fontSizeIncrementAllWindows (int increment);
 	static void onChatFontSizeChanged ();
 	static void onChatBoxKeyClickChanged ();
+	static void applyUiScaleToAllWindows (float scale);
 
 	static void cloneFromTabDragged (const UIPoint & pt, int tabId);
 

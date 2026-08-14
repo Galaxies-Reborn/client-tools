@@ -26,6 +26,7 @@
 #include "UIWidgetBoundaries.h"
 #include "UIWidgetRectangleStyles.h"
 #include <cassert>
+#include <cmath>
 #include <list>
 #include <vector>
 
@@ -106,6 +107,7 @@ const UILowerString UIWidget::PropertyName::PalShade              = UILowerStrin
 const UILowerString UIWidget::PropertyName::PopupStyle            = UILowerString ("PopupStyle");
 const UILowerString UIWidget::PropertyName::ResizeInset           = UILowerString ("ResizeInset");
 const UILowerString UIWidget::PropertyName::Rotation              = UILowerString ("Rotation");
+const UILowerString UIWidget::PropertyName::Scale                 = UILowerString ("Scale");
 const UILowerString UIWidget::PropertyName::ScrollExtent          = UILowerString ("ScrollExtent");
 const UILowerString UIWidget::PropertyName::ScrollLocation        = UILowerString ("ScrollLocation");
 const UILowerString UIWidget::PropertyName::ScrollSizeLine        = UILowerString ("ScrollSizeLine");
@@ -152,6 +154,79 @@ namespace UIWidgetNamespace
 
 	bool s_hasDragMovedYet = false;
 
+	struct WidgetWorldTransform
+	{
+		float originX;
+		float originY;
+		float scale;
+	};
+
+	long roundWorldCoordinate(float const value)
+	{
+		return static_cast<long>(value >= 0.0f ? std::floor(value + 0.5f) : std::ceil(value - 0.5f));
+	}
+
+	long floorLocalCoordinate(float const value)
+	{
+		return static_cast<long>(std::floor(value));
+	}
+
+	UIPoint getParentPointFromLocal(UIWidget const & widget, UIPoint const & localPoint)
+	{
+		// Widget origins are parent-layout coordinates. Apply only the widget's
+		// own scale so mouse-locked movement remains in that stable space.
+		float const scale = widget.GetScale();
+		return widget.GetLocation() + UIPoint(
+			roundWorldCoordinate(scale * static_cast<float>(localPoint.x)),
+			roundWorldCoordinate(scale * static_cast<float>(localPoint.y)));
+	}
+
+	bool hasScaledWidgetInHierarchy(UIWidget const & widget)
+	{
+		UIBaseObject const * object = &widget;
+		while (object)
+		{
+			if (object->IsA(TUIWidget) && static_cast<UIWidget const *>(object)->GetScale() != 1.0f)
+				return true;
+
+			object = object->GetParent();
+		}
+
+		return false;
+	}
+
+	WidgetWorldTransform getWidgetWorldTransform(UIWidget const & widget)
+	{
+		typedef std::vector<UIWidget const *> WidgetChain;
+		WidgetChain chain;
+
+		UIBaseObject const * object = &widget;
+		while (object)
+		{
+			if (object->IsA(TUIWidget))
+				chain.push_back(static_cast<UIWidget const *>(object));
+
+			object = object->GetParent();
+		}
+
+		WidgetWorldTransform result = { 0.0f, 0.0f, 1.0f };
+		for (WidgetChain::const_reverse_iterator iterator = chain.rbegin(); iterator != chain.rend(); ++iterator)
+		{
+			UIWidget const & current = **iterator;
+			result.originX += result.scale * static_cast<float>(current.GetLocation().x);
+			result.originY += result.scale * static_cast<float>(current.GetLocation().y);
+
+			result.scale *= current.GetScale();
+			if (&current != &widget)
+			{
+				result.originX -= result.scale * static_cast<float>(current.GetScrollLocation().x);
+				result.originY -= result.scale * static_cast<float>(current.GetScrollLocation().y);
+			}
+		}
+
+		return result;
+	}
+
 	//-----------------------------------------------------------------
 /*
 	else if(categoryName == CategoryName::Appearance)
@@ -176,6 +251,7 @@ namespace UIWidgetNamespace
 		_DESCRIPTOR(PackSize,"",T_string),
 		_DESCRIPTOR(ResizeInset,"",T_int),
 		_DESCRIPTOR(Rotation,"",T_string),
+		_DESCRIPTOR(Scale,"1",T_float),
 		_DESCRIPTOR(ScrollExtent,"",T_string),
 		_DESCRIPTOR(ScrollSizeLine,"",T_string),
 		_DESCRIPTOR(ScrollSizePage,"",T_string),
@@ -281,6 +357,7 @@ mSize                (),
 mScrollLocation      (),
 mScrollExtent        (),
 mRotation            (0.0f),
+mScale               (1.0f),
 mCursor              (0),
 mDragBadCursor       (0),
 mDragGoodCursor      (0),
@@ -298,6 +375,7 @@ mMinimumScrollExtent (0, 0),
 mSizeIncrement       (1L,1L),
 mCurrentUserModificationType     (UMT_NONE),
 mUserModificationStartPoint      (),
+mUserModificationStartPointInParent (),
 mUserModificationStartWidgetRect (),
 mCursorSet           (0),
 mBoundaries          (0),
@@ -437,7 +515,20 @@ void UIWidget::SetRect( const UIRect &NewRect )
 void UIWidget::GetWorldRect( UIRect &Out ) const
 {
 	DEBUG_DESTROYED();
-	
+
+	if (hasScaledWidgetInHierarchy(*this))
+	{
+		WidgetWorldTransform const transform = getWidgetWorldTransform(*this);
+		// Match the half-open pixel coverage used by scaled rendering and
+		// clipping: minimum edges expand down, maximum edges expand up.  Nearest
+		// rounding can omit a visibly rendered edge pixel at fractional scales.
+		Out.left = static_cast<long>(std::floor(transform.originX));
+		Out.top = static_cast<long>(std::floor(transform.originY));
+		Out.right = static_cast<long>(std::ceil(transform.originX + transform.scale * static_cast<float>(mSize.x)));
+		Out.bottom = static_cast<long>(std::ceil(transform.originY + transform.scale * static_cast<float>(mSize.y)));
+		return;
+	}
+
 	const UIBaseObject *Parent = GetParent();
 
 	GetRect( Out );
@@ -471,7 +562,15 @@ UIRect UIWidget::GetWorldRect () const
 void UIWidget::GetWorldLocation( UIPoint &Out ) const
 {
 	DEBUG_DESTROYED();
-	
+
+	if (hasScaledWidgetInHierarchy(*this))
+	{
+		WidgetWorldTransform const transform = getWidgetWorldTransform(*this);
+		Out.x = roundWorldCoordinate(transform.originX);
+		Out.y = roundWorldCoordinate(transform.originY);
+		return;
+	}
+
 	const UIBaseObject *Parent = GetParent();
 
 	Out = GetLocation();
@@ -485,6 +584,36 @@ void UIWidget::GetWorldLocation( UIPoint &Out ) const
 		}
 		Parent = Parent->GetParent();
 	}
+}
+
+//----------------------------------------------------------------------
+
+UIPoint UIWidget::GetWorldPointFromLocal(UIPoint const & localPoint) const
+{
+	DEBUG_DESTROYED();
+
+	if (!hasScaledWidgetInHierarchy(*this))
+		return GetWorldLocation() + localPoint;
+
+	WidgetWorldTransform const transform = getWidgetWorldTransform(*this);
+	return UIPoint(
+		roundWorldCoordinate(transform.originX + transform.scale * static_cast<float>(localPoint.x)),
+		roundWorldCoordinate(transform.originY + transform.scale * static_cast<float>(localPoint.y)));
+}
+
+//----------------------------------------------------------------------
+
+UIPoint UIWidget::GetLocalPointFromWorld(UIPoint const & worldPoint) const
+{
+	DEBUG_DESTROYED();
+
+	if (!hasScaledWidgetInHierarchy(*this))
+		return worldPoint - GetWorldLocation();
+
+	WidgetWorldTransform const transform = getWidgetWorldTransform(*this);
+	return UIPoint(
+		floorLocalCoordinate((static_cast<float>(worldPoint.x) - transform.originX) / transform.scale),
+		floorLocalCoordinate((static_cast<float>(worldPoint.y) - transform.originY) / transform.scale));
 }
 
 //----------------------------------------------------------------------
@@ -604,6 +733,27 @@ void UIWidget::SetSize(UISize const & NewSize)
 
 		// External.
 		SendCallback(&UIEventCallback::OnSizeChanged, PropertyName::OnSizeChanged);
+	}
+}
+
+//-----------------------------------------------------------------
+
+void UIWidget::SetScale(float const scale)
+{
+	DEBUG_DESTROYED();
+
+	if (scale <= 0.0f || !std::isfinite(scale) || scale == mScale)
+		return;
+
+	mScale = scale;
+
+	UIBaseObject * object = this;
+	while (object)
+	{
+		if (object->IsA(TUIWidget))
+			static_cast<UIWidget *>(object)->SetAttribute(BF_UnderMouseUpdated, false);
+
+		object = object->GetParent();
 	}
 }
 
@@ -1246,6 +1396,7 @@ bool UIWidget::ProcessUserMouseMove (const UIMessage & msg)
 			parentSize = static_cast<UIWidget *>(GetParent ())->GetSize ();
 
 		const UIPoint diff ((msg.MouseCoords - mUserModificationStartPoint) + (mLocation - mUserModificationStartWidgetRect.Location ()));
+		const UIPoint moveDiff (getParentPointFromLocal(*this, msg.MouseCoords) - mUserModificationStartPointInParent);
 
 		UIPoint resizeDiff (diff);
 
@@ -1320,9 +1471,9 @@ bool UIWidget::ProcessUserMouseMove (const UIMessage & msg)
 			rect.top    = std::max (0L, std::min (parentSize.y, rect.top    + resizeDiff.y));
 			break;
 		case UMT_MOVE:
-			if(diff.x!= 0 || diff.y != 0 )
+			if(moveDiff.x != 0 || moveDiff.y != 0)
 				s_hasDragMovedYet = true;
-			rect        += diff;
+			rect += moveDiff;
 
 			if ((rect.top < 0L) && (rect.bottom < 0L))
 			{
@@ -1459,6 +1610,7 @@ bool UIWidget::ProcessUserMessage (const UIMessage & msg)
 				SetAttribute(BF_UserModifying, true);
 				s_hasDragMovedYet = false;
 				mUserModificationStartPoint = msg.MouseCoords;
+				mUserModificationStartPointInParent = getParentPointFromLocal(*this, msg.MouseCoords);
 				GetRect (mUserModificationStartWidgetRect);
 
 				if (mCurrentUserModificationType == UMT_DRAGSCROLL)
@@ -2043,6 +2195,7 @@ void UIWidget::GetPropertyNames( UIPropertyNameVector &In, bool forCopy ) const
 		In.push_back( PropertyName::PackSize );
 		In.push_back( PropertyName::PalShade);
 		In.push_back( PropertyName::Rotation );
+		In.push_back( PropertyName::Scale );
 		In.push_back( PropertyName::ScrollExtent );
 		In.push_back( PropertyName::ScrollLocation );
 		In.push_back( PropertyName::ScrollSizeLine );
@@ -2111,6 +2264,7 @@ void UIWidget::GetPropertiesInCategory (UIPropertyCategories::Category category,
 		In.push_back( PropertyName::PackSize );
 		In.push_back( PropertyName::ResizeInset );
 		In.push_back( PropertyName::Rotation );
+		In.push_back( PropertyName::Scale );
 		In.push_back( PropertyName::ScrollExtent );
 		In.push_back( PropertyName::ScrollLocation );
 		In.push_back( PropertyName::ScrollSizeLine );
@@ -2503,6 +2657,15 @@ bool UIWidget::SetProperty( const UILowerString & Name, const UIString &Value )
 		{
 			return UIUtils::ParseFloat( Value, mRotation );
 		}
+	}
+	else if( Name == PropertyName::Scale )
+	{
+		float scale = 1.0f;
+		if (!UIUtils::ParseFloat(Value, scale) || scale <= 0.0f || !std::isfinite(scale))
+			return false;
+
+		SetScale(scale);
+		return true;
 	}
 	//----------------------------------------------------------------------
 
@@ -3266,6 +3429,8 @@ bool UIWidget::GetProperty( const UILowerString & Name, UIString &Value ) const
 		else
 			return UIUtils::FormatFloat( Value, mRotation );
 	}
+	else if( Name == PropertyName::Scale )
+		return UIUtils::FormatFloat(Value, mScale);
 
 	//----------------------------------------------------------------------
 
@@ -3820,7 +3985,7 @@ UIWidget * UIWidget::GetCustomDragWidget (const UIPoint & pt, UIPoint & offset )
 		if (mCustomDragWidget->GetParent () == 0)
 			offset = -(mCustomDragWidget->GetSize () / 2L);
 		else
-			offset -= (mCustomDragWidget->GetWorldLocation () + (mCustomDragWidget->GetSize () / 2L)) - GetWorldLocation ();
+			offset = -mCustomDragWidget->GetLocalPointFromWorld(GetWorldPointFromLocal(pt));
 
 		//-- offsets for custom widgets must be negative
 		offset.x = std::min (0L, offset.x);
@@ -4092,6 +4257,7 @@ void UIWidget::CopyPropertiesFrom( const UIBaseObject & rhs)
 		SetAttribute (BF_TextOpacityRelativeApply, rhs_widget.HasAttribute(BF_TextOpacityRelativeApply));
 		mTextOpacityRelativeMin = rhs_widget.mTextOpacityRelativeMin;
 		SetRotation(rhs_widget.GetRotation());
+		SetScale(rhs_widget.GetScale());
 		SetSize(rhs_widget.GetSize());
 		SetSizeIncrement(rhs_widget.GetSizeIncrement());
 		SetMinimumScrollExtent(rhs_widget.GetMinimumScrollExtent());
@@ -4569,7 +4735,15 @@ bool UIWidget::GetChildRectForShrinkWrap(UIRect & childRect) const
 		if (widget && widget->WillDraw())
 		{
 			hasValidChildren = true;
-			childRect.Extend(widget->GetWorldRect()); // extend in world space.
+
+			// Child locations live in this widget's logical coordinate space.
+			// Remove this widget's scroll and apply only the child's own scale;
+			// ancestor and wrapper scales must not leak back into layout sizes.
+			UIPoint const childLocation(widget->GetLocation() - GetScrollLocation());
+			UISize const childSize(
+				static_cast<long>(std::ceil(static_cast<float>(widget->GetWidth()) * widget->GetScale())),
+				static_cast<long>(std::ceil(static_cast<float>(widget->GetHeight()) * widget->GetScale())));
+			childRect.Extend(UIRect(childLocation, childSize));
 		}
 	}
 
@@ -4596,8 +4770,11 @@ void UIWidget::WrapChildren()
 				SetSize(newSize);
 				SetScrollExtent(newSize);
 
-				// Set the location.
-				UIPoint const & newLocation = newRect.Location() - parentWidget->GetWorldLocation();
+				// Convert the wrapped local origin through both widget transforms.
+				// Parent scroll is part of child layout coordinates, so restore it
+				// after converting the physical world point to parent-local space.
+				UIPoint const childWorldLocation = GetWorldPointFromLocal(newRect.Location());
+				UIPoint const newLocation = parentWidget->GetLocalPointFromWorld(childWorldLocation) + parentWidget->GetScrollLocation();
 				SetLocation(newLocation);
 			}
 			else

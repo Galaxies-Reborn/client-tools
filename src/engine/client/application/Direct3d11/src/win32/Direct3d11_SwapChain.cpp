@@ -46,6 +46,9 @@ namespace Direct3d11_SwapChainNamespace
 	int                       ms_height;
 	UINT                      ms_swapChainFlags;
 	bool                      ms_warnedAboutSubRectDepthClear;
+	bool                      ms_occluded;
+	ULONGLONG                 ms_nextOcclusionProbeTick;
+	bool                      ms_warnedAboutUnexpectedOcclusionProbeResult;
 
 	D3D11_VIEWPORT            ms_viewport;
 
@@ -53,11 +56,13 @@ namespace Direct3d11_SwapChainNamespace
 	// position sentinel matters: Graphics uses INT_MAX for "no saved position",
 	// not 0 and not -1 (Graphics.cpp:103-104).
 	int const                 cms_noSavedWindowPosition = 0x7fffffff;
+	ULONGLONG const           cms_occlusionProbeIntervalMilliseconds = 100;
 
 	bool                      createSwapChain();
 	bool                      createBackBufferViews();
 	void                      releaseBackBufferViews();
 	void                      updateWindowSettings();
+	bool                      probeOcclusion(bool &visible);
 }
 using namespace Direct3d11_SwapChainNamespace;
 
@@ -296,6 +301,9 @@ bool Direct3d11_SwapChain::install(Gl_install *gl_install)
 	ms_windowX             = gl_install->windowX;
 	ms_windowY             = gl_install->windowY;
 	ms_windowedModeChanged = gl_install->windowedModeChanged;
+	ms_occluded            = false;
+	ms_nextOcclusionProbeTick = 0;
+	ms_warnedAboutUnexpectedOcclusionProbeResult = false;
 
 	FATAL(!ms_window, ("Direct3d11: install was given a null window."));
 	FATAL(ms_width <= 0 || ms_height <= 0, ("Direct3d11: install was given a %dx%d frame buffer.", ms_width, ms_height));
@@ -340,6 +348,9 @@ void Direct3d11_SwapChain::remove()
 		ms_swapChain = NULL;
 	}
 
+	ms_occluded = false;
+	ms_nextOcclusionProbeTick = 0;
+	ms_warnedAboutUnexpectedOcclusionProbeResult = false;
 	ms_installed = false;
 }
 
@@ -503,6 +514,58 @@ void Direct3d11_SwapChain::endScene()
 
 // ----------------------------------------------------------------------
 /**
+ * Check whether a previously occluded window can present again.
+ *
+ * DXGI_PRESENT_TEST does not submit the back buffer. DO_NOT_WAIT is equally
+ * important here: an occlusion check must never turn into another main-thread
+ * wait while Windows is changing focus or the desktop compositor is busy.
+ */
+
+bool Direct3d11_SwapChainNamespace::probeOcclusion(bool &visible)
+{
+	visible = false;
+
+	ULONGLONG const now = GetTickCount64();
+	if (now < ms_nextOcclusionProbeTick)
+		return true;
+
+	ms_nextOcclusionProbeTick = now + cms_occlusionProbeIntervalMilliseconds;
+
+	HRESULT const hresult = ms_swapChain->Present(0, DXGI_PRESENT_TEST | DXGI_PRESENT_DO_NOT_WAIT);
+	Direct3d11_Device::checkForDeviceRemoved(hresult, "Present occlusion probe");
+
+	if (hresult == S_OK)
+	{
+		ms_occluded = false;
+		ms_nextOcclusionProbeTick = 0;
+		ms_warnedAboutUnexpectedOcclusionProbeResult = false;
+		visible = true;
+		return true;
+	}
+
+	if (hresult == DXGI_STATUS_OCCLUDED || hresult == DXGI_ERROR_WAS_STILL_DRAWING)
+		return true;
+
+	if (FAILED(hresult))
+	{
+		++Direct3d11_Metrics::presentFailures;
+		WARNING(true, ("Direct3d11: Present occlusion probe failed (%s).", Direct3d11_Device::describeHresult(hresult)));
+		return false;
+	}
+
+	// S_OK is the only result that proves a real Present can proceed. Keep the
+	// standby state for any other successful status and report it only once.
+	if (!ms_warnedAboutUnexpectedOcclusionProbeResult)
+	{
+		WARNING(true, ("Direct3d11: Present occlusion probe returned an unexpected status (%s); remaining in standby.", Direct3d11_Device::describeHresult(hresult)));
+		ms_warnedAboutUnexpectedOcclusionProbeResult = true;
+	}
+
+	return true;
+}
+
+// ----------------------------------------------------------------------
+/**
  * Show the frame.
  *
  * No caller checks the return value -- Game::run wraps both present calls in
@@ -516,6 +579,35 @@ bool Direct3d11_SwapChain::present()
 
 	if (!ms_swapChain)
 		return false;
+
+	// Windows exposes minimize/explicit-hide state before DXGI has to discover
+	// occlusion. Enter standby here so even the transition frame cannot reach a
+	// normal Present. Restoration still has to pass the TEST-present gate below.
+	if (IsIconic(ms_window) || !IsWindowVisible(ms_window))
+	{
+		if (!ms_occluded)
+		{
+			ms_occluded = true;
+			ms_nextOcclusionProbeTick = GetTickCount64() + cms_occlusionProbeIntervalMilliseconds;
+			ms_warnedAboutUnexpectedOcclusionProbeResult = false;
+		}
+
+		return true;
+	}
+
+	// Once DXGI reports complete occlusion, do no back-buffer work until a
+	// rate-limited, nonblocking TEST present proves the window is visible. This
+	// layer cannot stop the engine from rendering its scene target, but it can
+	// avoid the composite and every other presentation-side operation.
+	if (ms_occluded)
+	{
+		bool visible = false;
+		if (!probeOcclusion(visible))
+			return false;
+
+		if (!visible)
+			return true;
+	}
 
 	// Whatever the debug layer complained about during this frame. No-op unless debugLayer is on.
 	Direct3d11_Device::drainDebugMessages();
@@ -606,7 +698,8 @@ bool Direct3d11_SwapChain::present()
 	}
 
 	UINT const syncInterval = (ms_swapChainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) ? 0 : 1;
-	UINT const presentFlags = (ms_swapChainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) ? DXGI_PRESENT_ALLOW_TEARING : 0;
+	UINT const presentFlags = DXGI_PRESENT_DO_NOT_WAIT |
+		((ms_swapChainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING) ? DXGI_PRESENT_ALLOW_TEARING : 0);
 
 	HRESULT const hresult = ms_swapChain->Present(syncInterval, presentFlags);
 
@@ -614,10 +707,20 @@ bool Direct3d11_SwapChain::present()
 
 	Direct3d11_Device::checkForDeviceRemoved(hresult, "Present");
 
+	if (hresult == DXGI_ERROR_WAS_STILL_DRAWING)
+	{
+		// The compositor or present queue is temporarily busy. This frame was not
+		// submitted, but the main thread also did not stall; the next frame may retry.
+		return true;
+	}
+
 	if (hresult == DXGI_STATUS_OCCLUDED)
 	{
-		// The window is fully hidden. Not an error, and not worth a log line
-		// every frame while the user has something else maximised.
+		// Retain the state so subsequent calls skip compositing and use only a
+		// low-rate TEST present until Windows says the window is visible again.
+		ms_occluded = true;
+		ms_nextOcclusionProbeTick = GetTickCount64() + cms_occlusionProbeIntervalMilliseconds;
+		ms_warnedAboutUnexpectedOcclusionProbeResult = false;
 		return true;
 	}
 

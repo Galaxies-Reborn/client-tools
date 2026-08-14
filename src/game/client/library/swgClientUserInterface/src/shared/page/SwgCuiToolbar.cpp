@@ -1491,7 +1491,7 @@ bool SwgCuiToolbar::OnMessage(UIWidget *context, const UIMessage & msg)
 		
 		appendPopupOptions(pop);
 		
-		pop->SetLocation (context->GetWorldLocation () + msg.MouseCoords + UIPoint::one);
+		pop->SetLocation (context->GetWorldPointFromLocal(msg.MouseCoords) + UIPoint::one);
 		pop->AddCallback (this);
 		UIManager::gUIManager ().PushContextWidget (*pop);
 		return false;
@@ -1679,11 +1679,11 @@ bool SwgCuiToolbar::OnMessage(UIWidget *context, const UIMessage & msg)
 		
 		if (context == getPageToLock())
 		{
-			UISize size = m_volumePage->GetSize();
-			UIPoint Min = m_volumePage->GetLocation() + getPageToLock()->GetWorldLocation();
-			UIPoint Max = Min + size;
+			UIRect const volumeRect = m_volumePage->GetWorldRect();
+			UIPoint const Min(volumeRect.left, volumeRect.top);
+			UIPoint const Max(volumeRect.right, volumeRect.bottom);
 
-			UIPoint mouse = getPageToLock()->GetWorldLocation() + msg.MouseCoords;
+			UIPoint const mouse = getPageToLock()->GetWorldPointFromLocal(msg.MouseCoords);
 			
 			bool notOverVolume = !(mouse.x >= Min.x && mouse.x <= Max.x && mouse.y >= Min.y && mouse.y <= Max.y);
 			if (notOverVolume)
@@ -2542,6 +2542,10 @@ void SwgCuiToolbar::onCommandAdded (const CreatureObject::Messages::CommandAdded
  */
 void SwgCuiToolbar::update (float deltaTimeSecs)
 {
+	float const uiScale = CuiPreferences::getSkillBarUiScale();
+	if (getPage().GetScale() != uiScale)
+		getPage().SetScale(uiScale);
+
 	CuiMediator::update (deltaTimeSecs);
 
 	if(m_mouseOverPage)
@@ -2949,8 +2953,8 @@ void SwgCuiToolbar::update (float deltaTimeSecs)
 			if (m_mouseOverPage) 
 			{
 				m_mouseOverPage->SetVisible(true);
-				UIPoint parentPoint = m_toolbarPage ? m_toolbarPage->GetWorldLocation() : getPage().GetWorldLocation();
-				UIPoint p = widget->GetWorldLocation() - parentPoint;
+				UIWidget * const parentWidget = m_toolbarPage ? static_cast<UIWidget *>(m_toolbarPage) : static_cast<UIWidget *>(&getPage());
+				UIPoint const p = parentWidget->GetLocalPointFromWorld(widget->GetWorldLocation());
 				m_mouseOverPage->SetLocation(p);
 			}
 		}
@@ -3078,7 +3082,7 @@ void SwgCuiToolbar::update (float deltaTimeSecs)
 							if(!currentActionPage->IsVisible())
 								resetVisiblity = true;
 							currentActionPage->SetVisible(true);
-							UIPoint p = widget->GetWorldLocation() - getPage().GetWorldLocation();
+							UIPoint const p = getPage().GetLocalPointFromWorld(widget->GetWorldLocation());
 							currentActionPage->SetLocation(p);
 							if(resetVisiblity)
 							{								
@@ -3096,7 +3100,7 @@ void SwgCuiToolbar::update (float deltaTimeSecs)
 								UIPage *failedActionPage = getPageFromPool(m_failedActionPage, m_failedActionPages, m_nextFailedActionPage);
 								failedActionPage->SetVisible(false);								
 								failedActionPage->SetVisible(true);
-								UIPoint p = widget->GetWorldLocation() - getPage().GetWorldLocation();
+								UIPoint const p = getPage().GetLocalPointFromWorld(widget->GetWorldLocation());
 								failedActionPage->SetLocation(p);
 							}
 							// This only needs to get shown once because it fades quickly, we don't have to worry about
@@ -3127,7 +3131,7 @@ void SwgCuiToolbar::update (float deltaTimeSecs)
 						{								
 							UIPage *wrongWeaponTypePage = getPageFromPool(m_wrongWeaponTypePage, m_wrongWeaponTypePages, m_nextWrongWeaponTypePage);
 							wrongWeaponTypePage->SetVisible(true);
-							UIPoint p = widget->GetWorldLocation() - getPage().GetWorldLocation();
+							UIPoint const p = getPage().GetLocalPointFromWorld(widget->GetWorldLocation());
 							wrongWeaponTypePage->SetLocation(p);
 							wrongWeaponTypePage->SetAbsorbsInput(false);							
 						}
@@ -3268,7 +3272,7 @@ void SwgCuiToolbar::doWhiteFlash (const uint32 strCrc)
 						UIPage *whiteFlashPage = getPageFromPool(m_whiteFlashPage, m_whiteFlashPages, m_nextWhiteFlashPage);
 						if (widget != 0 && whiteFlashPage != 0)
 						{
-							UIPoint p = widget->GetWorldLocation() - getPage().GetWorldLocation();
+							UIPoint const p = getPage().GetLocalPointFromWorld(widget->GetWorldLocation());
 							whiteFlashPage->SetLocation(p);
 						}
 					}	
@@ -4269,7 +4273,11 @@ void SwgCuiToolbar::setDefaultAction(int slot, bool activateActionIfNeeded)
 		m_defaultActionSlot = slot;
 
 		GroundCombatActionManager::setCurrentSecondaryAction(getCommandName(m_defaultActionSlot), object);
-		if(activateActionIfNeeded && CuiPreferences::getCanFireSecondariesFromToolbar())
+		// Publish 14 input schemes do not carry the later
+		// F_canFireSecondariesFromToolbar flag.  Explicit slot activation (a
+		// toolbar click or bound hotkey) must still execute the selected command;
+		// callers that only want to change the selected action pass false.
+		if(activateActionIfNeeded)
 		{			
 			GroundCombatActionManager::attemptAction(GroundCombatActionManager::AT_secondaryAttackFromToolbar);
 		}

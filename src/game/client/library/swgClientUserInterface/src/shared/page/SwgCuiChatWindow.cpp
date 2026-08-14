@@ -679,6 +679,7 @@ SwgCuiChatWindow::~SwgCuiChatWindow()
 
 void SwgCuiChatWindow::performActivate()
 {
+	getPage().SetScale(CuiPreferences::getChatUiScale());
 	setEnabled(true);
 	acceptTextInput(false);
 
@@ -1244,7 +1245,7 @@ bool SwgCuiChatWindow::OnMessage(UIWidget *context, const UIMessage & msg)
 
 		appendPopupOptions(pop);
 
-		pop->SetLocation(context->GetWorldLocation() + msg.MouseCoords + UIPoint::one);
+		pop->SetLocation(context->GetWorldPointFromLocal(msg.MouseCoords) + UIPoint::one);
 		pop->SetPopupLocation(pop->GetLocation());
 		pop->AddCallback(this);
 		UIManager::gUIManager().PushContextWidget(*pop);
@@ -1329,10 +1330,10 @@ bool SwgCuiChatWindow::OnMessage(UIWidget *context, const UIMessage & msg)
 		}
 		else if (msg.Type == UIMessage::RightMouseUp)
 		{
-			UISize size = m_tabs->GetSize();
-			UIPoint Min = m_tabs->GetLocation() + getPage().GetWorldLocation();
-			UIPoint Max = Min + size;
-			UIPoint mouse = getPage().GetWorldLocation() + msg.MouseCoords;
+			UIRect const tabsRect = m_tabs->GetWorldRect();
+			UIPoint const Min(tabsRect.left, tabsRect.top);
+			UIPoint const Max(tabsRect.right, tabsRect.bottom);
+			UIPoint const mouse = getPage().GetWorldPointFromLocal(msg.MouseCoords);
 
 			bool notOverTabsPage = !(mouse.x >= Min.x && mouse.x <= Max.x && mouse.y >= Min.y && mouse.y <= Max.y);
 			
@@ -2965,6 +2966,20 @@ void SwgCuiChatWindow::fontSizeIncrementAllWindows(int increment)
 
 //----------------------------------------------------------------------
 
+void SwgCuiChatWindow::applyUiScaleToAllWindows(float const scale)
+{
+	for (int sceneType = 0; sceneType < Game::ST_numTypes; ++sceneType)
+	{
+		for (ChatWindowSet::iterator it = ms_activeChatWindows[sceneType].begin(); it != ms_activeChatWindows[sceneType].end(); ++it)
+		{
+			SwgCuiChatWindow * const chatWindow = NON_NULL(*it);
+			chatWindow->getPage().SetScale(scale);
+		}
+	}
+}
+
+//----------------------------------------------------------------------
+
 void SwgCuiChatWindow::onChatFontSizeChanged()
 {
 	Game::SceneType const sceneType = Game::getHudSceneType();
@@ -3214,6 +3229,10 @@ void SwgCuiChatWindow::OnHoverOut( UIWidget *Context )
 
 void SwgCuiChatWindow::update(float deltaTimeSecs)
 {
+	float const uiScale = CuiPreferences::getChatUiScale();
+	if (getPage().GetScale() != uiScale)
+		getPage().SetScale(uiScale);
+
 	Tab* activeTab = getActiveTab ();
 
 	if(activeTab)

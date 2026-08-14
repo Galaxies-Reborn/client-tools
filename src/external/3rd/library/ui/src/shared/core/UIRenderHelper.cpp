@@ -10,6 +10,7 @@
 #include "UITextStyle.h"
 #include "UIText.h"
 #include <cassert>
+#include <cmath>
 
 //======================================================================
 namespace UIRenderHelperNamespace
@@ -61,12 +62,28 @@ inline void UIRenderHelper::RenderWidget (UICanvas & DestinationCanvas, UIWidget
 	{
 		DestinationCanvas.Flush();
 		
-		const UIPoint & translate  = w.GetLocation () - w.GetScrollLocation ();
+		const float scale          = w.GetScale ();
 		UIRect  rect               = w.GetRect ();
+
+		if (scale != 1.0f)
+		{
+			rect.right = rect.left + static_cast<long>(std::ceil(static_cast<float>(w.GetWidth()) * scale));
+			rect.bottom = rect.top + static_cast<long>(std::ceil(static_cast<float>(w.GetHeight()) * scale));
+		}
 
 		if (DestinationCanvas.Clip (rect))
 		{
-			DestinationCanvas.Translate (translate);
+			if (scale == 1.0f)
+			{
+				const UIPoint & translate = w.GetLocation () - w.GetScrollLocation ();
+				DestinationCanvas.Translate (translate);
+			}
+			else
+			{
+				DestinationCanvas.Translate (w.GetLocation ());
+				DestinationCanvas.Scale (scale, scale);
+				DestinationCanvas.Translate (-w.GetScrollLocation ());
+			}
 			
 			if( w.GetRotation() != 0.0f )
 			{

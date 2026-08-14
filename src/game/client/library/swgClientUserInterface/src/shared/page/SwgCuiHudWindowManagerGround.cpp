@@ -155,7 +155,11 @@ m_petStatusPage(NULL)
 			{
 				mediatorPage->SetEnabled(false);
 				mediatorPage->SetEnabled(true);
-				m_targetStatusPage->setSettingsAutoSizeLocation(true, true);
+				// HAM Enhanced owns the target's vertical geometry.  Loading a
+				// previously saved retail-height rectangle after construction clips
+				// the enhanced Mind row.  Location remains user-persistent; visual
+				// size is controlled by the HAM scale preference.
+				m_targetStatusPage->setSettingsAutoSizeLocation(false, true);
 				m_targetStatusPage->setStickyVisible(true);
 				m_targetStatusPage->fetch();
 				m_targetStatusPage->activate();
@@ -215,7 +219,9 @@ m_petStatusPage(NULL)
 			{
 				mediatorPage->SetEnabled(false);
 				mediatorPage->SetEnabled(true);
-				m_secondaryTargetStatusPage->setSettingsAutoSizeLocation(true, true);
+				// The runtime-duplicated target-of-target uses the same authored HAM
+				// layout and must not inherit a stale saved target height.
+				m_secondaryTargetStatusPage->setSettingsAutoSizeLocation(false, true);
 				m_secondaryTargetStatusPage->setStickyVisible(true);
 				m_secondaryTargetStatusPage->fetch();
 				m_secondaryTargetStatusPage->activate();
@@ -660,7 +666,9 @@ void SwgCuiHudWindowManagerGround::createPlayerStatusPage()
 			NOT_NULL(player);
 			m_playerStatusPage->setTarget(player);
 			mediatorPage->SetVisible(true);
-			m_playerStatusPage->setSettingsAutoSizeLocation(true, true);			
+			// Preserve placement, but keep standard/enhanced height under the
+			// authored HAM layout instead of a stale workspace size.
+			m_playerStatusPage->setSettingsAutoSizeLocation(false, true);
 			m_playerStatusPage->setStickyVisible (true);
 			m_playerStatusPage->fetch();
 			m_playerStatusPage->activate();

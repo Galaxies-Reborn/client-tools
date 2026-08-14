@@ -589,6 +589,27 @@ void SwgCuiManager::update (float deltaTimeSecs)
 	}
 	else if (Game::getHudSceneType() != Game::getLastHudSceneType() && Game::getLastHudSceneType() != Game::ST_numTypes)
 	{
+		// Atmospheric flight changes the player's ship station without changing
+		// the terrain scene.  A normal space load selects the cockpit during its
+		// loading pass; the live ground-to-pilot transition needs the equivalent
+		// camera handoff before the HUD and input map switch to their space forms.
+		GroundScene * const groundScene = dynamic_cast<GroundScene *>(Game::getScene());
+		CreatureObject const * const player = Game::getPlayerCreature();
+		if (groundScene && player && !Game::isSpace())
+		{
+			int const station = player->getShipStation();
+			if (Game::getHudSceneType() == Game::ST_space &&
+				(station == ShipStation::ShipStation_Pilot || station == ShipStation::ShipStation_Operations))
+			{
+				groundScene->setView(GroundScene::CI_cockpit);
+			}
+			else if (Game::getHudSceneType() == Game::ST_ground &&
+				groundScene->getCurrentView() == GroundScene::CI_cockpit)
+			{
+				groundScene->setView(GroundScene::CI_freeChase);
+			}
+		}
+
 		//mark that we're changing hud types, so the scene_changed message that is generated don't spawn additional load screen work
 		s_handlingHudTypeChange = true;
 		Game::emitSceneChange();

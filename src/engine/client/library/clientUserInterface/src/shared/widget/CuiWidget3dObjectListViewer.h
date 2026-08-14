@@ -226,6 +226,7 @@ public:
 
 	void                      clearObjects             ();
 	void                      addObject                (Object & obj);
+	void                      addObject                (Object & logicalObject, Object & renderObject);
 	void                      removeObject             (Object & obj);
 	void                      setObject                (Object * obj);
 
@@ -305,6 +306,8 @@ private:
 	void                      updateObjectName           ();
 	void                      checkRenderLimits          ();
 	void recomputeNearAndFarPlanes();
+	UIFloatPoint controlToPhysical(UIFloatPoint const & point) const;
+	UIFloatPoint physicalToControl(UIFloatPoint const & point) const;
 
 protected:
 
@@ -344,6 +347,9 @@ private:
 	float                     m_fieldOfView;
 
 	mutable UIRect            m_viewport;
+	mutable UIFloatPoint      m_controlToPhysicalOrigin;
+	mutable UIFloatPoint      m_controlToPhysicalBasisX;
+	mutable UIFloatPoint      m_controlToPhysicalBasisY;
 
 	UIRect                    m_fitRect;
 

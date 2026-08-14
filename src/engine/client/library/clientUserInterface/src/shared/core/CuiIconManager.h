@@ -53,6 +53,7 @@ public:
 
 	static CuiWidget3dObjectListViewer * createObjectIcon       (ClientObject & obj, const char * const dragType);
 	static CuiWidget3dObjectListViewer * createObjectIcon       (Object & obj, const char * const dragType);
+	static Object *                      getObjectPreviewRenderObject(Object & logicalObject);
 	static void                          registerObjectIcon     (CuiWidget3dObjectListViewer & viewer, CuiIconManagerCallback * callback, bool minimalTooltip = true);
 	static void                          unregisterObjectIcon   (CuiWidget3dObjectListViewer & viewer);
 	static void                          unregisterIconsForPage (UIPage & page);

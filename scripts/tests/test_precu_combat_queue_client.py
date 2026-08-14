@@ -135,8 +135,9 @@ class PrecuCombatQueueClientTests(unittest.TestCase):
             self.status_ground_cpp,
             "bool SwgCuiStatusGround::updateTargetHam(CreatureObject const & creature",
         )
-        self.assertIn("if(m_isLookAtTarget ||", update_ham)
         self.assertIn("pageStyle = PS_ham", update_ham)
+        self.assertNotIn("pageStyle = PS_healthOnly", update_ham)
+        self.assertNotIn("creature.getAttribute(Attributes::Action) > 0", update_ham)
 
     def test_radial_attack_and_double_click_share_the_basic_attack_path(self) -> None:
         combat_attack = function_body(

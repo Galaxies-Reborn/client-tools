@@ -20,6 +20,7 @@ class UIScrollbar;
 class UIVolumePage;
 class SwgCuiBuffDisplay;
 class SwgCuiMfdStatus;
+class SwgCuiGroupHamEnhanceState;
 class UIButton;
 class UIComposite;
 class UIText;
@@ -79,6 +80,7 @@ private:
 	void clearMembers();
 	void activateMFDs(bool activate);
 	void resizeGroupWindow(int numElements);
+	void updateHamEnhanceLayout();
 	void generateMemberPopup(UIPopupMenu * pop);
 
 						~SwgCuiGroup ();
@@ -104,6 +106,8 @@ private:
 	bool                m_heightManuallySet;
 
 	int m_sceneType; // Game::SceneType
+	SwgCuiGroupHamEnhanceState * m_hamEnhanceState;
+	bool m_hamEnhanceApplied;
 };
 
 //======================================================================

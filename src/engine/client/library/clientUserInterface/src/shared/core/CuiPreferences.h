@@ -233,6 +233,19 @@ public:
 	static void                setHamEnhance(bool enabled);
 	static bool                getHamEnhance();
 
+	static void                setSkillBarUiScale(float scale);
+	static float               getSkillBarUiScale();
+	static void                setHamUiScale(float scale);
+	static float               getHamUiScale();
+	static void                setPartyUiScale(float scale);
+	static float               getPartyUiScale();
+	static void                setChatUiScale(float scale);
+	static float               getChatUiScale();
+	static void                setMenuUiScale(float scale);
+	static float               getMenuUiScale();
+	static float               getIndividualUiScaleMinimum();
+	static float               getIndividualUiScaleMaximum();
+
 	static void                setUseSwgMouseMap( bool b );
 	static bool                getUseSwgMouseMap();
 

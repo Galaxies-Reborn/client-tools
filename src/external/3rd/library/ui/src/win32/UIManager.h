@@ -287,6 +287,7 @@ private:
 	UIWidget *             mLastWidgetUnderMouse;
 	float                  mDragThreshold;	
 	UIPoint                mDragEchoOffset;
+	float                  mDragEchoScale;
 	bool                   mShowDragEcho;
 	bool                   mDragGood;
 	bool                   mAttemptToDrag;

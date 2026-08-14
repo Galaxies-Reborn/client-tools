@@ -14,6 +14,7 @@
 #include "UIText.h"
 
 #include <cassert>
+#include <cmath>
 #include <list>
 #include <map>
 
@@ -35,6 +36,22 @@ const UILowerString UIPage::MethodName::Wrap = UILowerString ("Wrap");
 
 namespace UIPageNamespace
 {
+	long inverseScaleCoordinate(long const coordinate, float const scale)
+	{
+		if (scale == 1.0f)
+			return coordinate;
+
+		return static_cast<long>(std::floor(static_cast<float>(coordinate) / scale));
+	}
+
+	UIPoint getChildLocalPoint(UIPage const & parent, UIWidget const & child, UIPoint const & parentPoint)
+	{
+		UIPoint const unscaled = parentPoint + parent.GetScrollLocation() - child.GetLocation();
+		return UIPoint(
+			inverseScaleCoordinate(unscaled.x, child.GetScale()),
+			inverseScaleCoordinate(unscaled.y, child.GetScale()));
+	}
+
 	//================================================================
 	// Basic category.
 	_GROUPBEGIN(Basic)
@@ -221,8 +238,8 @@ void UIPage::ReleaseMouseLock (const UIPoint & point)
 		if(o && o->IsA( TUIPage ) )
 		{
 			UIPage * const page = static_cast<UIPage *>(o);
-			
-			page->ReleaseMouseLock (point - page->GetLocation ());
+
+			page->ReleaseMouseLock(getChildLocalPoint(*this, *page, point));
 		}
 	}
 }
@@ -385,20 +402,9 @@ bool UIPage::ProcessMessage( const UIMessage &msg )
 		if( mWidgetWithMouseLock)
 		{
 			UIMessage TranslatedMessage;
-			UIPoint		p (mWidgetWithMouseLock->GetLocation());
-			
-			//-----------------------------------------------------------------
-			//-- widget with mouse lock may not be a direct child of the page
-
-			UIBaseObject * parent = mWidgetWithMouseLock;
-			while ((parent = parent->GetParent ()) != 0 && parent != this)
-			{
-				if (parent->IsA (TUIWidget))
-					p += static_cast<UIWidget *>(parent)->GetLocation ();
-			}
 
 			TranslatedMessage = msg;
-			TranslatedMessage.MouseCoords = (msg.MouseCoords - p) + GetScrollLocation();
+			TranslatedMessage.MouseCoords = mWidgetWithMouseLock->GetLocalPointFromWorld(GetWorldPointFromLocal(msg.MouseCoords));
 			
 			const bool Processed = mWidgetWithMouseLock->ProcessMessage( TranslatedMessage );
 
@@ -476,8 +482,6 @@ void UIPage::SetWidgetWithMouseLock (UIWidget * w)
 
 bool UIPage::ProcessMouseMessageUsingControlSet( const UIMessage &msg, UIObjectList &ControlSet, bool & childWasHit )
 {
-	const UIPoint & ScrollLocation = GetScrollLocation();
-
 	for( UIObjectList::iterator i = ControlSet.begin(); i != ControlSet.end(); ++i )
 	{
 		UIBaseObject * const o = *i;
@@ -492,7 +496,7 @@ bool UIPage::ProcessMouseMessageUsingControlSet( const UIMessage &msg, UIObjectL
 			if (!w->IsEnabled ())
 				continue;
 
-			const UIPoint p ((msg.MouseCoords - w->GetLocation ()) + ScrollLocation);
+			const UIPoint p = getChildLocalPoint(*this, *w, msg.MouseCoords);
 
 			if( w->WantsMessage( msg ) && ( ( msg.Type == UIMessage::MouseExit && w == mWidgetUnderMouse ) || ( w->WillDraw() && w->HitTest( p ) ) ) )
 			{
@@ -580,8 +584,7 @@ bool UIPage::ProcessMouseMessageUsingControlSet( const UIMessage &msg, UIObjectL
 		{
 			UIMessage MouseOverMessage( msg );
 
-			const UIPoint & p = mWidgetUnderMouse->GetLocation();
-			MouseOverMessage.MouseCoords = (msg.MouseCoords - p) + ScrollLocation;
+			MouseOverMessage.MouseCoords = getChildLocalPoint(*this, *mWidgetUnderMouse, msg.MouseCoords);
 			MouseOverMessage.Type = UIMessage::MouseExit;
 
 			UI_IGNORE_RETURN(mWidgetUnderMouse->ProcessMessage( MouseOverMessage ));
@@ -741,8 +744,6 @@ UIWidget *UIPage::GetWidgetFromPoint( const UIPoint &PointToTest, bool mustGetIn
 	if (HasPageAttribute(PA_PackDirty))
 		const_cast<UIPage *>(this)->Pack ();
 
-	const UIPoint & ScrollLocation = GetScrollLocation();
-
 	for( UIObjectList::const_iterator i = mObjects->begin(); i != mObjects->end(); ++i )
 	{
 		UIBaseObject * const o = *i;
@@ -750,7 +751,7 @@ UIWidget *UIPage::GetWidgetFromPoint( const UIPoint &PointToTest, bool mustGetIn
 		if( o->IsA( TUIWidget ) )
 		{
 			UIWidget * const w = static_cast<UIWidget *>( o );
-			const UIPoint p ((PointToTest - w->GetLocation()) + ScrollLocation);
+			const UIPoint p = getChildLocalPoint(*this, *w, PointToTest);
 
 			if( w->WillDraw() && w->HitTest( p ) )
 			{
@@ -1053,9 +1054,22 @@ void UIPage::Render( UICanvas &DestinationCanvas ) const
 		}
 
 		DestinationCanvas.PushState();
-		DestinationCanvas.Translate( GetLocation() );
-		UI_IGNORE_RETURN(DestinationCanvas.Clip( GetRect() ));
-		DestinationCanvas.Translate( -GetScrollLocation() );
+		if (GetScale() == 1.0f)
+		{
+			DestinationCanvas.Translate( GetLocation() );
+			UI_IGNORE_RETURN(DestinationCanvas.Clip( GetRect() ));
+			DestinationCanvas.Translate( -GetScrollLocation() );
+		}
+		else
+		{
+			UIRect visualRect = GetRect();
+			visualRect.right = visualRect.left + static_cast<long>(std::ceil(static_cast<float>(GetWidth()) * GetScale()));
+			visualRect.bottom = visualRect.top + static_cast<long>(std::ceil(static_cast<float>(GetHeight()) * GetScale()));
+			UI_IGNORE_RETURN(DestinationCanvas.Clip(visualRect));
+			DestinationCanvas.Translate(GetLocation());
+			DestinationCanvas.Scale(GetScale(), GetScale());
+			DestinationCanvas.Translate(-GetScrollLocation());
+		}
 		DestinationCanvas.ModifyOpacity( GetOpacity() );
 	}
  
@@ -1706,7 +1720,7 @@ void UIPage::UpdateUnderMouse (const UIPoint & pt)
 			}
 			else
 			{
-				const UIPoint translated (pt + GetScrollLocation () - widget->GetLocation ());
+				const UIPoint translated = getChildLocalPoint(*this, *widget, pt);
 				
 				if (!widget->HitTest (translated))
 					widget->SetUnderMouse (false);

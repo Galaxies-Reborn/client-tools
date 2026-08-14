@@ -2599,9 +2599,47 @@ void GroundScene::receiveMessage(const MessageDispatch::Emitter &, const Message
 
 				if (existingObject)
 				{
+					Object const * const oldContainingObject = ContainerInterface::getContainedByObject(*clientObject);
+					ClientObject const * const oldContainingClientObject = oldContainingObject ? oldContainingObject->asClientObject() : 0;
+					bool const atmosphericShipLeavingControlDevice =
+						!Game::isSpace() &&
+						clientObject->asShipObject() &&
+						oldContainingClientObject &&
+						oldContainingClientObject->getGameObjectType() == SharedObjectTemplate::GOT_data_ship_control_device;
+					bool const atmosphericShipNeedsWorldRegistration =
+						!Game::isSpace() &&
+						clientObject->asShipObject() &&
+						clientObject->isInitialized() &&
+						(atmosphericShipLeavingControlDevice ||
+							ContainerInterface::getContainedByObject(*clientObject) == 0);
+
 					CellProperty::setPortalTransitionsEnabled (false);
-						existingObject->setTransform_o2p (transform);
+					existingObject->setTransform_o2p (transform);
 					CellProperty::setPortalTransitionsEnabled (true);
+					if (atmosphericShipNeedsWorldRegistration)
+					{
+						// UpdateContainment can arrive before SceneCreate and exposes the
+						// cached datapad ShipObject while it still has its contained (often
+						// zero) transform.  Rebuild world/DPVS registration only after this
+						// authoritative SceneCreate transform has been applied.  Merely
+						// warping an object registered at the origin is not sufficient on
+						// every driver and was the source of intermittent invisible calls.
+						if (atmosphericShipLeavingControlDevice)
+							clientObject->updateContainment(NetworkId::cms_invalid, -1);
+						if (clientObject->isInWorld())
+							clientObject->removeFromWorld();
+						RenderWorld::addObjectNotifications(*clientObject);
+						clientObject->addToWorld();
+						clientObject->scheduleForAlter();
+					}
+					if (clientObject->asShipObject())
+					{
+						WARNING(true, ("Existing ShipObject %s refreshed by SceneCreate at position=(%g,%g,%g)",
+							networkId.getValueString().c_str(),
+							transform.getPosition_p().x,
+							transform.getPosition_p().y,
+							transform.getPosition_p().z));
+					}
 
 					CollisionWorld::objectWarped (existingObject);
 
@@ -2629,10 +2667,14 @@ void GroundScene::receiveMessage(const MessageDispatch::Emitter &, const Message
 				ShipObject * const shipObject = clientObject->asShipObject();
 				if ((shipObject != 0) && (shipObject != Game::getPlayerContainingShip()))
 				{
-					// player controlled ships will always hyperspace in
+					// Player-controlled ships entering a space scene hyperspace in.
+					// Atmospheric datapad calls create the same persistent ShipObject
+					// on a terrain scene; forcing that object through the space arrival
+					// path moves its client representation 1200m through terrain before
+					// it reaches the authoritative landing point.
 					ObjectTemplate const * const objectTemplate = shipObject->getObjectTemplate();
 					SharedShipObjectTemplate const * const sharedShipObjectTemplate = dynamic_cast<SharedShipObjectTemplate const * const>(objectTemplate);
-					if ((sharedShipObjectTemplate != 0) && (sharedShipObjectTemplate->getPlayerControlled()))
+					if (Game::isSpace() && (sharedShipObjectTemplate != 0) && (sharedShipObjectTemplate->getPlayerControlled()))
 					{
 						hyperspace = true;
 					}
@@ -2811,6 +2853,51 @@ void GroundScene::receiveMessage(const MessageDispatch::Emitter &, const Message
 
 			//-- Do the containment update.
 			target->updateContainment(o.getContainerId(), o.getSlotArrangement());
+
+			// A scene handoff may reuse the local CreatureObject and ShipObject while
+			// replacing their server authority.  Reconcile the player-controlled ship
+			// controller from the authoritative pilot containment instead of leaving a
+			// RemoteShipController behind.  Without this controller the space HUD can
+			// load, but throttle/turn/autopilot input has nowhere to go.
+			CreatureObject * const localPilot = target->asCreatureObject();
+			if (localPilot && localPilot == Game::getPlayerCreature() &&
+				localPilot->getShipStation() == ShipStation::ShipStation_Pilot)
+			{
+				ShipObject * const pilotedShip = localPilot->getPilotedShip();
+				if (pilotedShip)
+				{
+					PlayerShipController * const playerShipController =
+						dynamic_cast<PlayerShipController *>(pilotedShip->getController());
+					if (pilotedShip->getPilot() != localPilot || !playerShipController)
+						pilotedShip->onShipPilotMounted(localPilot);
+
+					setView(GroundScene::CI_cockpit);
+					WARNING(true, ("Local pilot containment reconciled player=%s ship=%s controller=%s scene=%s",
+						localPilot->getNetworkId().getValueString().c_str(),
+						pilotedShip->getNetworkId().getValueString().c_str(),
+						dynamic_cast<PlayerShipController *>(pilotedShip->getController()) ? "player" : "remote",
+						Game::isSpace() ? "space" : "ground"));
+				}
+			}
+
+			// A called atmospheric ship is often already present on this client as
+			// datapad content.  Its server-side world move arrives as an explicit
+			// containment update followed by SceneCreate.  Do not register it here:
+			// this message does not carry the authoritative world transform and the
+			// cached object is commonly still at the origin.  The existing-object
+			// SceneCreate path above registers it after applying the final transform.
+			ShipObject * const atmosphericShip = target->asShipObject();
+			if (atmosphericShip && o.getContainerId() == NetworkId::cms_invalid && target->isInitialized())
+			{
+				target->scheduleForAlter();
+				WARNING(true, ("Atmospheric ShipObject %s awaiting authoritative SceneCreate template=%s cachedPosition=(%g,%g,%g) appearance=%p",
+					target->getNetworkId().getValueString().c_str(),
+					target->getObjectTemplateName(),
+					target->getPosition_w().x,
+					target->getPosition_w().y,
+					target->getPosition_w().z,
+					target->getAppearance()));
+			}
 
 			//-- Sanity check the target's position when attached to something (cell/vehicle/mount).
 			if (target->getAttachedTo())

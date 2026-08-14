@@ -159,6 +159,7 @@ public:
 		static const UILowerString PopupStyle;
 		static const UILowerString ResizeInset;
 		static const UILowerString Rotation;
+		static const UILowerString Scale;
 		static const UILowerString ScrollExtent;
 		static const UILowerString ScrollLocation;
 		static const UILowerString ScrollSizeLine;
@@ -235,6 +236,8 @@ public:
 	        UIRect          GetWorldRect              () const;
 	        void            GetWorldLocation          (UIPoint & ) const;
 	        UIPoint         GetWorldLocation          () const;
+	        UIPoint         GetWorldPointFromLocal    (const UIPoint & localPoint) const;
+	        UIPoint         GetLocalPointFromWorld    (const UIPoint & worldPoint) const;
 	        UIPoint         GetLocationRelativeTo     (const UIWidget & otherWidget) const;
 
 	        void            SetLocation               (const UIPoint &Location, bool center = false );
@@ -249,6 +252,9 @@ public:
 
 	virtual void            SetSize                   (const UISize &);
 	  const UISize &        GetSize                   () const { return mSize; };
+
+	        void            SetScale                  (float scale);
+	        float           GetScale                  () const { return mScale; }
 
 	void                    SetMinimumSize            (const UISize &);
 	  const UISize &        GetMinimumSize            () const { return mMinimumSize; }
@@ -566,6 +572,7 @@ private:
 	UISize                    mScrollExtent;
 
 	float                     mRotation;
+	float                     mScale;
 
 	UICursor                 *mCursor;
 	UICursor                 *mDragBadCursor;
@@ -594,6 +601,7 @@ private:
 
 	UserModificationType      mCurrentUserModificationType;
 	UIPoint                   mUserModificationStartPoint;
+	UIPoint                   mUserModificationStartPointInParent;
 	UIRect                    mUserModificationStartWidgetRect;
 
 	UICursorSet *             mCursorSet;

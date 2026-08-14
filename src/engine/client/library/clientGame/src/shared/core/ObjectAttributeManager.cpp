@@ -632,6 +632,14 @@ void ObjectAttributeManager::formatAttributes   (const AttributeVector & av, Uni
 		if (fullKey.empty())
 			continue;
 
+		// Private transport used to resolve/render saved datapad appearances.
+		// These implementation attributes are not player-facing stats.
+		if (fullKey == "gr_internal_preview_customization" ||
+			fullKey == "gr_internal_ship_preview_id" ||
+			fullKey == "gr_internal_ship_preview_template" ||
+			fullKey == "gr_internal_ship_preview_customization")
+			continue;
+
 		bool const isTooltip = (fullKey.find(SharedObjectAttributes::tooltip) != std::string::npos);
 		if (isTooltip != tooltips)
 			continue;

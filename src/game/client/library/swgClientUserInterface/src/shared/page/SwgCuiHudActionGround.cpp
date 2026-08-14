@@ -109,15 +109,18 @@ bool  SwgCuiHudActionGround::performAction (const std::string & id, const Unicod
 
 			if(closestSpaceTerminal)
 			{
+				// Establish the terminal on the mediator before asking the server for
+				// parking data.  A local/low-latency response can otherwise arrive
+				// before SwgCuiShipChoose::setTerminal() and be discarded as stale.
+				DEBUG_REPORT_LOG_PRINT(true, ("SwgCuiHudActionGround::performAction - spawning ShipChoose with terminal [%s].\n", closestSpaceTerminal->getNetworkId().getValueString().c_str()));
+				getWindowManagerGround().spawnShipChoose(closestSpaceTerminal->getNetworkId());
+
 				Controller * const controller = NON_NULL (Game::getPlayer()->getController());
 				if(controller)
 				{
 					MessageQueueGenericValueType<NetworkId> * const msg = new MessageQueueGenericValueType<NetworkId>(closestSpaceTerminal->getNetworkId());
 					controller->appendMessage (CM_spaceTerminalRequest, 0.0f, msg, GameControllerMessageFlags::SEND | GameControllerMessageFlags::RELIABLE | GameControllerMessageFlags::DEST_SERVER);
 				} //lint !e429 msg not freed (controller owns it)
-
-				DEBUG_REPORT_LOG_PRINT(true, ("SwgCuiHudActionGround::performAction - spawning ShipChoose with terminal [%s].\n", closestSpaceTerminal->getNetworkId().getValueString().c_str()));
-				getWindowManagerGround().spawnShipChoose(closestSpaceTerminal->getNetworkId());
 			}
 			else
 				CuiSystemMessageManager::sendFakeSystemMessage (Unicode::narrowToWide("You must be near a terminal to do this.")); //TODO localize

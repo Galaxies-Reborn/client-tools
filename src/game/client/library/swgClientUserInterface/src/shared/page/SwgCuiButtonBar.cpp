@@ -335,6 +335,10 @@ void SwgCuiButtonBar::turnOffInventoryEffector()
 
 void SwgCuiButtonBar::update (float deltaTimeSecs)
 {
+	float const uiScale = CuiPreferences::getMenuUiScale();
+	if (getPage().GetScale() != uiScale)
+		getPage().SetScale(uiScale);
+
 	CuiMediator::update (deltaTimeSecs);
 
 	updateExpertiseEffector();
@@ -566,16 +570,15 @@ void SwgCuiButtonBar::updateMenuHighlight()
 
 	UIPoint mouseCoord = UIManager::gUIManager().GetLastMouseCoord();
 
-	UIPoint loc    = m_buttonsComposite->GetWorldLocation();
 	UIPoint locRel = m_buttonsComposite->GetLocation();
+	UIPoint const localMouse = m_buttonsComposite->GetLocalPointFromWorld(mouseCoord);
+	float const localCellSize = static_cast<float>(m_buttonsComposite->GetSize().y) / m_numberButtons;
 
-	float cellSize = static_cast<float>(m_buttonsComposite->GetSize().y) / m_numberButtons;
-
-	int slot = static_cast<int>((mouseCoord.y - loc.y) / cellSize);
+	int slot = static_cast<int>(static_cast<float>(localMouse.y) / localCellSize);
 	if(slot < 0) slot = 0;
 	if(slot > (m_numberButtons - 1)) slot = (m_numberButtons - 1);
 
-	int offset = static_cast<int>(ceil(slot * cellSize));
+	int offset = static_cast<int>(ceil(slot * localCellSize));
 
 	m_mouseoverPage->SetLocation(locRel.x + 3, locRel.y + offset);
 }
@@ -667,11 +670,13 @@ void SwgCuiButtonBar::toggleMenu()
 		//Position the menu appropriately; detect if menu is on left or top of screen
 		UIPoint screenLoc = m_menuButton->GetWorldLocation();
 		UIPoint newLoc(0, 0);
+		UIRect const buttonsWorldRect = m_buttonsComposite->GetWorldRect();
+		UISize const buttonsWorldSize(buttonsWorldRect.Width(), buttonsWorldRect.Height());
 
-		if (screenLoc.x < (m_buttonsComposite->GetSize().x + 5))
+		if (screenLoc.x < (buttonsWorldSize.x + 5))
 			newLoc.x = 110;
 
-		if (screenLoc.y < (m_buttonsComposite->GetSize().y + 5))
+		if (screenLoc.y < (buttonsWorldSize.y + 5))
 			newLoc.y = m_menuButtonPage->GetLocation().y + m_menuButtonPage->GetSize().y;
 		else
 			newLoc.y = m_menuButtonPage->GetLocation().y - m_buttonsComposite->GetSize().y;

@@ -20,6 +20,7 @@ class CreatureObject;
 class PlayerObject;
 class SwgCuiBuff;
 class SwgCuiMfdStatusBar;
+class SwgCuiStatusGroundHamEnhanceState;
 class Transform;
 class UIImage;
 class UIText;
@@ -152,6 +153,7 @@ private:
 	void onNewTarget();
 
 	void updateVoiceChatIcon(TangibleObject const & tangibleObject);
+	UIPage * getIndividualUiScaleRoot() const;
 
 private:
 	
@@ -226,6 +228,11 @@ private:
 	UIImage * m_speakingIcon;
 
 	SwgCuiStatusGroundNamespace::BuffIconSettingsChangedCallback * m_buffIconSettingsChangedCallback;
+	SwgCuiStatusGroundHamEnhanceState * m_hamEnhanceState;
+	UIPage * m_individualUiScaleRoot;
+	bool m_hamEnhanceApplied;
+
+	void updateHamEnhanceLayout();
 };
 
 //======================================================================
