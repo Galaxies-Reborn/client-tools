@@ -64,6 +64,12 @@ public:
 	// Multiplier on the engine's fog density, from fogDensityPercent. 1.0 is parity; lower
 	// stretches the fog curve over a longer draw distance rather than removing haze.
 	static float       getFogDensityScale();
+
+	// Optional compatibility lighting adjustments. The default renders the
+	// supplied PRE-CU data as authored without the inherited DX9 compensation.
+	static bool        getAmbientBoost();
+	static float       getDiffuseLightingFloor();
+
 	static int         getFullscreenRefreshRate();
 	static int         getSwapChainBufferCount();
 	static bool        getAntiAlias();
