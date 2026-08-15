@@ -47,6 +47,14 @@ SwgCuiOptBase("SwgCuiOptGalaxiesReborn", page)
 	}
 
 	slider = 0;
+	getCodeDataObject(TUISliderbar, slider, "sliderSelectedTargetHamUiScale", true);
+	if (slider)
+	{
+		registerSlider(*slider, CuiPreferences::setSelectedTargetHamUiScale, CuiPreferences::getSelectedTargetHamUiScale,
+			SwgCuiOptBase::getOne, CuiPreferences::getIndividualUiScaleMinimum(), CuiPreferences::getIndividualUiScaleMaximum());
+	}
+
+	slider = 0;
 	getCodeDataObject(TUISliderbar, slider, "sliderPartyUiScale", true);
 	if (slider)
 	{

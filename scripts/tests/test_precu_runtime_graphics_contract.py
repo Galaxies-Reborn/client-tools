@@ -127,7 +127,7 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
             r"(?m)^\s*disable\s*=\s*true\s*$",
         )
 
-    def test_live_manifest_is_the_canonical_53_tre_stack(self):
+    def test_legacy_profile_template_remains_the_pinned_53_tre_stack(self):
         config = LIVE_CONFIG.read_text(encoding="utf-8")
         trees = tuple(
             re.findall(r"(?m)^\s*searchTree_[^=]+\s*=\s*([^\s#]+)\s*$", config)
@@ -170,16 +170,18 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
         self.assertIn('"precu_runtime.rsp"', script)
         self.assertIn("Invalid Pre-CU runtime response entry", script)
         self.assertIn("$parts[0].Replace", script)
-        self.assertIn(
-            'foreach ($archiveName in @("precu_runtime.tre", "precu_worlds.tre"))',
-            script,
-        )
+        self.assertIn("LegacyPrecuTreStack", script)
+        self.assertIn("precu_consolidated.json", script)
+        self.assertIn("protected-14-archive", script)
+        self.assertIn("consolidatedPolicy.expected.archive_sha256", script)
+        self.assertIn("$changedStagedSources", script)
         self.assertIn("Name='xpbar'", script)
         self.assertIn("$precuManagedLoosePaths", script)
         self.assertIn("$precuLooseOverridePaths", script)
         self.assertIn("removedPrecuLooseOverrides", script)
         self.assertNotIn("@($precuAssetOverrideFiles)", script)
         self.assertIn("runtimeProfile   = $RuntimeProfile", script)
+        self.assertIn("precuArchiveLayout = $precuArchiveLayout", script)
         self.assertIn("precuAssetOverrideCount = 0", script)
         self.assertIn("precuAssetArchiveCount", script)
 
