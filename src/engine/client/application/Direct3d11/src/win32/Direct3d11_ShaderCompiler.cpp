@@ -419,11 +419,9 @@ ID3DBlob *Direct3d11_ShaderCompilerNamespace::compile(char const *source, int so
 		}
 		else
 		{
-#if PRODUCTION == 0
-			FATAL(true, ("Direct3d11: '%s' failed to compile as %s (%s):\n%s", name, target, Direct3d11_Device::describeHresult(hresult), detail));
-#else
+			// Shader source is data. Match the stock DX9 warn-and-skip contract so
+			// one malformed loose override cannot terminate the client.
 			WARNING(true, ("Direct3d11: '%s' failed to compile as %s (%s): %s", name, target, Direct3d11_Device::describeHresult(hresult), detail));
-#endif
 		}
 
 		if (errors)
