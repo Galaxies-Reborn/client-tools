@@ -69,6 +69,7 @@ public:
 	// supplied PRE-CU data as authored without the inherited DX9 compensation.
 	static bool        getAmbientBoost();
 	static float       getDiffuseLightingFloor();
+	static bool        getSynthesizeHemisphericLight();
 
 	static int         getFullscreenRefreshRate();
 	static int         getSwapChainBufferCount();
