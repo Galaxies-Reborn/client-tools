@@ -1628,6 +1628,27 @@ void ShipObject::onLeaveByHyperspace()
 
 // ----------------------------------------------------------------------
 
+void ShipObject::onEnterByAtmosphere()
+{
+	RemoteShipController * remoteShipController = dynamic_cast<RemoteShipController *>(getController());
+	if (remoteShipController != 0)
+		remoteShipController->enterByAtmosphere();
+}
+
+// ----------------------------------------------------------------------
+
+bool ShipObject::onLeaveByAtmosphere()
+{
+	RemoteShipController * remoteShipController = dynamic_cast<RemoteShipController *>(getController());
+	if (remoteShipController == 0)
+		return false;
+
+	remoteShipController->leaveByAtmosphere();
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
 CachedNetworkId const & ShipObject::getTurretTarget(int weaponIndex) const
 {
 	std::map<int, ShipWeaponStatus>::const_iterator const it = m_shipWeaponStatusMap.find(weaponIndex);

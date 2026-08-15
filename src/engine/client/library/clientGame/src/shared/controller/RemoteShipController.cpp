@@ -43,6 +43,10 @@ namespace RemoteShipControllerNamespace
 	bool ms_renderShipExtent = false;
 	float const cms_hyperspaceSpeed = 600.0f;
 	float const cms_maximumHyperspaceTimeSeconds = 2.0f;
+	float const cms_atmosphericArrivalHeight = 160.0f;
+	float const cms_atmosphericArrivalTimeSeconds = 4.0f;
+	float const cms_atmosphericDepartureHeight = 160.0f;
+	float const cms_atmosphericDepartureTimeSeconds = 4.0f;
 }
 
 using namespace RemoteShipControllerNamespace;
@@ -91,7 +95,13 @@ RemoteShipController::RemoteShipController(ShipObject * const newOwner) :
 	m_isInHyperspace(false),
 	m_killShipWhenFinishedHyperspace(false),
 	m_totalElapsedTimeInHyperspaceSeconds(0.0f),
-	m_transformAfterHyperspace()
+	m_transformAfterHyperspace(),
+	m_isInAtmosphericArrival(false),
+	m_totalElapsedTimeInAtmosphericArrivalSeconds(0.0f),
+	m_transformAfterAtmosphericArrival(),
+	m_isInAtmosphericDeparture(false),
+	m_totalElapsedTimeInAtmosphericDepartureSeconds(0.0f),
+	m_transformBeforeAtmosphericDeparture()
 {
 }
 
@@ -99,7 +109,13 @@ RemoteShipController::RemoteShipController(ShipObject * const newOwner) :
 
 RemoteShipController::~RemoteShipController()
 {
-	if (m_isInHyperspace)
+	if (m_isInAtmosphericArrival)
+	{
+		Object * const owner = getOwner();
+		if (owner != 0)
+			owner->setTransform_o2p(m_transformAfterAtmosphericArrival);
+	}
+	else if (m_isInHyperspace)
 	{
 		Object * const owner = getOwner();
 		if (owner != 0)
@@ -114,7 +130,7 @@ RemoteShipController::~RemoteShipController()
 void RemoteShipController::endBaselines()
 {
 	Object * const owner = getOwner();
-	if (owner)
+	if (owner && !m_isInAtmosphericArrival)
 		m_serverTransform_p = owner->getTransform_o2p();
 
 	ShipController::endBaselines();
@@ -130,6 +146,8 @@ void RemoteShipController::receiveTransform(ShipUpdateTransformMessage const & s
 	{
 		m_serverToClientLastSyncStamp = syncStampLong;
 		m_serverTransform_p = shipUpdateTransformMessage.getTransform();
+		if (m_isInAtmosphericArrival)
+			m_transformAfterAtmosphericArrival = m_serverTransform_p;
 		m_shipDynamicsModel->setTransform(m_serverTransform_p);
 		m_shipDynamicsModel->setVelocity(shipUpdateTransformMessage.getVelocity());
 		m_shipDynamicsModel->setYawRate(shipUpdateTransformMessage.getYawRate());
@@ -161,65 +179,104 @@ float RemoteShipController::realAlter(const float elapsedTime)
 	ShipObject * const owner = getShipOwner();
 	if (owner && owner->isInitialized())
 	{
-		//-- Update the server position
-		m_shipDynamicsModel->predict(elapsedTime, ClientShipObjectInterface(owner));
-
-		if (m_isInHyperspace)
+		if (m_isInAtmosphericArrival)
 		{
-			m_totalElapsedTimeInHyperspaceSeconds += elapsedTime;
+			m_totalElapsedTimeInAtmosphericArrivalSeconds += elapsedTime;
+			float const fraction = clamp(0.0f,
+				m_totalElapsedTimeInAtmosphericArrivalSeconds / cms_atmosphericArrivalTimeSeconds,
+				1.0f);
+			float const easedFraction = fraction * fraction * (3.0f - 2.0f * fraction);
 
-			bool const finished = (m_totalElapsedTimeInHyperspaceSeconds >= cms_maximumHyperspaceTimeSeconds);
+			Transform arrivalTransform = m_transformAfterAtmosphericArrival;
+			Vector arrivalPosition = arrivalTransform.getPosition_p();
+			arrivalPosition.y += cms_atmosphericArrivalHeight * (1.0f - easedFraction);
+			arrivalTransform.setPosition_p(arrivalPosition);
+			owner->setTransform_o2p(arrivalTransform);
+			m_shipDynamicsModel->setTransform(arrivalTransform);
 
-			if (finished)
+			if (fraction >= 1.0f)
 			{
-				owner->setTransform_o2p(m_transformAfterHyperspace);
-				m_isInHyperspace = false;
-
-				if (m_killShipWhenFinishedHyperspace)
-				{
-					m_killShipWhenFinishedHyperspace = false;
-					owner->kill();
-				}
+				owner->setTransform_o2p(m_transformAfterAtmosphericArrival);
+				m_shipDynamicsModel->setTransform(m_transformAfterAtmosphericArrival);
+				m_isInAtmosphericArrival = false;
 			}
-			else
-			{
-				float const distanceToMove = cms_hyperspaceSpeed * elapsedTime;
-				owner->move_o(Vector(0.0f, 0.0f, distanceToMove));
-			}
+		}
+		else if (m_isInAtmosphericDeparture)
+		{
+			m_totalElapsedTimeInAtmosphericDepartureSeconds += elapsedTime;
+			float const fraction = clamp(0.0f,
+				m_totalElapsedTimeInAtmosphericDepartureSeconds / cms_atmosphericDepartureTimeSeconds,
+				1.0f);
+			float const easedFraction = fraction * fraction * (3.0f - 2.0f * fraction);
 
-			m_shipDynamicsModel->setTransform(owner->getTransform_o2p());
+			Transform departureTransform = m_transformBeforeAtmosphericDeparture;
+			Vector departurePosition = departureTransform.getPosition_p();
+			departurePosition.y += cms_atmosphericDepartureHeight * easedFraction;
+			departureTransform.setPosition_p(departurePosition);
+			owner->setTransform_o2p(departureTransform);
+			m_shipDynamicsModel->setTransform(departureTransform);
 		}
 		else
 		{
-			Transform const & serverTransform = ms_disableModeling ? m_serverTransform_p : m_shipDynamicsModel->getTransform();
+			//-- Update the server position
+			m_shipDynamicsModel->predict(elapsedTime, ClientShipObjectInterface(owner));
 
-			//-- Lerp client position to server position
-			if (ms_disableSmoothing)
-				owner->setTransform_o2p(serverTransform);
+			if (m_isInHyperspace)
+			{
+				m_totalElapsedTimeInHyperspaceSeconds += elapsedTime;
+				bool const finished = (m_totalElapsedTimeInHyperspaceSeconds >= cms_maximumHyperspaceTimeSeconds);
+
+				if (finished)
+				{
+					owner->setTransform_o2p(m_transformAfterHyperspace);
+					m_isInHyperspace = false;
+
+					if (m_killShipWhenFinishedHyperspace)
+					{
+						m_killShipWhenFinishedHyperspace = false;
+						owner->kill();
+					}
+				}
+				else
+				{
+					float const distanceToMove = cms_hyperspaceSpeed * elapsedTime;
+					owner->move_o(Vector(0.0f, 0.0f, distanceToMove));
+				}
+
+				m_shipDynamicsModel->setTransform(owner->getTransform_o2p());
+			}
 			else
 			{
-				const Transform & clientTransform = owner->getTransform_o2p();
-				if (!clientTransform.approximates(serverTransform))
+				Transform const & serverTransform = ms_disableModeling ? m_serverTransform_p : m_shipDynamicsModel->getTransform();
+
+				//-- Lerp client position to server position
+				if (ms_disableSmoothing)
+					owner->setTransform_o2p(serverTransform);
+				else
 				{
-					//determine new position
-					const Object& cell = owner->getParentCell()->getOwner();
-					Vector const serverPosition_w = cell.rotateTranslate_o2w(serverTransform.getPosition_p());
-					Vector const clientPosition_w = owner->getPosition_w();
-					Vector const position_w = Vector::linearInterpolate(clientPosition_w, serverPosition_w, clamp(0.0f, 2.f * elapsedTime, 1.0f));
+					const Transform & clientTransform = owner->getTransform_o2p();
+					if (!clientTransform.approximates(serverTransform))
+					{
+						//determine new position
+						const Object& cell = owner->getParentCell()->getOwner();
+						Vector const serverPosition_w = cell.rotateTranslate_o2w(serverTransform.getPosition_p());
+						Vector const clientPosition_w = owner->getPosition_w();
+						Vector const position_w = Vector::linearInterpolate(clientPosition_w, serverPosition_w, clamp(0.0f, 2.f * elapsedTime, 1.0f));
 
-					//determine new rotation
-					Transform const startTransform(owner->getTransform_o2p());
-					Quaternion const startOrientation(startTransform);
-					Quaternion const endOrientation(serverTransform);
-					Quaternion const orientation(startOrientation.slerp(endOrientation, clamp(0.0f, 2.f * elapsedTime, 1.0f)));
+						//determine new rotation
+						Transform const startTransform(owner->getTransform_o2p());
+						Quaternion const startOrientation(startTransform);
+						Quaternion const endOrientation(serverTransform);
+						Quaternion const orientation(startOrientation.slerp(endOrientation, clamp(0.0f, 2.f * elapsedTime, 1.0f)));
 
-					Transform transform_p;
-					orientation.getTransform(&transform_p);
-					transform_p.reorthonormalize();
-					transform_p.setPosition_p(position_w);
+						Transform transform_p;
+						orientation.getTransform(&transform_p);
+						transform_p.reorthonormalize();
+						transform_p.setPosition_p(position_w);
 
-					//apply new rotation/position
-					owner->setTransform_o2p(transform_p);
+						//apply new rotation/position
+						owner->setTransform_o2p(transform_p);
+					}
 				}
 			}
 		}
@@ -311,6 +368,49 @@ void RemoteShipController::leaveByHyperspace()
 		m_transformAfterHyperspace = owner->getTransform_o2p();
 		float const distanceToMove = cms_hyperspaceSpeed * cms_maximumHyperspaceTimeSeconds;
 		m_transformAfterHyperspace.move_l(Vector(0.0f, 0.0f, distanceToMove));
+	}
+}
+
+// ----------------------------------------------------------------------
+
+void RemoteShipController::enterByAtmosphere()
+{
+	m_isInHyperspace = false;
+	m_killShipWhenFinishedHyperspace = false;
+	m_isInAtmosphericDeparture = false;
+	m_isInAtmosphericArrival = true;
+	m_totalElapsedTimeInAtmosphericArrivalSeconds = 0.0f;
+
+	ShipObject * const owner = getShipOwner();
+	if (owner != 0)
+	{
+		m_transformAfterAtmosphericArrival = owner->getTransform_o2p();
+		m_serverTransform_p = m_transformAfterAtmosphericArrival;
+		Transform arrivalTransform = m_transformAfterAtmosphericArrival;
+		Vector arrivalPosition = arrivalTransform.getPosition_p();
+		arrivalPosition.y += cms_atmosphericArrivalHeight;
+		arrivalTransform.setPosition_p(arrivalPosition);
+		owner->setTransform_o2p(arrivalTransform);
+		m_shipDynamicsModel->setTransform(arrivalTransform);
+	}
+}
+
+// ----------------------------------------------------------------------
+
+void RemoteShipController::leaveByAtmosphere()
+{
+	m_isInHyperspace = false;
+	m_killShipWhenFinishedHyperspace = false;
+	m_isInAtmosphericArrival = false;
+	m_isInAtmosphericDeparture = true;
+	m_totalElapsedTimeInAtmosphericDepartureSeconds = 0.0f;
+
+	ShipObject * const owner = getShipOwner();
+	if (owner != 0)
+	{
+		m_transformBeforeAtmosphericDeparture = owner->getTransform_o2p();
+		m_serverTransform_p = m_transformBeforeAtmosphericDeparture;
+		m_shipDynamicsModel->setTransform(m_transformBeforeAtmosphericDeparture);
 	}
 }
 

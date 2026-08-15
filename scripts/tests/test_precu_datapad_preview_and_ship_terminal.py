@@ -83,6 +83,17 @@ class DatapadPreviewAndShipTerminalTests(unittest.TestCase):
         self.assertIn("s_datapadShipFallbackCache", source)
         self.assertIn("ObjectTemplateList::createObject(templateCrc)", source)
         self.assertIn("customizationData->loadLocalDataFromString(customization)", source)
+        self.assertIn("Object * const persistentFallback", source)
+        self.assertIn("linkedObject->isInWorld() || ContainerInterface::getContainedByObject(*linkedObject)", source)
+        self.assertIn("cachedObject->isInWorld() || ContainerInterface::getContainedByObject(*cachedObject)", source)
+        self.assertLess(
+            source.index("Object * const persistentFallback"),
+            source.index("Container const * const container = ContainerInterface::getContainer(logicalObject)"),
+        )
+        self.assertLess(
+            source.index("Container const * const container = ContainerInterface::getContainer(logicalObject)"),
+            source.index("if (persistentFallback)"),
+        )
         self.assertIn("clearDatapadShipFallbackCache();", source)
         self.assertIn("viewer->addObject(obj, *renderObject)", source)
         self.assertIn("dragWidget->addObject(obj, *renderObject)", source)
@@ -109,6 +120,78 @@ class DatapadPreviewAndShipTerminalTests(unittest.TestCase):
         self.assertIn("sharedShipObjectTemplate->getPlayerControlled()", creation)
         self.assertIn("shipObject->onEnterByHyperspace();", creation)
         self.assertLess(creation.index("Game::isSpace()"), creation.index("hyperspace = true;"))
+
+    def test_ground_call_recreates_cached_ship_and_descends_vertically(self) -> None:
+        scene = read_tools(
+            "src/engine/client/library/clientGame/src/shared/scene/GroundScene.cpp"
+        )
+        controller = read_tools(
+            "src/engine/client/library/clientGame/src/shared/controller/"
+            "RemoteShipController.cpp"
+        )
+        controller_header = read_tools(
+            "src/engine/client/library/clientGame/src/shared/controller/"
+            "RemoteShipController.h"
+        )
+        ship = read_tools(
+            "src/engine/client/library/clientGame/src/shared/object/ShipObject.cpp"
+        )
+        server_controller = read_server(
+            "engine/server/library/serverGame/src/shared/controller/"
+            "PlayerShipController.cpp"
+        )
+        server_control_device = read_server(
+            "engine/server/library/serverGame/src/shared/object/"
+            "IntangibleObject.cpp"
+        )
+
+        recreate = scene[
+            scene.index("bool const recreateAtmosphericShip") :
+            scene.index("else if (clientObject->isClientCached", scene.index("bool const recreateAtmosphericShip"))
+        ]
+        self.assertIn("!Game::isSpace()", recreate)
+        self.assertIn("hyperspace", recreate)
+        self.assertIn("!clientObject->isInWorld()", recreate)
+        self.assertIn("ContainerInterface::getContainedByObject(*clientObject) == 0", recreate)
+        self.assertIn("delete clientObject;", recreate)
+        self.assertIn("existingObject = 0;", recreate)
+        self.assertIn("shipObject->onEnterByAtmosphere();", scene)
+        self.assertIn("void ShipObject::onEnterByAtmosphere()", ship)
+        self.assertIn("void enterByAtmosphere();", controller_header)
+
+        arrival = controller[
+            controller.index("void RemoteShipController::enterByAtmosphere()") :
+        ]
+        self.assertIn("cms_atmosphericArrivalHeight = 160.0f", controller)
+        self.assertIn("cms_atmosphericArrivalTimeSeconds = 4.0f", controller)
+        self.assertIn("arrivalPosition.y += cms_atmosphericArrivalHeight", arrival)
+        self.assertNotIn("move_o", arrival)
+        self.assertIn("fraction * fraction * (3.0f - 2.0f * fraction)", controller)
+        self.assertIn("arrivalPosition.y += cms_atmosphericArrivalHeight * (1.0f - easedFraction)", controller)
+
+        heights = []
+        for elapsed in (0.0, 1.0, 2.0, 3.0, 4.0):
+            fraction = elapsed / 4.0
+            eased = fraction * fraction * (3.0 - 2.0 * fraction)
+            heights.append(160.0 * (1.0 - eased))
+        self.assertEqual(heights[0], 160.0)
+        self.assertEqual(heights[-1], 0.0)
+        self.assertTrue(all(a > b for a, b in zip(heights, heights[1:])))
+
+        unpack = server_controller[
+            server_controller.index("void PlayerShipController::teleport") :
+            server_controller.index("void PlayerShipController::handleMessage")
+        ]
+        self.assertLess(
+            unpack.index("ship->setHyperspaceOnCreate(true);"),
+            unpack.index("ContainerInterface::transferItemToWorld"),
+        )
+        self.assertIn("ship->setHyperspaceOnCreate(false);", unpack)
+        gain = server_control_device[
+            server_control_device.index("void IntangibleObject::onContainerGainItem") :
+            server_control_device.index("void IntangibleObject::onContainerLostItem")
+        ]
+        self.assertIn("ship->setHyperspaceOnCreate(false);", gain)
 
     def test_atmospheric_ship_call_explicitly_unpacks_player_ship(self) -> None:
         controller = read_server(
@@ -139,6 +222,16 @@ class DatapadPreviewAndShipTerminalTests(unittest.TestCase):
         self.assertIn("awaiting authoritative SceneCreate", containment)
         self.assertNotIn("RenderWorld::addObjectNotifications(*target);", containment)
         self.assertNotIn("target->addToWorld();", containment)
+        self.assertIn("atmosphericShipAwaitingAuthoritativeCreate", containment)
+        self.assertLess(
+            containment.index("target->removeFromWorld();"),
+            containment.index("target->updateContainment(o.getContainerId(), o.getSlotArrangement());"),
+        )
+        self.assertGreaterEqual(containment.count("target->removeFromWorld();"), 2)
+        self.assertLess(
+            containment.index("target->updateContainment(o.getContainerId(), o.getSlotArrangement());"),
+            containment.rindex("target->removeFromWorld();"),
+        )
         self.assertIn("atmosphericShipLeavingControlDevice", scene)
         self.assertIn("atmosphericShipNeedsWorldRegistration", scene)
         self.assertIn(
@@ -148,11 +241,15 @@ class DatapadPreviewAndShipTerminalTests(unittest.TestCase):
         recovery_end = scene.index("Existing ShipObject %s refreshed", recovery_start)
         recovery = scene[recovery_start:recovery_end]
         self.assertLess(
-            recovery.index("existingObject->setTransform_o2p (transform);"),
             recovery.index("clientObject->removeFromWorld();"),
+            recovery.index("existingObject->setTransform_o2p (transform);"),
         )
         self.assertLess(
             recovery.index("clientObject->removeFromWorld();"),
+            recovery.index("clientObject->asShipObject()->onEnterByAtmosphere();"),
+        )
+        self.assertLess(
+            recovery.index("clientObject->asShipObject()->onEnterByAtmosphere();"),
             recovery.index("RenderWorld::addObjectNotifications(*clientObject);"),
         )
         self.assertLess(
@@ -186,6 +283,7 @@ class DatapadPreviewAndShipTerminalTests(unittest.TestCase):
         self.assertIn("ObserveTracker::isObserving(*client, *this)", transfer)
         self.assertIn("UpdateContainmentMessage const worldContainment", transfer)
         self.assertIn("client->send(worldContainment, true)", transfer)
+
         self.assertIn("sendCreateAndBaselinesToClient(*client)", transfer)
         self.assertIn("ObserveTracker::onObjectMadeVisibleTo(*this, observers)", transfer)
 
@@ -246,6 +344,48 @@ class DatapadPreviewAndShipTerminalTests(unittest.TestCase):
         self.assertIn("Math.max(CALL_DISTANCE, footprint + playerRadius + CALL_SEARCH_PADDING)", placement)
         self.assertIn("locations.getGoodLocationAroundLocationAvoidCollidables", placement)
         self.assertIn("false, false, footprint", placement)
+
+    def test_ground_store_lifts_ship_before_applying_containment(self) -> None:
+        controller = read_tools(
+            "src/engine/client/library/clientGame/src/shared/controller/RemoteShipController.cpp"
+        )
+        controller_header = read_tools(
+            "src/engine/client/library/clientGame/src/shared/controller/RemoteShipController.h"
+        )
+        ship = read_tools(
+            "src/engine/client/library/clientGame/src/shared/object/ShipObject.cpp"
+        )
+        scene = read_tools(
+            "src/engine/client/library/clientGame/src/shared/scene/GroundScene.cpp"
+        )
+
+        self.assertIn("cms_atmosphericDepartureHeight = 160.0f", controller)
+        self.assertIn("cms_atmosphericDepartureTimeSeconds = 4.0f", controller)
+        self.assertIn("void RemoteShipController::leaveByAtmosphere()", controller)
+        self.assertIn("m_isInAtmosphericDeparture", controller_header)
+        departure = controller[
+            controller.index("else if (m_isInAtmosphericDeparture)") :
+            controller.index("else\n", controller.index("else if (m_isInAtmosphericDeparture)") + 1)
+        ]
+        self.assertIn("cms_atmosphericDepartureHeight * easedFraction", departure)
+        self.assertIn("bool ShipObject::onLeaveByAtmosphere()", ship)
+
+        containment_start = scene.index('else if(message.isType("UpdateContainmentMessage"))')
+        containment_end = scene.index("else if(message.isType", containment_start + 1)
+        containment = scene[containment_start:containment_end]
+        self.assertIn("beginAtmosphericShipDeparture", containment)
+        self.assertIn("atmosphericShipToStore->onLeaveByAtmosphere()", containment)
+        self.assertIn("ms_pendingAtmosphericShipContainments[o.getNetworkId()]", containment)
+        self.assertLess(
+            containment.index("atmosphericShipToStore->onLeaveByAtmosphere()"),
+            containment.index("target->updateContainment(o.getContainerId(), o.getSlotArrangement());"),
+        )
+        self.assertIn("updatePendingAtmosphericShipContainments(elapsedTime);", scene)
+        pending = scene[
+            scene.index("void GroundSceneNamespace::updatePendingAtmosphericShipContainments") :
+            scene.index("//-----------------------------------------------------------------", scene.index("void GroundSceneNamespace::updatePendingAtmosphericShipContainments") + 1)
+        ]
+        self.assertIn("ship->updateContainment(current->second.containerId, current->second.arrangement);", pending)
 
     def test_stored_ship_state_self_heals_only_for_matching_nonparked_pcd(self) -> None:
         library = (

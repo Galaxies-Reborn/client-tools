@@ -856,8 +856,27 @@ void RegistryKey::install(const char *productKeyRelativePath)
 	// create/open the product user key
 	productUserKey = currentUserKey->createSubkey(useRegistryPath, AF_READ | AF_WRITE);
 
-	// create/open the product machine key
-	productMachineKey = localMachineKey->createSubkey(useRegistryPath, AF_READ);
+	// Machine preferences are read-only for the client.  RegCreateKeyEx still
+	// requires elevation when the native x64 HKLM key does not exist, which made
+	// a clean per-user launch stop behind an administrator dialog.  Open the
+	// machine key when an installer has provided it; otherwise use a second
+	// read-only handle to the product's per-user key.
+	HKEY machineProductKeyHandle = 0;
+	LONG const machineProductKeyResult = RegOpenKeyEx(
+		HKEY_LOCAL_MACHINE,
+		useRegistryPath,
+		0,
+		KEY_READ,
+		&machineProductKeyHandle);
+	if (machineProductKeyResult == ERROR_SUCCESS)
+		productMachineKey = new RegistryKey(machineProductKeyHandle, true);
+	else
+	{
+		DEBUG_REPORT_LOG_PRINT(true, ("Machine product registry key '%s' unavailable (%ld); using per-user settings\n",
+			useRegistryPath,
+			machineProductKeyResult));
+		productMachineKey = currentUserKey->openSubkey(useRegistryPath, AF_READ);
+	}
 
 	delete [] useRegistryPath;
 

@@ -283,6 +283,26 @@ namespace GroundSceneNamespace
 
 	bool s_installed          = false;
 
+	struct PendingAtmosphericShipContainment
+	{
+		PendingAtmosphericShipContainment() : containerId(), arrangement(-1), remainingSeconds(0.0f) {}
+		PendingAtmosphericShipContainment(NetworkId const & newContainerId, int const newArrangement, float const newRemainingSeconds) :
+			containerId(newContainerId),
+			arrangement(newArrangement),
+			remainingSeconds(newRemainingSeconds)
+		{
+		}
+
+		NetworkId containerId;
+		int arrangement;
+		float remainingSeconds;
+	};
+
+	typedef std::map<NetworkId, PendingAtmosphericShipContainment> PendingAtmosphericShipContainmentMap;
+	PendingAtmosphericShipContainmentMap ms_pendingAtmosphericShipContainments;
+	float const cms_atmosphericShipDepartureTimeSeconds = 4.0f;
+	void updatePendingAtmosphericShipContainments(float elapsedTime);
+
 	bool  ms_loadingScreenRender;
 	float ms_loadingScreenRenderYaw;
 
@@ -432,6 +452,8 @@ void GroundScene::install ()
 
 void GroundSceneNamespace::remove ()
 {
+	ms_pendingAtmosphericShipContainments.clear();
+
 	DebugFlags::unregisterFlag (ms_logCreateMessages);
 	DebugFlags::unregisterFlag (ms_testCollision);
 	DebugFlags::unregisterFlag (ms_renderDetailLevel);
@@ -445,6 +467,32 @@ void GroundSceneNamespace::remove ()
 
 	CrashReportInformation::removeDynamicText(ms_terrainName);
 	CrashReportInformation::removeDynamicText(ms_playerPosition);
+}
+
+//-----------------------------------------------------------------
+
+void GroundSceneNamespace::updatePendingAtmosphericShipContainments(float const elapsedTime)
+{
+	PendingAtmosphericShipContainmentMap::iterator iterator = ms_pendingAtmosphericShipContainments.begin();
+	while (iterator != ms_pendingAtmosphericShipContainments.end())
+	{
+		PendingAtmosphericShipContainmentMap::iterator const current = iterator++;
+		current->second.remainingSeconds -= elapsedTime;
+		if (current->second.remainingSeconds > 0.0f)
+			continue;
+
+		ClientObject * const ship = dynamic_cast<ClientObject *>(NetworkIdManager::getObjectById(current->first));
+		if (ship)
+		{
+			WARNING(true, ("Atmospheric ShipObject %s completed vertical departure; applying stored containment %s arrangement=%d",
+				current->first.getValueString().c_str(),
+				current->second.containerId.getValueString().c_str(),
+				current->second.arrangement));
+			ship->updateContainment(current->second.containerId, current->second.arrangement);
+		}
+
+		ms_pendingAtmosphericShipContainments.erase(current);
+	}
 }
 
 //-----------------------------------------------------------------
@@ -1930,6 +1978,7 @@ void GroundScene::updateCuiLoading()
 void GroundScene::update(float elapsedTime)
 {
 	NP_PROFILER_AUTO_BLOCK_DEFINE("GroundScene update");
+	updatePendingAtmosphericShipContainments(elapsedTime);
 
 	//-- scan input map for scene messages
 	handleInputMapScan ();
@@ -2557,8 +2606,25 @@ void GroundScene::receiveMessage(const MessageDispatch::Emitter &, const Message
 		if (existingObject)
 		{
 			ClientObject* const clientObject = safe_cast<ClientObject*> (existingObject);
+			bool const recreateAtmosphericShip =
+				!Game::isSpace() &&
+				hyperspace &&
+				clientObject->asShipObject() &&
+				clientObject->isInitialized() &&
+				!clientObject->isInWorld() &&
+				ContainerInterface::getContainedByObject(*clientObject) == 0;
 
-			if (clientObject->isClientCached ())
+			if (recreateAtmosphericShip)
+			{
+				// The datapad can already own a fully initialized instance of this
+				// persistent ShipObject.  Let authoritative SceneCreate construct the
+				// canonical world instance instead of reviving viewer-only lifecycle.
+				WARNING(true, ("Recreating cached atmospheric ShipObject %s through canonical SceneCreate",
+					networkId.getValueString().c_str()));
+				delete clientObject;
+				existingObject = 0;
+			}
+			else if (clientObject->isClientCached ())
 			{
 				DEBUG_REPORT_LOG_PRINT (ms_logCreateMessages, ("SceneCreateObject: networkId=%s, recreating existing client-cached object\n", networkId.getValueString ().c_str ()));
 
@@ -2613,9 +2679,6 @@ void GroundScene::receiveMessage(const MessageDispatch::Emitter &, const Message
 						(atmosphericShipLeavingControlDevice ||
 							ContainerInterface::getContainedByObject(*clientObject) == 0);
 
-					CellProperty::setPortalTransitionsEnabled (false);
-					existingObject->setTransform_o2p (transform);
-					CellProperty::setPortalTransitionsEnabled (true);
 					if (atmosphericShipNeedsWorldRegistration)
 					{
 						// UpdateContainment can arrive before SceneCreate and exposes the
@@ -2624,11 +2687,25 @@ void GroundScene::receiveMessage(const MessageDispatch::Emitter &, const Message
 						// authoritative SceneCreate transform has been applied.  Merely
 						// warping an object registered at the origin is not sufficient on
 						// every driver and was the source of intermittent invisible calls.
-						if (atmosphericShipLeavingControlDevice)
-							clientObject->updateContainment(NetworkId::cms_invalid, -1);
 						if (clientObject->isInWorld())
 							clientObject->removeFromWorld();
+						if (atmosphericShipLeavingControlDevice)
+							clientObject->updateContainment(NetworkId::cms_invalid, -1);
+					}
+
+					CellProperty::setPortalTransitionsEnabled (false);
+					existingObject->setTransform_o2p (transform);
+					CellProperty::setPortalTransitionsEnabled (true);
+					if (atmosphericShipNeedsWorldRegistration)
+					{
+						// Put the reused client object at the top of its atmospheric
+						// arrival before it becomes renderable again.  Adding it to the
+						// world first exposes one frame at its previous stored/landing
+						// transform when a ship is called for a second time.
+						if (hyperspace)
+							clientObject->asShipObject()->onEnterByAtmosphere();
 						RenderWorld::addObjectNotifications(*clientObject);
+						CellProperty::addPortalCrossingNotification(*clientObject);
 						clientObject->addToWorld();
 						clientObject->scheduleForAlter();
 					}
@@ -2679,10 +2756,19 @@ void GroundScene::receiveMessage(const MessageDispatch::Emitter &, const Message
 						hyperspace = true;
 					}
 
-					if(hyperspace)
+					if (hyperspace && Game::isSpace())
 					{
 						DEBUG_REPORT_LOG_PRINT (ms_logCreateMessages, ("SceneCreateObject: networkId=%s, running hyperspace-specific logic\n", networkId.getValueString ().c_str ()));
 						shipObject->onEnterByHyperspace();
+					}
+					else if (hyperspace)
+					{
+						WARNING(true, ("Atmospheric ShipObject %s beginning vertical arrival at position=(%g,%g,%g)",
+							networkId.getValueString().c_str(),
+							transform.getPosition_p().x,
+							transform.getPosition_p().y,
+							transform.getPosition_p().z));
+						shipObject->onEnterByAtmosphere();
 					}
 				}
 			}
@@ -2851,8 +2937,53 @@ void GroundScene::receiveMessage(const MessageDispatch::Emitter &, const Message
 					target->detachFromObject(Object::DF_none);
 			}
 
+			// Ground storage is authoritative immediately on the server, but keep
+			// the already-visible ship detached from its datapad container long
+			// enough to perform a client-only vertical departure.  The deferred
+			// containment is applied after the animation and uses the original
+			// authoritative container/arrangement from this message.
+			ShipObject * const atmosphericShipToStore = target->asShipObject();
+			bool const beginAtmosphericShipDeparture =
+				!Game::isSpace() &&
+				atmosphericShipToStore &&
+				target->isInWorld() &&
+				o.getContainerId() != NetworkId::cms_invalid;
+			if (beginAtmosphericShipDeparture && atmosphericShipToStore->onLeaveByAtmosphere())
+			{
+				ms_pendingAtmosphericShipContainments[o.getNetworkId()] = PendingAtmosphericShipContainment(
+					o.getContainerId(),
+					o.getSlotArrangement(),
+					cms_atmosphericShipDepartureTimeSeconds);
+				WARNING(true, ("Atmospheric ShipObject %s beginning vertical departure before stored containment %s arrangement=%d",
+					o.getNetworkId().getValueString().c_str(),
+					o.getContainerId().getValueString().c_str(),
+					o.getSlotArrangement()));
+				return;
+			}
+
+			// A repeat atmospheric call can reuse a ShipObject that still has
+			// world/render registration from its previous landing.  The world
+			// containment update does not carry the new call transform, so hide
+			// the object before detaching it and wait for SceneCreate to place it.
+			bool const atmosphericShipAwaitingAuthoritativeCreate =
+				!Game::isSpace() &&
+				target->asShipObject() &&
+				o.getContainerId() == NetworkId::cms_invalid &&
+				target->isInitialized();
+			if (atmosphericShipAwaitingAuthoritativeCreate && target->isInWorld())
+				target->removeFromWorld();
+
 			//-- Do the containment update.
 			target->updateContainment(o.getContainerId(), o.getSlotArrangement());
+			if (atmosphericShipAwaitingAuthoritativeCreate && target->isInWorld())
+			{
+				// ClientObject::handleContainerChangeWithWorld() automatically adds
+				// an initialized object to the world when its new parent is invalid.
+				// SceneCreate is the next message carrying the new call transform, so
+				// immediately undo that automatic registration to prevent one frame
+				// at the previous landing location.
+				target->removeFromWorld();
+			}
 
 			// A scene handoff may reuse the local CreatureObject and ShipObject while
 			// replacing their server authority.  Reconcile the player-controlled ship
@@ -2886,8 +3017,7 @@ void GroundScene::receiveMessage(const MessageDispatch::Emitter &, const Message
 			// this message does not carry the authoritative world transform and the
 			// cached object is commonly still at the origin.  The existing-object
 			// SceneCreate path above registers it after applying the final transform.
-			ShipObject * const atmosphericShip = target->asShipObject();
-			if (atmosphericShip && o.getContainerId() == NetworkId::cms_invalid && target->isInitialized())
+			if (atmosphericShipAwaitingAuthoritativeCreate)
 			{
 				target->scheduleForAlter();
 				WARNING(true, ("Atmospheric ShipObject %s awaiting authoritative SceneCreate template=%s cachedPosition=(%g,%g,%g) appearance=%p",

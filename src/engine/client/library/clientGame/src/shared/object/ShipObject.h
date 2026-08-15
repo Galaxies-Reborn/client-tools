@@ -165,6 +165,8 @@ public:
 	void onShipPilotDismounted();
 	void onEnterByHyperspace();
 	void onLeaveByHyperspace();
+	void onEnterByAtmosphere();
+	bool onLeaveByAtmosphere();
 	CachedNetworkId const & getTurretTarget(int weaponIndex) const;
 	bool isTurret(int weaponIndex) const;
 	int getTurretCount() const;

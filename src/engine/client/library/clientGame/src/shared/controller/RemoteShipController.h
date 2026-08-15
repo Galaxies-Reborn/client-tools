@@ -40,6 +40,8 @@ public:
 	// hyperspace methods
 	void enterByHyperspace();
 	void leaveByHyperspace();
+	void enterByAtmosphere();
+	void leaveByAtmosphere();
 
 protected:
 
@@ -67,6 +69,16 @@ private:
 	bool m_killShipWhenFinishedHyperspace;
 	float m_totalElapsedTimeInHyperspaceSeconds;
 	Transform m_transformAfterHyperspace;
+
+	// ground atmospheric arrival members
+	bool m_isInAtmosphericArrival;
+	float m_totalElapsedTimeInAtmosphericArrivalSeconds;
+	Transform m_transformAfterAtmosphericArrival;
+
+	// ground atmospheric departure members
+	bool m_isInAtmosphericDeparture;
+	float m_totalElapsedTimeInAtmosphericDepartureSeconds;
+	Transform m_transformBeforeAtmosphericDeparture;
 };
 
 //----------------------------------------------------------------------

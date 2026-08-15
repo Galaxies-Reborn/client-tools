@@ -309,6 +309,37 @@ namespace CuiIconManagerNamespace
 		if (!clientObject || clientObject->getGameObjectType() != SharedObjectTemplate::GOT_data_ship_control_device)
 			return &logicalObject;
 
+		// Prime the persistent render proxy while the real ship is still safely
+		// contained.  A ground call briefly detaches the live ShipObject before
+		// SceneCreate supplies its authoritative transform; during that interval
+		// the live object is deliberately off-world and must not replace the
+		// datapad preview.
+		std::string shipIdString;
+		std::string previewTemplate;
+		std::string previewCustomization;
+		ObjectAttributeManager::AttributeVector attributes;
+		if (ObjectAttributeManager::getAttributes(logicalObject.getNetworkId(), attributes, false))
+		{
+			ObjectAttributeManager::AttributePair * const previewIdAttribute =
+				ObjectAttributeManager::findAttribute(attributes, cs_shipPreviewIdAttribute);
+			if (previewIdAttribute)
+				shipIdString = Unicode::wideToNarrow(previewIdAttribute->second);
+
+			ObjectAttributeManager::AttributePair * const previewTemplateAttribute =
+				ObjectAttributeManager::findAttribute(attributes, cs_shipPreviewTemplateAttribute);
+			if (previewTemplateAttribute)
+				previewTemplate = Unicode::wideToNarrow(previewTemplateAttribute->second);
+
+			ObjectAttributeManager::AttributePair * const previewCustomizationAttribute =
+				ObjectAttributeManager::findAttribute(attributes, cs_shipPreviewCustomizationAttribute);
+			if (previewCustomizationAttribute)
+				previewCustomization = Unicode::wideToNarrow(previewCustomizationAttribute->second);
+		}
+
+		Object * const persistentFallback = previewTemplate.empty()
+			? 0
+			: getOrCreateDatapadShipFallback(logicalObject.getNetworkId(), previewTemplate, previewCustomization);
+
 		Container const * const container = ContainerInterface::getContainer(logicalObject);
 		if (container)
 		{
@@ -327,37 +358,21 @@ namespace CuiIconManagerNamespace
 		// A called ship is no longer physically contained by its control device.
 		// Resolve the persistent link sent as a private attribute so the datapad
 		// can continue rendering the real (and therefore correctly painted) ship.
-		std::string previewTemplate;
-		std::string previewCustomization;
-		ObjectAttributeManager::AttributeVector attributes;
-		if (ObjectAttributeManager::getAttributes(logicalObject.getNetworkId(), attributes, false))
+		if (!shipIdString.empty())
 		{
-			ObjectAttributeManager::AttributePair * const previewIdAttribute =
-				ObjectAttributeManager::findAttribute(attributes, cs_shipPreviewIdAttribute);
-			if (previewIdAttribute)
+			Object * const linkedObject = NetworkIdManager::getObjectById(NetworkId(shipIdString));
+			ClientObject * const linkedClientObject = linkedObject ? linkedObject->asClientObject() : 0;
+			if (linkedClientObject && linkedClientObject->asShipObject())
 			{
-				std::string const shipIdString = Unicode::wideToNarrow(previewIdAttribute->second);
-				if (!shipIdString.empty())
+				// A null container plus !isInWorld is the intentional containment-to-
+				// SceneCreate handoff.  Keep the customized proxy visible until the
+				// authoritative world object is ready to render.
+				if (linkedObject->isInWorld() || ContainerInterface::getContainedByObject(*linkedObject))
 				{
-					Object * const linkedObject = NetworkIdManager::getObjectById(NetworkId(shipIdString));
-					ClientObject * const linkedClientObject = linkedObject ? linkedObject->asClientObject() : 0;
-					if (linkedClientObject && linkedClientObject->asShipObject())
-					{
-						s_datapadShipPreviewCache[logicalObject.getNetworkId()] = Watcher<Object>(linkedObject);
-						return linkedObject;
-					}
+					s_datapadShipPreviewCache[logicalObject.getNetworkId()] = Watcher<Object>(linkedObject);
+					return linkedObject;
 				}
 			}
-
-			ObjectAttributeManager::AttributePair * const previewTemplateAttribute =
-				ObjectAttributeManager::findAttribute(attributes, cs_shipPreviewTemplateAttribute);
-			if (previewTemplateAttribute)
-				previewTemplate = Unicode::wideToNarrow(previewTemplateAttribute->second);
-
-			ObjectAttributeManager::AttributePair * const previewCustomizationAttribute =
-				ObjectAttributeManager::findAttribute(attributes, cs_shipPreviewCustomizationAttribute);
-			if (previewCustomizationAttribute)
-				previewCustomization = Unicode::wideToNarrow(previewCustomizationAttribute->second);
 		}
 
 		DatapadShipPreviewCache::iterator const cached = s_datapadShipPreviewCache.find(logicalObject.getNetworkId());
@@ -365,18 +380,15 @@ namespace CuiIconManagerNamespace
 		{
 			Object * const cachedObject = cached->second.getPointer();
 			ClientObject * const cachedClientObject = cachedObject ? cachedObject->asClientObject() : 0;
-			if (cachedClientObject && cachedClientObject->asShipObject())
+			if (cachedClientObject &&
+				cachedClientObject->asShipObject() &&
+				(cachedObject->isInWorld() || ContainerInterface::getContainedByObject(*cachedObject)))
 				return cachedObject;
 			s_datapadShipPreviewCache.erase(cached);
 		}
 
-		if (!previewTemplate.empty())
-		{
-			Object * const fallback = getOrCreateDatapadShipFallback(
-				logicalObject.getNetworkId(), previewTemplate, previewCustomization);
-			if (fallback)
-				return fallback;
-		}
+		if (persistentFallback)
+			return persistentFallback;
 
 		DatapadShipFallbackCache::iterator const fallback = s_datapadShipFallbackCache.find(logicalObject.getNetworkId());
 		if (fallback != s_datapadShipFallbackCache.end() && fallback->second.object)
