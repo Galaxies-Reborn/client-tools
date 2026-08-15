@@ -34,6 +34,97 @@ PIXEL_CUBE_PROGRAMS = {
     "pixel_program/a_envmask_specmap_ps20.psh",
     "pixel_program/h_color2_envmask_specmap_ps20.psh",
 }
+PLAIN_PIXEL_INCLUDE_PROGRAMS = {
+    "pixel_program/terrain_dot3.inc",
+}
+TERRAIN_DOT3_PIXEL_HELPER = b'''float3 grPrecuCalculateHemisphericLightingVertexColor(
+\tfloat3 direction,
+\tfloat3 normal,
+\tfloat3 vertexDiffuse,
+\tfloat3 vertexColor)
+{
+\tfloat dotProduct = dot(direction, normal);
+\tfloat3 light =
+\t\tdot3LightTangentMinusDiffuseColor
+\t\t+ dot3LightDiffuseColor
+\t\t- max(0.0f, dotProduct) * dot3LightTangentMinusDiffuseColor
+\t\t+ min(0.0f, dotProduct) * dot3LightTangentMinusBackColor;
+\tlight = light * vertexColor + vertexDiffuse;
+\treturn saturate(light);
+}
+
+'''
+VERTEX_FLAT_CONSTANT_PROGRAMS = {
+    "vertex_program/a_lava_alpha_vs11.vsh",
+}
+VERTEX_EMISSIVE_CONSTANT_PROGRAMS = {
+    "vertex_program/terrain_dot3_vs20_blend0_spec.vsh",
+    "vertex_program/terrain_dot3_vs20_blend1_spec.vsh",
+    "vertex_program/terrain_dot3_vs20_blend2_spec.vsh",
+    "vertex_program/terrain_dot3_vs20_blend3_spec.vsh",
+}
+TERRAIN_DOT3_VERTEX_HELPERS = b'''
+
+float3 precuTransformTerrainDot3(float3 inputDirection, float3 vertexNormal_o)
+{
+\tfloat3 j = cross(vertexNormal_o, float3(1.0f, 0.0f, 0.0f));
+\tfloat3 i = cross(j, vertexNormal_o);
+\treturn mul(float3x3(i, j, vertexNormal_o), inputDirection);
+}
+
+float3 precuTransformTerrainDot3LightDirection(float3 vertexNormal_o)
+{
+\treturn normalize(precuTransformTerrainDot3(cLightData_dot3_0_direction.xyz, vertexNormal_o));
+}
+
+float4 precuCalculateDiffusePointLight(
+\tfloat3 position_w,
+\tfloat4 diffuseColor,
+\tfloat4 attenuation,
+\tfloat3 vertexPosition_w,
+\tfloat3 normal_w,
+\tfloat attenuationW)
+{
+\tfloat3 lightDirection = position_w - vertexPosition_w;
+\tfloat lightDistanceSquared = dot(lightDirection, lightDirection);
+\tfloat oneOverLightDistance = rsqrt(lightDistanceSquared);
+\tlightDirection *= oneOverLightDistance;
+\tfloat4 attenuationFactors = float4(
+\t\t1.0f,
+\t\tlightDistanceSquared * oneOverLightDistance,
+\t\tlightDistanceSquared,
+\t\tattenuationW);
+\tfloat distanceAttenuation = 1.0f / dot(attenuation, attenuationFactors);
+\treturn max(dot(normal_w, lightDirection), 0.0f) * distanceAttenuation * diffuseColor;
+}
+
+float4 precuCalculateDiffuseTerrainLighting(float4 vertexPosition_o, float3 vertexNormal_o)
+{
+\tfloat4x4 objectWorld = float4x4(c[4], c[5], c[6], c[7]);
+\tfloat3 vertexPosition_w = mul(vertexPosition_o, objectWorld).xyz;
+\tfloat3 normal_w = normalize(mul(vertexNormal_o, (float3x3)objectWorld));
+\tfloat4 result =
+\t\tmax(dot(normal_w, cLightData_parallel_0_direction.xyz), 0.0f) * cLightData_parallel_0_diffuseColor
+\t\t+ max(dot(normal_w, cLightData_parallel_1_direction.xyz), 0.0f) * cLightData_parallel_1_diffuseColor;
+\tresult += precuCalculateDiffusePointLight(
+\t\tcLightData_pointSpecular_0_position.xyz,
+\t\tcLightData_pointSpecular_0_diffuseColor,
+\t\tcLightData_pointSpecular_0_attenuation,
+\t\tvertexPosition_w,
+\t\tnormal_w,
+\t\t1.0f);
+\tresult += precuCalculateDiffusePointLight(cLightData_point_0_position.xyz, cLightData_point_0_diffuseColor, cLightData_point_0_attenuation, vertexPosition_w, normal_w, rsqrt(dot(cLightData_point_0_position.xyz - vertexPosition_w, cLightData_point_0_position.xyz - vertexPosition_w)));
+\tresult += precuCalculateDiffusePointLight(cLightData_point_1_position.xyz, cLightData_point_1_diffuseColor, cLightData_point_1_attenuation, vertexPosition_w, normal_w, rsqrt(dot(cLightData_point_1_position.xyz - vertexPosition_w, cLightData_point_1_position.xyz - vertexPosition_w)));
+\tresult += precuCalculateDiffusePointLight(cLightData_point_2_position.xyz, cLightData_point_2_diffuseColor, cLightData_point_2_attenuation, vertexPosition_w, normal_w, rsqrt(dot(cLightData_point_2_position.xyz - vertexPosition_w, cLightData_point_2_position.xyz - vertexPosition_w)));
+\tresult += precuCalculateDiffusePointLight(cLightData_point_3_position.xyz, cLightData_point_3_diffuseColor, cLightData_point_3_attenuation, vertexPosition_w, normal_w, rsqrt(dot(cLightData_point_3_position.xyz - vertexPosition_w, cLightData_point_3_position.xyz - vertexPosition_w)));
+\treturn result;
+}
+
+float precuIntensity(float3 rgb)
+{
+\treturn dot(rgb, float3(0.3f, 0.59f, 0.11f));
+}
+'''
 PIXEL_HEMISPHERIC_CALL = re.compile(rb"(?<![A-Za-z0-9_])calculateHemisphericLighting\(")
 PIXEL_HEMISPHERIC_HELPER = b'''float3 grPrecuCalculateHemisphericLighting(float3 direction, float3 normal, float3 vertexDiffuse)
 {
@@ -124,6 +215,11 @@ def source_index(source_client: Path):
 def require_hlsl(name: str, payload: bytes) -> None:
     if name.startswith("vertex_program/"):
         is_hlsl = payload.lstrip(b"\xef\xbb\xbf\x00\r\n\t ").startswith(b"//hlsl")
+    elif name in PLAIN_PIXEL_INCLUDE_PROGRAMS:
+        is_hlsl = (
+            payload.lstrip(b"\xef\xbb\xbf\x00\r\n\t ").startswith(b"//")
+            and b"computeLayerColor" in payload
+        )
     elif name.startswith("pixel_program/"):
         is_hlsl = payload.startswith(b"FORM") and b"//hlsl" in payload
     else:
@@ -161,6 +257,18 @@ def rewrite_iff_chunks(payload: bytes, transform) -> bytes:
 
 
 def adapt_dx11(name: str, payload: bytes) -> bytes:
+    if name == "pixel_program/terrain_dot3.inc":
+        output, replacements = re.subn(
+            rb"(?<![A-Za-z0-9_])calculateHemisphericLightingVertexColor\(",
+            b"grPrecuCalculateHemisphericLightingVertexColor(",
+            payload,
+        )
+        if replacements != 3:
+            raise ImportError(
+                f"expected three terrain hemispheric-light calls in {name}, found {replacements}"
+            )
+        return TERRAIN_DOT3_PIXEL_HELPER + output
+
     if name in PIXEL_CUBE_PROGRAMS:
         sampler_replacements = 0
         call_replacements = 0
@@ -216,6 +324,67 @@ def adapt_dx11(name: str, payload: bytes) -> bytes:
         raise ImportError(
             f"expected one retail vertex include pair in {name}, found {replacements}"
         )
+    if name in VERTEX_FLAT_CONSTANT_PROGRAMS:
+        output, emissive_replacements = re.subn(
+            rb"\bmaterial\.emissiveColor\b", b"cMaterial_emissiveColor", output
+        )
+        output, specular_replacements = re.subn(
+            rb"\bmaterial\.specularColor\b", b"cMaterial_specularColor", output
+        )
+        output, time_replacements = re.subn(
+            rb"\bcurrentTime\b", b"cCurrentTime.x", output
+        )
+        if (emissive_replacements, specular_replacements, time_replacements) != (1, 3, 1):
+            raise ImportError(
+                f"unexpected flat-constant references in {name}: "
+                f"emissive={emissive_replacements}, "
+                f"specular={specular_replacements}, time={time_replacements}"
+            )
+    if name in VERTEX_EMISSIVE_CONSTANT_PROGRAMS:
+        output = output.replace(VERTEX_DX11_PROLOGUE, VERTEX_DX11_PROLOGUE + TERRAIN_DOT3_VERTEX_HELPERS)
+        output, emissive_replacements = re.subn(
+            rb"\bmaterial\.emissiveColor\b", b"cMaterial_emissiveColor", output
+        )
+        replacements = {
+            b"transformTerrainDot3LightDirection": b"precuTransformTerrainDot3LightDirection",
+            b"transformTerrainDot3": b"precuTransformTerrainDot3",
+            b"lightData.ambient.ambientColor": b"cLightData_ambient_ambientColor",
+            b"lightData.dot3[0].direction_o": b"cLightData_dot3_0_direction.xyz",
+            b"lightData.dot3[0].cameraPosition_o": b"cLightData_dot3_0_cameraPosition.xyz",
+            b"intensity(": b"precuIntensity(",
+        }
+        replacement_counts = {}
+        for source, target in replacements.items():
+            output, replacement_counts[source] = re.subn(
+                rb"(?<![A-Za-z0-9_])" + re.escape(source), target, output
+            )
+        output, lighting_replacements = re.subn(
+            rb"DiffuseSpecular diffuseSpecular = calculateDiffuseSpecularTerrainLighting\(true, inputVertex\.position, inputVertex\.normal\);",
+            b"float4 precuDiffuse = precuCalculateDiffuseTerrainLighting(inputVertex.position, inputVertex.normal);",
+            output,
+        )
+        output, diffuse_replacements = re.subn(
+            rb"diffuseSpecular\.diffuse", b"precuDiffuse", output
+        )
+        expected_counts = {
+            b"transformTerrainDot3LightDirection": 1,
+            b"transformTerrainDot3": 2,
+            b"lightData.ambient.ambientColor": 1,
+            b"lightData.dot3[0].direction_o": 1,
+            b"lightData.dot3[0].cameraPosition_o": 2,
+            b"intensity(": 1,
+        }
+        if (
+            emissive_replacements != 1
+            or replacement_counts != expected_counts
+            or lighting_replacements != 1
+            or diffuse_replacements != 1
+        ):
+            raise ImportError(
+                f"unexpected terrain shader references in {name}: "
+                f"emissive={emissive_replacements}, replacements={replacement_counts}, "
+                f"lighting={lighting_replacements}, diffuse={diffuse_replacements}"
+            )
     return output
 
 

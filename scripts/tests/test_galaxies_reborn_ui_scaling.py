@@ -16,6 +16,7 @@ OPTIONS_UI = ASSET_ROOT / "ui/ui_options.inc"
 SCALE_CONTROLS = {
     "SkillBar": "Skill Bar Scale",
     "Ham": "HAM Scale",
+    "SelectedTargetHam": "Selected Target HAM Scale",
     "Party": "Party Scale",
     "Chat": "Chat Scale",
     "Menu": "Menu Scale",

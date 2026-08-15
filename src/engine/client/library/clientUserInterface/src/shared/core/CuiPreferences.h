@@ -237,6 +237,8 @@ public:
 	static float               getSkillBarUiScale();
 	static void                setHamUiScale(float scale);
 	static float               getHamUiScale();
+	static void                setSelectedTargetHamUiScale(float scale);
+	static float               getSelectedTargetHamUiScale();
 	static void                setPartyUiScale(float scale);
 	static float               getPartyUiScale();
 	static void                setChatUiScale(float scale);

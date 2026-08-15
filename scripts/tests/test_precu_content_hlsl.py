@@ -18,8 +18,8 @@ class PrecuContentHlslTests(unittest.TestCase):
             cls.rows = list(csv.DictReader(handle, fieldnames=header, delimiter="\t"))
 
     def test_manifest_is_the_bounded_nge_content_shader_surface(self):
-        self.assertEqual(len(self.rows), 7)
-        self.assertEqual(len({row["path"] for row in self.rows}), 7)
+        self.assertEqual(len(self.rows), 29)
+        self.assertEqual(len({row["path"] for row in self.rows}), 29)
         self.assertTrue(
             all(
                 row["path"].startswith(("pixel_program/", "vertex_program/"))
@@ -49,6 +49,17 @@ class PrecuContentHlslTests(unittest.TestCase):
                 )
                 self.assertNotIn(b"vertex_shader_constants.inc", payload)
                 self.assertNotIn(b"vertex_program/include/functions.inc", payload)
+            elif row["path"].endswith(".inc"):
+                self.assertIn(
+                    b"float3 grPrecuCalculateHemisphericLightingVertexColor(",
+                    payload,
+                    row["path"],
+                )
+                self.assertEqual(
+                    payload.count(b"grPrecuCalculateHemisphericLightingVertexColor("),
+                    4,
+                    row["path"],
+                )
             else:
                 self.assertTrue(payload.startswith(b"FORM"), row["path"])
                 self.assertIn(b"//hlsl", payload, row["path"])

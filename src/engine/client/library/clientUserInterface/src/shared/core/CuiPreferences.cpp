@@ -117,6 +117,7 @@ namespace
 	bool        ms_hamEnhance                       = true;
 	float       ms_skillBarUiScale                  = 1.0f;
 	float       ms_hamUiScale                       = 1.0f;
+	float       ms_selectedTargetHamUiScale         = 1.0f;
 	float       ms_partyUiScale                     = 1.0f;
 	float       ms_chatUiScale                      = 1.0f;
 	float       ms_menuUiScale                      = 1.0f;
@@ -808,11 +809,13 @@ void CuiPreferences::install ()
 	ms_hamEnhance = true;
 	REGISTER_OPTION_USER(skillBarUiScale);
 	REGISTER_OPTION_USER(hamUiScale);
+	REGISTER_OPTION_USER(selectedTargetHamUiScale);
 	REGISTER_OPTION_USER(partyUiScale);
 	REGISTER_OPTION_USER(chatUiScale);
 	REGISTER_OPTION_USER(menuUiScale);
 	setSkillBarUiScale(ms_skillBarUiScale);
 	setHamUiScale(ms_hamUiScale);
+	setSelectedTargetHamUiScale(ms_selectedTargetHamUiScale);
 	setPartyUiScale(ms_partyUiScale);
 	setChatUiScale(ms_chatUiScale);
 	setMenuUiScale(ms_menuUiScale);
@@ -2895,6 +2898,20 @@ void CuiPreferences::setHamUiScale(float scale)
 float CuiPreferences::getHamUiScale()
 {
 	return clampIndividualUiScale(ms_hamUiScale);
+}
+
+//----------------------------------------------------------------------
+
+void CuiPreferences::setSelectedTargetHamUiScale(float scale)
+{
+	ms_selectedTargetHamUiScale = clampIndividualUiScale(scale);
+}
+
+//----------------------------------------------------------------------
+
+float CuiPreferences::getSelectedTargetHamUiScale()
+{
+	return clampIndividualUiScale(ms_selectedTargetHamUiScale);
 }
 
 //----------------------------------------------------------------------

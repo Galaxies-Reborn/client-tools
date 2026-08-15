@@ -446,6 +446,7 @@ void SwgCuiAllTargets::update(const Camera & camera)
 
 	long const fontSize = static_cast<long>(CuiPreferences::getObjectNameFontSizeFactor() * 4.5f + 10.0f);
 	UITextStyle const * style = CuiTextManager::getTextStyle(fontSize);
+	float const selectedTargetHamUiScale = CuiPreferences::getSelectedTargetHamUiScale();
 
 	for (std::set<CachedNetworkId>::const_iterator it = s_currentObjectSet.begin (); it != s_currentObjectSet.end (); /*++it*/)
 	{
@@ -477,6 +478,15 @@ void SwgCuiAllTargets::update(const Camera & camera)
 
 				UIPage & statusPage = status->getPage();
 				{
+					// Opening the Options window can clear the transient look-at target
+					// while the selected combat target remains the intended target.  The
+					// overhead HAM slider must follow either representation of the
+					// player's selected target so it also updates while being adjusted.
+					bool const isSelectedTargetHam = (tangibleId == lookAtTarget) || (tangibleId == intendedTarget);
+					float const statusUiScale = isSelectedTargetHam ? selectedTargetHamUiScale : 1.0f;
+					if (statusPage.GetScale() != statusUiScale)
+						statusPage.SetScale(statusUiScale);
+
 					statusPage.PackIfDirty();
 					// Authored HAM Enhanced status roots own complete standard and
 					// enhanced geometry.  Shrink-wrapping the duplicate here happens
@@ -488,8 +498,10 @@ void SwgCuiAllTargets::update(const Camera & camera)
 					if (m_sceneType == Game::ST_space) 
 						parentHeadPt -= screenCenterOffset;
 
-					parentHeadPt.x -= (statusPage.GetWidth() / 2);
-					parentHeadPt.y -= static_cast<UIScalar>((static_cast<float>(status->getRenderHeight()) * cameraScale));
+					UIScalar const visualWidth = static_cast<UIScalar>(ceilf(static_cast<float>(statusPage.GetWidth()) * statusUiScale));
+					UIScalar const visualHeight = static_cast<UIScalar>(ceilf(static_cast<float>(status->getRenderHeight()) * cameraScale * statusUiScale));
+					parentHeadPt.x -= (visualWidth / 2);
+					parentHeadPt.y -= visualHeight;
 
 					statusPage.SetLocation(parentHeadPt);
 
@@ -569,7 +581,7 @@ void SwgCuiAllTargets::update(const Camera & camera)
 			statusPage.SetDepth(dit->first);
 			
 			// Update the status widget height of this object.
-			UIScalar const renderHeight = status->getRenderHeight();
+			UIScalar const renderHeight = static_cast<UIScalar>(ceilf(static_cast<float>(status->getRenderHeight()) * statusPage.GetScale()));
 			CuiObjectTextManager::updateNameWidgetHeight(status->getTarget(), renderHeight);
 		}
 	}

@@ -9,6 +9,8 @@ param(
     [ValidateSet("None", "Precu")]
     [string]$RuntimeProfile = "None",
 
+    [switch]$LegacyPrecuTreStack,
+
     [switch]$NoBackup
 )
 
@@ -66,6 +68,7 @@ $profileFiles = @()
 $shaderOverrideFiles = @()
 $precuManagedLoosePaths = @()
 $precuAssetArchiveFiles = @()
+$precuArchiveLayout = "none"
 if ($RuntimeProfile -eq "Precu") {
     $profileDirectory = Join-Path $repoRoot "config\precu"
     $profileFiles = @(
@@ -140,15 +143,66 @@ if ($RuntimeProfile -eq "Precu") {
     # Publish 14 layout. In particular, each skill-box wrapper owns an xpbar;
     # leaving this override behind falls back to the retail singleton bar.
     $precuAssetsRoot = Join-Path (Split-Path -Parent $repoRoot) "pre-cu-reborn-assets"
-    foreach ($archiveName in @("precu_runtime.tre", "precu_worlds.tre")) {
-        $sourcePath = Join-Path $precuAssetsRoot $archiveName
-        if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
-            throw "The generated Pre-CU asset archive is missing: $sourcePath"
-        }
+    if ($LegacyPrecuTreStack) {
+        $precuArchiveLayout = "legacy-53-archive"
+        foreach ($archiveName in @("precu_runtime.tre", "precu_worlds.tre")) {
+            $sourcePath = Join-Path $precuAssetsRoot $archiveName
+            if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+                throw "The generated Pre-CU asset archive is missing: $sourcePath"
+            }
 
-        $precuAssetArchiveFiles += [pscustomobject]@{
-            Source = $sourcePath
-            Name   = $archiveName
+            $precuAssetArchiveFiles += [pscustomobject]@{
+                Source = $sourcePath
+                Name   = $archiveName
+            }
+        }
+    }
+    else {
+        $precuArchiveLayout = "protected-14-archive"
+        $consolidatedPolicyPath = Join-Path $precuAssetsRoot "precu_consolidated.json"
+        $consolidatedConfigPath = Join-Path $precuAssetsRoot ".precu-consolidated-build\client\precu_live.cfg"
+        if (-not (Test-Path -LiteralPath $consolidatedPolicyPath -PathType Leaf) -or
+            -not (Test-Path -LiteralPath $consolidatedConfigPath -PathType Leaf)) {
+            throw "The protected PRE-CU TRE stack has not been built and verified. Run the asset repository consolidation workflow or pass -LegacyPrecuTreStack explicitly."
+        }
+        $consolidatedPolicy = Get-Content -LiteralPath $consolidatedPolicyPath -Raw | ConvertFrom-Json
+        $consolidatedConfigHash = (Get-FileHash -LiteralPath $consolidatedConfigPath -Algorithm SHA256).Hash
+        if ($consolidatedConfigHash -cne [string]$consolidatedPolicy.expected.proposed_config_sha256) {
+            throw "The protected PRE-CU configuration identity drifted: $consolidatedConfigPath"
+        }
+        $profileFiles = @(
+            $profileFiles | ForEach-Object {
+                if ($_.Name -ceq "precu_live.cfg") {
+                    [pscustomobject]@{ Source = $consolidatedConfigPath; Name = $_.Name }
+                }
+                else { $_ }
+            }
+        )
+        $consolidatedRoots = @{
+            assets = $precuAssetsRoot
+            base_outputs = Join-Path $precuAssetsRoot ".precu-base-build\output"
+            later_outputs = Join-Path $precuAssetsRoot ".precu-later-build\output"
+        }
+        foreach ($layer in @($consolidatedPolicy.layers)) {
+            $sourceRoot = $consolidatedRoots[[string]$layer.source]
+            if (-not $sourceRoot) {
+                throw "Unknown protected PRE-CU archive source role: $($layer.source)"
+            }
+            foreach ($archiveNameValue in @($layer.archives)) {
+                $archiveName = [string]$archiveNameValue
+                $sourcePath = Join-Path $sourceRoot $archiveName
+                if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+                    throw "The protected PRE-CU archive is missing: $sourcePath"
+                }
+                $actualHash = (Get-FileHash -LiteralPath $sourcePath -Algorithm SHA256).Hash
+                if ($actualHash -cne [string]$consolidatedPolicy.expected.archive_sha256.$archiveName) {
+                    throw "The protected PRE-CU archive identity drifted: $archiveName"
+                }
+                $precuAssetArchiveFiles += [pscustomobject]@{
+                    Source = $sourcePath
+                    Name = $archiveName
+                }
+            }
         }
     }
 
@@ -302,6 +356,14 @@ if (-not $PSCmdlet.ShouldProcess($clientRootPath, "stage $Configuration x64 game
 
 $stagedSources = @($runtimeFiles) + @($profileFiles) +
     @($shaderOverrideFiles) + @($precuAssetArchiveFiles)
+$changedStagedSources = @(
+    $stagedSources | Where-Object {
+        $destination = Join-Path $clientRootPath $_.Name
+        -not (Test-Path -LiteralPath $destination -PathType Leaf) -or
+            (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -cne
+                (Get-FileHash -LiteralPath $_.Source -Algorithm SHA256).Hash
+    }
+)
 
 $precuLooseOverridePaths = @(
     $precuManagedLoosePaths |
@@ -312,7 +374,7 @@ $precuLooseOverridePaths = @(
 $backupDirectory = $null
 if (-not $NoBackup) {
     $existingTargets = @(
-        $stagedSources |
+        $changedStagedSources |
             ForEach-Object { Join-Path $clientRootPath $_.Name } |
             Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
     )
@@ -348,7 +410,7 @@ foreach ($path in @($incompatibleLocalPaths) + @($obsoleteRuntimePaths) + @($pre
     Remove-Item -LiteralPath $path -Force
 }
 
-foreach ($file in $stagedSources) {
+foreach ($file in $changedStagedSources) {
     $destination = Join-Path $clientRootPath $file.Name
     $destinationParent = Split-Path -Parent $destination
     New-Item -ItemType Directory -Path $destinationParent -Force | Out-Null
@@ -376,6 +438,7 @@ $manifest = [ordered]@{
     configuration    = $Configuration
     platform         = "x64"
     runtimeProfile   = $RuntimeProfile
+    precuArchiveLayout = $precuArchiveLayout
     sourceRepository = $repoRoot
     sourceCommit     = $gitCommit
     sourceBranch     = $gitBranch
@@ -401,7 +464,7 @@ $json = $manifest | ConvertTo-Json -Depth 5
 $utf8NoBom = [Text.UTF8Encoding]::new($false)
 [IO.File]::WriteAllText((Join-Path $clientRootPath "x64-runtime-manifest.json"), $json + [Environment]::NewLine, $utf8NoBom)
 
-Write-Host "Staged $($stagedSources.Count) x64 runtime/profile/shader/asset files to $clientRootPath"
+Write-Host "Staged $($changedStagedSources.Count) changed x64 runtime/profile/shader/asset files to $clientRootPath ($($stagedSources.Count) managed)."
 if ($backupDirectory) {
     Write-Host "Previous runtime files were backed up to $backupDirectory"
 }

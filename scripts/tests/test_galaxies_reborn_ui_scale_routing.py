@@ -42,6 +42,19 @@ class GalaxiesRebornUiScaleRoutingTests(unittest.TestCase):
         self.assertNotIn("IndividualUiScale='ham'", sample[:1200])
         self.assertNotIn("IndividualUiScale='ham'", group)
 
+    def test_selected_target_ham_scale_is_applied_with_scaled_anchor_math(self) -> None:
+        all_targets = (PAGE_ROOT / "SwgCuiAllTargets.cpp").read_text(encoding="utf-8")
+        self.assertIn("CuiPreferences::getSelectedTargetHamUiScale()", all_targets)
+        self.assertIn(
+            "(tangibleId == lookAtTarget) || (tangibleId == intendedTarget)",
+            all_targets,
+        )
+        self.assertIn("isSelectedTargetHam ? selectedTargetHamUiScale : 1.0f", all_targets)
+        self.assertIn("statusPage.SetScale(statusUiScale);", all_targets)
+        self.assertIn("statusPage.GetWidth()) * statusUiScale", all_targets)
+        self.assertIn("status->getRenderHeight()) * cameraScale * statusUiScale", all_targets)
+        self.assertIn("status->getRenderHeight()) * statusPage.GetScale()", all_targets)
+
     def test_scaled_popups_and_containment_use_world_transform_helpers(self) -> None:
         lockable = (CORE_ROOT / "SwgCuiLockableMediator.cpp").read_text(encoding="utf-8")
         status = (PAGE_ROOT / "SwgCuiStatusGround.cpp").read_text(encoding="utf-8")
