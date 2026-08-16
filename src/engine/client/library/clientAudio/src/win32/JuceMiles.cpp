@@ -274,6 +274,73 @@ void audioDecodeLog(char const *format, ...)
 }
 
 std::uint64_t s_nextFillToken = 1;
+
+struct DecodedAudio
+{
+	juce::AudioBuffer<float> pcm;
+	S32 channels = 0;
+	S32 sampleRate = 0;
+	S32 bits = 0;
+	S32 blockAlign = 1;
+	FrameIndex totalFrames = 0;
+};
+
+bool decodeEncoded(std::vector<U8> const &encoded, DecodedAudio &out)
+{
+	if (encoded.empty())
+	{
+		setError("Audio data is empty");
+		return false;
+	}
+	auto stream = std::make_unique<juce::MemoryInputStream>(encoded.data(), encoded.size(), false);
+	std::unique_ptr<juce::AudioFormatReader> reader(s_formatManager.createReaderFor(std::move(stream)));
+	if (!reader || reader->numChannels == 0 || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
+	{
+		setError("JUCE could not recognize or decode the audio data");
+		return false;
+	}
+	if (reader->lengthInSamples > static_cast<juce::int64>((std::numeric_limits<int>::max)()))
+	{
+		setError("Audio asset is too large for the in-memory JUCE decoder");
+		return false;
+	}
+	out.channels = static_cast<S32>((std::min)(reader->numChannels, 2u));
+	out.sampleRate = static_cast<S32>(reader->sampleRate + 0.5);
+	out.bits = static_cast<S32>(reader->bitsPerSample);
+	out.totalFrames = static_cast<FrameIndex>(reader->lengthInSamples);
+	out.blockAlign = (std::max)(1, out.channels * (std::max)(1, out.bits / 8));
+	if (isWave(encoded.data(), encoded.size()))
+	{
+		size_t formatOffset = 0;
+		U32 formatLength = 0;
+		if (findWaveChunk(encoded.data(), encoded.size(), "fmt ", formatOffset, formatLength) && formatLength >= 16)
+			out.blockAlign = (std::max)(1, static_cast<S32>(readU16(encoded.data() + formatOffset + 12)));
+	}
+	out.pcm.setSize(out.channels, static_cast<int>(out.totalFrames), false, true, false);
+	if (!reader->read(&out.pcm, 0, static_cast<int>(out.totalFrames), 0, true, out.channels > 1))
+	{
+		out.pcm.setSize(0, 0);
+		setError("JUCE failed while decoding the audio data");
+		return false;
+	}
+	return true;
+}
+
+void applyDecoded(SampleState &sample, DecodedAudio &decoded)
+{
+	sample.sourceChannels = decoded.channels;
+	sample.sourceSampleRate = decoded.sampleRate;
+	sample.sourceBits = decoded.bits;
+	sample.totalFrames = decoded.totalFrames;
+	sample.playbackRate = decoded.sampleRate;
+	sample.encodedBlockAlign = decoded.blockAlign;
+	sample.pcm = std::move(decoded.pcm);
+	sample.seekFrame = 0;
+	sample.cursorFrame = 0.0;
+	sample.completed.store(false, std::memory_order_release);
+	sample.status = SMP_DONE;
+}
+
 std::atomic<std::uint64_t> s_callbackBlocks{0};
 std::atomic<std::uint64_t> s_callbackLockMisses{0};
 
@@ -345,57 +412,6 @@ bool openStreamedSample(SampleState &sample, HSAMPLE handle, char const *name)
 			audioDecodeLog("[audio.stream] fill=%.1fms name=%s", juce::Time::getMillisecondCounterHiRes() - w0, nameCopy.c_str());
 		}).detach();
 	}
-	return true;
-}
-
-bool decodeAudio(SampleState &sample)
-{
-	if (sample.encodedData.empty())
-	{
-		setError("Audio data is empty");
-		return false;
-	}
-
-	auto stream = std::make_unique<juce::MemoryInputStream>(sample.encodedData.data(), sample.encodedData.size(), false);
-	std::unique_ptr<juce::AudioFormatReader> reader(s_formatManager.createReaderFor(std::move(stream)));
-	if (!reader || reader->numChannels == 0 || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
-	{
-		setError("JUCE could not recognize or decode the audio data");
-		return false;
-	}
-	if (reader->lengthInSamples > static_cast<juce::int64>((std::numeric_limits<int>::max)()))
-	{
-		setError("Audio asset is too large for the in-memory JUCE decoder");
-		return false;
-	}
-
-	sample.sourceChannels = static_cast<S32>((std::min)(reader->numChannels, 2u));
-	sample.sourceSampleRate = static_cast<S32>(reader->sampleRate + 0.5);
-	sample.sourceBits = static_cast<S32>(reader->bitsPerSample);
-	sample.totalFrames = static_cast<FrameIndex>(reader->lengthInSamples);
-	sample.playbackRate = sample.sourceSampleRate;
-	sample.encodedBlockAlign = (std::max)(1, sample.sourceChannels * (std::max)(1, sample.sourceBits / 8));
-
-	if (isWave(sample.encodedData.data(), sample.encodedData.size()))
-	{
-		size_t formatOffset = 0;
-		U32 formatLength = 0;
-		if (findWaveChunk(sample.encodedData.data(), sample.encodedData.size(), "fmt ", formatOffset, formatLength) && formatLength >= 16)
-			sample.encodedBlockAlign = (std::max)(1, static_cast<S32>(readU16(sample.encodedData.data() + formatOffset + 12)));
-	}
-
-	sample.pcm.setSize(sample.sourceChannels, static_cast<int>(sample.totalFrames), false, true, false);
-	if (!reader->read(&sample.pcm, 0, static_cast<int>(sample.totalFrames), 0, true, sample.sourceChannels > 1))
-	{
-		sample.pcm.setSize(0, 0);
-		setError("JUCE failed while decoding the audio data");
-		return false;
-	}
-
-	sample.seekFrame = 0;
-	sample.cursorFrame = 0.0;
-	sample.completed.store(false, std::memory_order_release);
-	sample.status = SMP_DONE;
 	return true;
 }
 
@@ -1067,17 +1083,30 @@ void AILCALL AIL_release_sample_handle(HSAMPLE sample)
 
 S32 AILCALL AIL_set_named_sample_file(HSAMPLE sampleHandle, C8 const *, void const *fileImage, U32 fileSize, S32)
 {
-	std::lock_guard<std::recursive_mutex> lock(s_mutex);
-	SampleState *sample = findSample(sampleHandle);
-	if (!sample || !fileImage || fileSize == 0)
+	if (!fileImage || fileSize == 0)
 	{
 		setError("Cannot assign an empty audio file");
 		return 0;
 	}
+
+	std::vector<U8> encoded(static_cast<U8 const *>(fileImage), static_cast<U8 const *>(fileImage) + fileSize);
+	DecodedAudio decoded;
+	bool const ok = decodeEncoded(encoded, decoded);
+
+	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	SampleState *sample = findSample(sampleHandle);
+	if (!sample)
+	{
+		setError("Cannot assign audio to a released sample");
+		return 0;
+	}
 	destroyVoice(*sample);
 	sample->fillToken = 0;
-	sample->encodedData.assign(static_cast<U8 const *>(fileImage), static_cast<U8 const *>(fileImage) + fileSize);
-	return decodeAudio(*sample) && createVoice(*sample) ? 1 : 0;
+	sample->encodedData = std::move(encoded);
+	if (!ok)
+		return 0;
+	applyDecoded(*sample, decoded);
+	return createVoice(*sample) ? 1 : 0;
 }
 
 S32 AILCALL AIL_set_sample_file(HSAMPLE sample, void const *fileImage, S32 block)
