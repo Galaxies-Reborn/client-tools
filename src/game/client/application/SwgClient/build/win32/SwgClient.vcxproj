@@ -99,7 +99,8 @@
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LinkIncremental>true</LinkIncremental>
+    <!-- Keep /FORCE effective for the legacy x64 dependency surface. -->
+    <LinkIncremental>false</LinkIncremental>
     <TargetName>Galaxies Reborn PRECU_d</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">
