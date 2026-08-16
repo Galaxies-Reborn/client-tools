@@ -14,6 +14,9 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <cstdarg>
+#include <share.h>
+#include <thread>
 
 #pragma push_macro("U8")
 #pragma push_macro("U16")
@@ -76,6 +79,7 @@ struct SampleState
 
 	HDIGDRIVER driver = nullptr;
 	juce::AudioBuffer<float> pcm;
+	std::uint64_t fillToken = 0;
 	std::vector<U8> encodedData;
 	FrameIndex totalFrames = 0;
 	FrameIndex seekFrame = 0;
@@ -254,6 +258,92 @@ bool findWaveChunk(U8 const *data, size_t size, char const id[4], size_t &offset
 		position += 8 + declaredLength + (declaredLength & 1u);
 	}
 	return false;
+}
+
+void audioDecodeLog(char const *format, ...)
+{
+	static FILE *s_log = _fsopen("audio-decode.log", "a", _SH_DENYWR);
+	if (!s_log)
+		return;
+	va_list va;
+	va_start(va, format);
+	vfprintf(s_log, format, va);
+	va_end(va);
+	fputc('\n', s_log);
+	fflush(s_log);
+}
+
+std::uint64_t s_nextFillToken = 1;
+
+bool openStreamedSample(SampleState &sample, HSAMPLE handle, char const *name)
+{
+	double const t0 = juce::Time::getMillisecondCounterHiRes();
+	auto headerStream = std::make_unique<juce::MemoryInputStream>(sample.encodedData.data(), sample.encodedData.size(), false);
+	std::unique_ptr<juce::AudioFormatReader> reader(s_formatManager.createReaderFor(std::move(headerStream)));
+	if (!reader || reader->numChannels == 0 || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
+		return false;
+	if (reader->lengthInSamples > static_cast<juce::int64>((std::numeric_limits<int>::max)()))
+		return false;
+
+	sample.sourceChannels = static_cast<S32>((std::min)(reader->numChannels, 2u));
+	sample.sourceSampleRate = static_cast<S32>(reader->sampleRate + 0.5);
+	sample.sourceBits = static_cast<S32>(reader->bitsPerSample);
+	sample.totalFrames = static_cast<FrameIndex>(reader->lengthInSamples);
+	sample.playbackRate = sample.sourceSampleRate;
+	sample.encodedBlockAlign = (std::max)(1, sample.sourceChannels * (std::max)(1, sample.sourceBits / 8));
+	sample.seekFrame = 0;
+	sample.cursorFrame = 0.0;
+	sample.completed.store(false, std::memory_order_release);
+	sample.status = SMP_DONE;
+	sample.pcm.setSize(sample.sourceChannels, static_cast<int>(sample.totalFrames), false, true, false);
+
+	int const firstBlock = static_cast<int>((std::min)(sample.totalFrames, static_cast<FrameIndex>(sample.sourceSampleRate)));
+	if (firstBlock > 0 && !reader->read(&sample.pcm, 0, firstBlock, 0, true, sample.sourceChannels > 1))
+		return false;
+
+	std::uint64_t const token = s_nextFillToken++;
+	sample.fillToken = token;
+	audioDecodeLog("[audio.stream] open=%.1fms frames=%d ch=%d rate=%d firstBlock=%d name=%s",
+		juce::Time::getMillisecondCounterHiRes() - t0, static_cast<int>(sample.totalFrames),
+		static_cast<int>(sample.sourceChannels), static_cast<int>(sample.sourceSampleRate),
+		firstBlock, (name && *name) ? name : "(unnamed)");
+
+	if (static_cast<FrameIndex>(firstBlock) < sample.totalFrames)
+	{
+		FrameIndex const total = sample.totalFrames;
+		S32 const channels = sample.sourceChannels;
+		std::vector<U8> encodedCopy = sample.encodedData;
+		std::string nameCopy = (name && *name) ? name : "";
+		std::thread([handle, token, total, channels, firstBlock,
+			encodedCopy = std::move(encodedCopy), nameCopy = std::move(nameCopy)]() mutable
+		{
+			double const w0 = juce::Time::getMillisecondCounterHiRes();
+			auto fillStream = std::make_unique<juce::MemoryInputStream>(encodedCopy.data(), encodedCopy.size(), false);
+			std::unique_ptr<juce::AudioFormatReader> fillReader(s_formatManager.createReaderFor(std::move(fillStream)));
+			if (!fillReader)
+				return;
+
+			int const chunkFrames = 262144;
+			juce::AudioBuffer<float> scratch(channels, chunkFrames);
+			FrameIndex position = static_cast<FrameIndex>(firstBlock);
+			while (position < total)
+			{
+				int const n = static_cast<int>((std::min)(total - position, static_cast<FrameIndex>(chunkFrames)));
+				if (!fillReader->read(&scratch, 0, n, static_cast<juce::int64>(position), true, channels > 1))
+					return;
+
+				std::lock_guard<std::recursive_mutex> lock(s_mutex);
+				auto const iter = s_samples.find(handle);
+				if (iter == s_samples.end() || iter->second->fillToken != token)
+					return;
+				for (int ch = 0; ch < channels; ++ch)
+					iter->second->pcm.copyFrom(ch, static_cast<int>(position), scratch, ch, 0, n);
+				position += static_cast<FrameIndex>(n);
+			}
+			audioDecodeLog("[audio.stream] fill=%.1fms name=%s", juce::Time::getMillisecondCounterHiRes() - w0, nameCopy.c_str());
+		}).detach();
+	}
+	return true;
 }
 
 bool decodeAudio(SampleState &sample)
@@ -717,6 +807,7 @@ void releaseSample(HSAMPLE sampleHandle)
 	auto const iter = s_samples.find(sampleHandle);
 	if (iter == s_samples.end())
 		return;
+	iter->second->fillToken = 0;
 	destroyVoice(*iter->second);
 	delete sampleHandle;
 	s_samples.erase(iter);
@@ -976,6 +1067,7 @@ S32 AILCALL AIL_set_named_sample_file(HSAMPLE sampleHandle, C8 const *, void con
 		return 0;
 	}
 	destroyVoice(*sample);
+	sample->fillToken = 0;
 	sample->encodedData.assign(static_cast<U8 const *>(fileImage), static_cast<U8 const *>(fileImage) + fileSize);
 	return decodeAudio(*sample) && createVoice(*sample) ? 1 : 0;
 }
@@ -1190,11 +1282,25 @@ HSTREAM AILCALL AIL_open_stream(HDIGDRIVER driver, char const *filename, S32)
 	std::vector<U8> fileData;
 	if (!findDriver(driver) || !filename || !readStreamFile(filename, fileData)) return nullptr;
 	HSAMPLE const sampleHandle = AIL_allocate_sample_handle(driver);
-	char const *extension = std::strrchr(filename, '.');
-	if (!sampleHandle || !AIL_set_named_sample_file(sampleHandle, extension ? extension : "", fileData.data(), static_cast<U32>(fileData.size()), 0))
-	{
-		if (sampleHandle) AIL_release_sample_handle(sampleHandle);
+	if (!sampleHandle)
 		return nullptr;
+
+	SampleState * const sample = findSample(sampleHandle);
+	bool opened = false;
+	if (sample)
+	{
+		destroyVoice(*sample);
+		sample->encodedData = fileData;
+		opened = openStreamedSample(*sample, sampleHandle, filename);
+	}
+	if (!opened)
+	{
+		char const *extension = std::strrchr(filename, '.');
+		if (!AIL_set_named_sample_file(sampleHandle, extension ? extension : "", fileData.data(), static_cast<U32>(fileData.size()), 0))
+		{
+			AIL_release_sample_handle(sampleHandle);
+			return nullptr;
+		}
 	}
 	HSTREAM token = new _STREAM;
 	std::memset(token, 0, sizeof(*token));
