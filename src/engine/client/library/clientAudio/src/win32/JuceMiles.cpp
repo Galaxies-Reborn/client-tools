@@ -274,6 +274,8 @@ void audioDecodeLog(char const *format, ...)
 }
 
 std::uint64_t s_nextFillToken = 1;
+std::atomic<std::uint64_t> s_callbackBlocks{0};
+std::atomic<std::uint64_t> s_callbackLockMisses{0};
 
 bool openStreamedSample(SampleState &sample, HSAMPLE handle, char const *name)
 {
@@ -708,8 +710,14 @@ void DriverState::audioDeviceIOCallbackWithContext(
 			juce::FloatVectorOperations::clear(outputChannelData[channel], numSamples);
 	}
 
+	s_callbackBlocks.fetch_add(1, std::memory_order_relaxed);
 	std::unique_lock<std::recursive_mutex> lock(s_mutex, std::try_to_lock);
-	if (!lock.owns_lock() || numOutputChannels <= 0 || numSamples <= 0)
+	if (!lock.owns_lock())
+	{
+		s_callbackLockMisses.fetch_add(1, std::memory_order_relaxed);
+		return;
+	}
+	if (numOutputChannels <= 0 || numSamples <= 0)
 		return;
 
 	if (wetBuffer.getNumSamples() < numSamples)
@@ -1466,6 +1474,21 @@ U32 AILCALL AIL_get_timer_highest_delay(void) { return 0; }
 void AILCALL AIL_serve(void)
 {
 	std::lock_guard<std::recursive_mutex> lock(s_mutex);
+	{
+		static std::uint64_t s_lastReportedMisses = 0;
+		static double s_lastReportMs = 0.0;
+		double const nowMs = juce::Time::getMillisecondCounterHiRes();
+		std::uint64_t const misses = s_callbackLockMisses.load(std::memory_order_relaxed);
+		if (misses != s_lastReportedMisses && (nowMs - s_lastReportMs) >= 5000.0)
+		{
+			audioDecodeLog("[audio.dropout] lockMisses=%llu of %llu callback blocks (+%llu since last report)",
+				static_cast<unsigned long long>(misses),
+				static_cast<unsigned long long>(s_callbackBlocks.load(std::memory_order_relaxed)),
+				static_cast<unsigned long long>(misses - s_lastReportedMisses));
+			s_lastReportedMisses = misses;
+			s_lastReportMs = nowMs;
+		}
+	}
 	std::vector<HSAMPLE> completed;
 	for (auto const &entry : s_samples)
 		if (entry.second->completed.exchange(false, std::memory_order_acq_rel)) completed.push_back(entry.first);
