@@ -548,7 +548,8 @@ ID3D11InputLayout *Direct3d11_InputLayoutCache::getInputLayout(uint32 const *for
 		return existing->second;
 
 	D3D11_INPUT_ELEMENT_DESC elements[32];
-	int const elementCount = buildElements(formatFlags, streamCount, textureCoordinateSetMapping, mappingCount, elements, 32, boneStream);
+	int const maxInputElements = static_cast<int>(sizeof(elements) / sizeof(elements[0]));
+	int const elementCount = buildElements(formatFlags, streamCount, textureCoordinateSetMapping, mappingCount, elements, maxInputElements, boneStream);
 
 	ID3D11InputLayout *layout = NULL;
 
@@ -569,7 +570,7 @@ ID3D11InputLayout *Direct3d11_InputLayoutCache::getInputLayout(uint32 const *for
 			// unsatisfied one with an element on the phantom stream (slot 15, a
 			// stride-zero buffer of zeros, bound by Direct3d11_Draw with the real
 			// streams), and create the layout again.
-			int const augmentedCount = appendPhantomElements(vertexShaderBytecode, vertexShaderBytecodeSize, elements, elementCount, cs_maxInputElements);
+			int const augmentedCount = appendPhantomElements(vertexShaderBytecode, vertexShaderBytecodeSize, elements, elementCount, maxInputElements);
 			if (augmentedCount > elementCount)
 			{
 				HRESULT const retryResult = device->CreateInputLayout(elements, static_cast<UINT>(augmentedCount), vertexShaderBytecode, vertexShaderBytecodeSize, &layout);

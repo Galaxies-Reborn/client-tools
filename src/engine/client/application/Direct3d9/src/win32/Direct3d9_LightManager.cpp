@@ -339,7 +339,7 @@ void Direct3d9_LightManager::setObeysLightScale(const bool obeysLightScale)
 		getPossiblyScaledSpecularIntensity  = &Light::getSpecularIntensity;
 		getPossiblyScaledSpecularColor      = &Light::getSpecularColor;
 	}
-	ms_dirty = true;	
+	ms_dirty = true;
 }
 
 // ----------------------------------------------------------------------
@@ -733,9 +733,9 @@ void Direct3d9_LightManager::applyLights_vertexShader()
 #ifdef VSPS
 
 void Direct3d9_LightManager::_vsps_setExtendedLightData(
-	HemisphericLightData &extendedParallelSpecular, 
-	const Light *light, 
-	const VectorArgb &diffuseColor, 
+	HemisphericLightData &extendedParallelSpecular,
+	const Light *light,
+	const VectorArgb &diffuseColor,
 	float bloomEnabled
 	)
 {

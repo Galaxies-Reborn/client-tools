@@ -229,6 +229,13 @@ class PreCuRuntimeGraphicsContractTests(unittest.TestCase):
         self.assertIn("[int]$MaxCpuCount = 4", script)
         self.assertIn('"/m:$MaxCpuCount"', script)
 
+    def test_client_build_rejects_force_linked_unresolved_externals(self):
+        script = BUILD_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("Tee-Object -FilePath $buildLog", script)
+        self.assertIn('Pattern "unresolved external symbol"', script)
+        self.assertIn("$unresolved.Count -gt 0", script)
+        self.assertIn("/FORCE emitted a binary anyway", script)
+
     def test_dedicated_client_has_an_unambiguous_executable_identity(self):
         project = CLIENT_PROJECT.read_text(encoding="utf-8")
         targets = DIRECTORY_TARGETS.read_text(encoding="utf-8")

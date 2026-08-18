@@ -566,7 +566,6 @@ void Direct3d9_StaticShaderData::Pass::construct(const StaticShader &shader, con
 					DEBUG_WARNING(true, ("Missing texture coordinate set tag %s for shader %s, defaulting to 0", ConvertTagToStaticString((*textureCoordinateSetTags)[i]), shader.getShaderTemplate().getName().getString()));
 					textureCoordinate = 0;
 				}
-				
 				if (textureCoordinate > 7)
 				{
 					DEBUG_WARNING(true, ("shader [%s]: texture coordinate out of range 0/%d/7, resetting to 0", shader.getName() ? shader.getName() : "<NULL shader name>", static_cast<int>(textureCoordinate)));
