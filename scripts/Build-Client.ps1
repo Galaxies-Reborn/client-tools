@@ -16,6 +16,8 @@ param(
 
     [string]$VisualStudioRoot,
 
+    [string]$OutputRoot,
+
     [ValidateRange(0, 128)]
     [int]$MaxCpuCount = 0
 )
@@ -95,44 +97,78 @@ function Assert-Inputs {
 
 function Get-ExpectedArtifacts {
     param(
+        [Parameter(Mandatory)][string]$RepoRoot,
         [Parameter(Mandatory)][string]$Platform,
         [Parameter(Mandatory)][string]$SelectedConfiguration,
         [Parameter(Mandatory)][string]$SelectedRenderer,
-        [Parameter(Mandatory)][string]$Suffix
+        [Parameter(Mandatory)][string]$Suffix,
+        [string]$SelectedOutputRoot
     )
 
     if ($Platform -eq "x64") {
-        $outputRoot = "src\build\win32\x64\$SelectedConfiguration"
-        $artifacts = @("$outputRoot\SwgClient_$Suffix.exe")
+        $outputRoot = if ($SelectedOutputRoot) {
+            Join-Path $SelectedOutputRoot $SelectedConfiguration
+        }
+        else {
+            Join-Path $RepoRoot "src\build\win32\x64\$SelectedConfiguration"
+        }
+
+        $artifacts = @(
+            (Join-Path $outputRoot "SwgClient_$Suffix.exe"),
+            (Join-Path $outputRoot "DllExport.dll")
+        )
         if ($SelectedRenderer -eq "DX9" -or $SelectedRenderer -eq "All") {
             $artifacts += @(
-                "$outputRoot\gl05_$Suffix.dll",
-                "$outputRoot\gl06_$Suffix.dll",
-                "$outputRoot\gl07_$Suffix.dll"
+                (Join-Path $outputRoot "gl05_$Suffix.dll"),
+                (Join-Path $outputRoot "gl06_$Suffix.dll"),
+                (Join-Path $outputRoot "gl07_$Suffix.dll")
             )
         }
         if ($SelectedRenderer -eq "DX11" -or $SelectedRenderer -eq "All") {
-            $artifacts += "$outputRoot\gl11_$Suffix.dll"
+            $artifacts += Join-Path $outputRoot "gl11_$Suffix.dll"
         }
         return $artifacts
     }
 
-    $artifacts = @("src\compile\win32\SwgClient\$SelectedConfiguration\SwgClient_$Suffix.exe")
+    $artifacts = @(Join-Path $RepoRoot "src\compile\win32\SwgClient\$SelectedConfiguration\SwgClient_$Suffix.exe")
     if ($SelectedRenderer -eq "DX9" -or $SelectedRenderer -eq "All") {
         $artifacts += @(
-            "src\compile\win32\Direct3d9\$SelectedConfiguration\gl05_$Suffix.dll",
-            "src\compile\win32\Direct3d9_ffp\$SelectedConfiguration\gl06_$Suffix.dll",
-            "src\compile\win32\Direct3d9_vsps\$SelectedConfiguration\gl07_$Suffix.dll"
+            (Join-Path $RepoRoot "src\compile\win32\Direct3d9\$SelectedConfiguration\gl05_$Suffix.dll"),
+            (Join-Path $RepoRoot "src\compile\win32\Direct3d9_ffp\$SelectedConfiguration\gl06_$Suffix.dll"),
+            (Join-Path $RepoRoot "src\compile\win32\Direct3d9_vsps\$SelectedConfiguration\gl07_$Suffix.dll")
         )
     }
     if ($SelectedRenderer -eq "DX11" -or $SelectedRenderer -eq "All") {
-        $artifacts += "src\compile\win32\Direct3d11\$SelectedConfiguration\gl11_$Suffix.dll"
+        $artifacts += Join-Path $RepoRoot "src\compile\win32\Direct3d11\$SelectedConfiguration\gl11_$Suffix.dll"
     }
     return $artifacts
 }
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $solution = Join-Path $repoRoot "src\build\win32\swg.sln"
+$selectedOutputRoot = $null
+if ($OutputRoot) {
+    if ($Architecture -ne "x64") {
+        throw "OutputRoot currently requires -Architecture x64. Win32 projects retain their legacy per-project output layout."
+    }
+
+    $fullOutputRoot = [IO.Path]::GetFullPath($OutputRoot)
+    $filesystemRoot = [IO.Path]::GetPathRoot($fullOutputRoot)
+    if ([string]::Equals(
+        $fullOutputRoot.TrimEnd('\', '/'),
+        $filesystemRoot.TrimEnd('\', '/'),
+        [StringComparison]::OrdinalIgnoreCase)) {
+        throw "OutputRoot must not be a filesystem root: $fullOutputRoot"
+    }
+
+    # Windows PowerShell's native argument quoting can swallow the closing
+    # quote when a path containing spaces ends in a backslash. Keep the build
+    # root separator-free; OutDir uses a trailing forward slash, which MSBuild
+    # accepts and normalizes without the native quoting ambiguity.
+    $selectedOutputRoot = $fullOutputRoot.TrimEnd('\', '/')
+    [void][IO.Directory]::CreateDirectory($selectedOutputRoot)
+}
+
 $prerequisites = & (Join-Path $PSScriptRoot "Test-ClientBuildPrerequisites.ps1") `
     -PlatformToolset $PlatformToolset `
     -VisualStudioRoot $VisualStudioRoot `
@@ -167,6 +203,22 @@ foreach ($platform in $platforms) {
         "/nr:false",
         "/v:minimal"
     )
+    if ($platform -eq "x64" -and $selectedOutputRoot) {
+        $platformOutputDirectory = (Join-Path $selectedOutputRoot $Configuration).TrimEnd('\', '/') + '/'
+        $arguments += @(
+            "/p:SwgBuildRoot=$selectedOutputRoot",
+            # OutDir is also supplied as an early global property. Several
+            # legacy projects calculate TargetPath before Directory.Build.targets
+            # is imported; this keeps project-reference metadata aligned with
+            # the redirected linker and librarian outputs.
+            "/p:OutDir=$platformOutputDirectory",
+            "/p:SwgDisableLegacyStaging=true",
+            # A gameplay package is not a Visual Studio remote-deployment
+            # payload. Disabling recipe generation avoids project-local recipe
+            # probes after all binaries have been redirected externally.
+            "/p:GenerateDesktopDeployRecipeFile=false"
+        )
+    }
     if ($MaxCpuCount -gt 0) {
         $arguments += "/m:$MaxCpuCount"
     }
@@ -178,7 +230,14 @@ foreach ($platform in $platforms) {
     Write-Host "Solution: $solution"
     Write-Host "Build: $Configuration|$platform; renderers=$Renderer; audio=$AudioBackend; toolset=$PlatformToolset"
 
-    $buildLog = Join-Path ([IO.Path]::GetTempPath()) ("swg-build-{0}-{1}-{2}.log" -f $Configuration, $platform, $PID)
+    $buildLogRoot = if ($selectedOutputRoot) {
+        Join-Path $selectedOutputRoot "logs"
+    }
+    else {
+        [IO.Path]::GetTempPath()
+    }
+    [void][IO.Directory]::CreateDirectory($buildLogRoot)
+    $buildLog = Join-Path $buildLogRoot ("swg-build-{0}-{1}-{2}.log" -f $Configuration, $platform, $PID)
     & $msbuild @arguments | Tee-Object -FilePath $buildLog
     if ($LASTEXITCODE -ne 0) {
         throw "The $Configuration|$platform client build failed with exit code $LASTEXITCODE."
@@ -197,13 +256,14 @@ foreach ($platform in $platforms) {
 
     $expectedMachine = if ($platform -eq "x64") { 0x8664 } else { 0x014c }
     $artifacts = Get-ExpectedArtifacts `
+        -RepoRoot $repoRoot `
         -Platform $platform `
         -SelectedConfiguration $Configuration `
         -SelectedRenderer $Renderer `
-        -Suffix $suffix
+        -Suffix $suffix `
+        -SelectedOutputRoot $selectedOutputRoot
 
-    foreach ($relativePath in $artifacts) {
-        $path = Join-Path $repoRoot $relativePath
+    foreach ($path in $artifacts) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "Expected build artifact is missing: $path"
         }

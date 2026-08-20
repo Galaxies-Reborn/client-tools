@@ -12,8 +12,12 @@
 #include "Direct3d11_Device.h"
 #include "Direct3d11_ImageWriter.h"
 
-// TEMPORARY DIAGNOSTIC: RenderDoc's in-application API, from the installed SDK.
-#include "C:/Program Files/RenderDoc/renderdoc_app.h"
+// RenderDoc capture support is optional. Define SWG_ENABLE_RENDERDOC_CAPTURE
+// and add the SDK include directory for a diagnostic build; Release and Steam
+// Deck builds have no machine-specific RenderDoc dependency.
+#if defined(SWG_ENABLE_RENDERDOC_CAPTURE)
+#include "renderdoc_app.h"
+#endif
 #include "Direct3d11_StateCache.h"
 #include "Direct3d11_Metrics.h"
 #include "Direct3d11_ConstantBuffers.h"
@@ -586,6 +590,7 @@ bool Direct3d11_SwapChain::present()
 		int const captureFrame = ConfigDirect3d11::getDebugRenderDocFrame();
 		if (captureFrame > 0)
 		{
+#if defined(SWG_ENABLE_RENDERDOC_CAPTURE)
 			static int renderDocFrameNumber = 0;
 			++renderDocFrameNumber;
 
@@ -614,6 +619,14 @@ bool Direct3d11_SwapChain::present()
 					WARNING(true, ("Direct3d11: debugRenderDocFrame is set but renderdoc.dll is not loaded; launch under renderdoccmd."));
 				}
 			}
+#else
+			static bool warnedWithoutRenderDocSupport = false;
+			if (!warnedWithoutRenderDocSupport)
+			{
+				warnedWithoutRenderDocSupport = true;
+				WARNING(true, ("Direct3d11: debugRenderDocFrame is set, but this build was compiled without SWG_ENABLE_RENDERDOC_CAPTURE."));
+			}
+#endif
 		}
 	}
 

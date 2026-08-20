@@ -9,6 +9,18 @@
   <PropertyGroup Condition="'$(Platform)' == 'x64'">
     <SwgDependenciesDir>$(MSBuildThisFileDirectory)deps\x64</SwgDependenciesDir>
     <SwgX64DependenciesDir>$(SwgDependenciesDir)</SwgX64DependenciesDir>
+    <!-- Define renamed x64 targets before Microsoft.Cpp targets calculate
+         TargetPath. Keeping this in Directory.Build.props also makes project
+         references agree with the gl##_*.dll names written by the linker. -->
+    <SwgOutputSuffix Condition="'$(Configuration)' == 'Release'">r</SwgOutputSuffix>
+    <SwgOutputSuffix Condition="'$(Configuration)' == 'Optimized'">o</SwgOutputSuffix>
+    <SwgOutputSuffix Condition="'$(Configuration)' == 'Debug'">d</SwgOutputSuffix>
+    <TargetName Condition="'$(SwgOutputSuffix)' != '' and '$(MSBuildProjectName)' == 'SwgClient'">SwgClient_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(SwgOutputSuffix)' != '' and '$(MSBuildProjectName)' == 'Direct3d9'">gl05_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(SwgOutputSuffix)' != '' and '$(MSBuildProjectName)' == 'Direct3d9_ffp'">gl06_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(SwgOutputSuffix)' != '' and '$(MSBuildProjectName)' == 'Direct3d9_vsps'">gl07_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(SwgOutputSuffix)' != '' and '$(MSBuildProjectName)' == 'Direct3d11'">gl11_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(SwgOutputSuffix)' != '' and '$(MSBuildProjectName)' == 'Headless'">gl00_$(SwgOutputSuffix)</TargetName>
     <SwgCompatibilityDependencies>swg-stubs.lib;vivoxSharedWrapper.lib;libxml2.lib;pcre.lib;</SwgCompatibilityDependencies>
     <SwgAudioBackendDependencies Condition="'$(SwgAudioBackend)' == 'Miles'">mss64.lib;</SwgAudioBackendDependencies>
     <SwgPlatformLibraryDirectories>$(DXSDK_DIR)Lib\x64;$(WindowsSDK_LibraryPath_x64);$(SwgDependenciesDir)\lib;$(MSBuildThisFileDirectory)mss64-stub;</SwgPlatformLibraryDirectories>

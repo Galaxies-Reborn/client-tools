@@ -1,0 +1,42 @@
+THIRD-PARTY RUNTIME NOTICES
+===========================
+
+This runtime contains the following separately licensed components. The exact
+license texts and notices shipped with the package are in this directory.
+
+SDL 3.4.10
+  File: SDL3.dll
+  License: zlib license (SDL3.txt)
+
+libxml2 2.15.3
+  File: libxml2.dll
+  License: MIT-style libxml2 license (libxml2.txt)
+
+GNU libiconv 1.18, vcpkg port revision 4
+  File: iconv-2.dll
+  License: GNU LGPL 2.1 for the library (see the exact terms in libiconv.txt)
+  The DLL is dynamically linked and may be replaced with an ABI-compatible
+  build. The corresponding upstream source is available from
+  https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz and the build port
+  used for this binary is available from the Microsoft vcpkg repository at
+  commit 99a97de2cb371449d4fb9dc970f2ac562d689ec2. A distributor remains
+  responsible for satisfying the LGPL source and relinking requirements; a
+  URL in this notice is not a substitute where the license requires source or
+  a valid written offer.
+
+zlib 1.3.2
+  File: z.dll
+  License: zlib license (zlib.txt)
+
+JUCE 8.0.14
+  JUCE audio modules are statically linked into SwgClient_r.exe.
+  License: AGPLv3 or a commercial JUCE license (JUCE.md)
+  A distributor must select and comply with an applicable JUCE licensing path.
+
+Microsoft Visual C++ x64 Runtime
+  Files: the app-local Microsoft.VC145.CRT DLL set selected during staging
+  License: the Microsoft Visual Studio redistributable terms applicable to the
+  installed Visual Studio copy from which those DLLs were staged.
+
+Original game data and the Galaxies Reborn client code are not relicensed by
+this notice.

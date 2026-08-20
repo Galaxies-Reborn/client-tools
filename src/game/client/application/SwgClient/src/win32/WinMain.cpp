@@ -21,6 +21,33 @@ extern void externalCommandHandler(const char*);
 
 // ======================================================================
 
+namespace
+{
+	constexpr DWORD cs_modulePathCapacity = 32768;
+
+	bool setWorkingDirectoryToExecutable()
+	{
+		wchar_t modulePath[cs_modulePathCapacity];
+		DWORD const modulePathLength = GetModuleFileNameW(NULL, modulePath, cs_modulePathCapacity);
+		if (modulePathLength == 0 || modulePathLength >= cs_modulePathCapacity)
+			return false;
+
+		DWORD directoryLength = modulePathLength;
+		while (directoryLength > 0 && modulePath[directoryLength - 1] != L'\\' && modulePath[directoryLength - 1] != L'/')
+			--directoryLength;
+
+		if (directoryLength == 0)
+			return false;
+
+		// Keep the trailing separator. This preserves a drive-root path (C:\\)
+		// and is accepted by both Windows and Wine/Proton.
+		modulePath[directoryLength] = L'\0';
+		return SetCurrentDirectoryW(modulePath) != FALSE;
+	}
+}
+
+// ======================================================================
+
 static bool SetUserSelectedMemoryManagerTarget()
 {
 	char buffer[32];
@@ -119,6 +146,16 @@ int WINAPI WinMain(
 	int       nCmdShow        // show state of window
 	)
 {
+	// Config, renderer DLL, logs, and client data all use paths relative to the
+	// process working directory. Steam and other launchers are free to supply a
+	// different directory, so anchor it to the executable before any subsystem
+	// tries to open a file.
+	if (!setWorkingDirectoryToExecutable())
+	{
+		MessageBoxW(NULL, L"The client could not use its executable directory. Move the client to an accessible folder and try again.", L"Star Wars Galaxies", MB_OK | MB_ICONERROR);
+		return 1;
+	}
+
 	if (!SetUserSelectedMemoryManagerTarget())
 		SetDefaultMemoryManagerTargetSize();
 

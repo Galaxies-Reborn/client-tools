@@ -6,8 +6,13 @@
   </Target>
 
   <PropertyGroup Condition="'$(Platform)' == 'x64'">
-    <OutDir>$(MSBuildThisFileDirectory)src\build\win32\x64\$(Configuration)\</OutDir>
+    <SwgBuildRoot Condition="'$(SwgBuildRoot)' == ''">$(MSBuildThisFileDirectory)src\build\win32\x64</SwgBuildRoot>
+    <OutDir>$(SwgBuildRoot)\$(Configuration)\</OutDir>
     <IntDir>$(OutDir)obj\$(MSBuildProjectName)\</IntDir>
+    <!-- Configuration defaults are resolved after Directory.Build.props for a
+         direct project invocation. Repeat these assignments here so that path
+         remains compatible, while solution/script builds get early TargetPath
+         metadata from Directory.Build.props. -->
     <SwgOutputSuffix Condition="'$(Configuration)' == 'Release'">r</SwgOutputSuffix>
     <SwgOutputSuffix Condition="'$(Configuration)' == 'Optimized'">o</SwgOutputSuffix>
     <SwgOutputSuffix Condition="'$(Configuration)' == 'Debug'">d</SwgOutputSuffix>
@@ -32,7 +37,20 @@
     <Bscmake>
       <OutputFile>$(IntDir)$(MSBuildProjectName).bsc</OutputFile>
     </Bscmake>
+    <Link>
+      <!-- Project files inherited from the Win32 build search the solution's
+           legacy output directory. Put the selected x64 build root first so an
+           external build cannot link stale libraries from the source tree. -->
+      <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
   </ItemDefinitionGroup>
+
+  <!-- The legacy D3D9 projects copy renderer files into repository-local stage
+       directories after every build. Steam Deck packaging has its own verified
+       staging step, so an external build root disables those side effects. -->
+  <PropertyGroup Condition="'$(SwgDisableLegacyStaging)' == 'true'">
+    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
+  </PropertyGroup>
 
   <ItemDefinitionGroup Condition="'$(Platform)' == 'x64' and '$(ConfigurationType)' == 'StaticLibrary'">
     <Lib>

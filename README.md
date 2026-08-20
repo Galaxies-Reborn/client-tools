@@ -48,6 +48,24 @@ JUCE 8 modules are dual-licensed under AGPLv3 or the commercial JUCE license. Di
 
 SDL input is enabled by default and supports multiple independent controllers. See the [multi-controller input guide](docs/inputreborn.md) for runtime configuration and keymap compatibility.
 
+### Steam Deck Package
+
+The Release x64/DX11 client can be compiled and assembled as a Proton-ready
+Steam Deck package while keeping every generated file outside the source tree:
+
+```powershell
+.\scripts\Build-SteamDeckClient.ps1 `
+    -ClientAssetRoot 'E:\path\to\complete-client-data' `
+    -OutputRoot 'E:\SWG\SWGSource\SteamDeck'
+```
+
+Client data is required but is not stored or downloaded by this repository.
+The command creates separate `build` and clean `client` directories, validates
+the x64 runtime, applies the 1280x800 DX11/SDL preset, and emits a SHA-256
+runtime manifest. See the [Steam Deck build and installation guide](docs/steamdeck.md)
+for licensing, server configuration, Proton installation, and on-device test
+requirements.
+
 ## Source Style
 
 First-party C and C++ use Allman braces with tab-based indentation. The repository `.clang-format` file is the formatting authority for new and changed first-party source. Vendored dependencies under `deps` and `src/external/3rd` retain their upstream formatting so they remain reviewable against their source releases.
