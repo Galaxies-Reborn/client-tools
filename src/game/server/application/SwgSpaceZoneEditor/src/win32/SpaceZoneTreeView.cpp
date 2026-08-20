@@ -99,7 +99,7 @@ void SpaceZoneTreeView::addNode(HTREEITEM parent, HTREEITEM after, SwgSpaceZoneE
 {
 	NOT_NULL(object);
 	HTREEITEM item = GetTreeCtrl().InsertItem(object->getName(), parent, after);
-	GetTreeCtrl().SetItemData(item, reinterpret_cast<DWORD>(object));
+	GetTreeCtrl().SetItemData(item, reinterpret_cast<DWORD_PTR>(object));
 
 	if (object->isPatrolPointSpawner())
 	{
@@ -366,7 +366,7 @@ void SpaceZoneTreeView::validate()
 			}
 
 			CString buffer;
-			buffer.Format("%s is out of bounds at <%1.2f, %1.2f, %1.2f>\r\n", object->getName(), position.x, position.y, position.z);
+			buffer.Format("%s is out of bounds at <%1.2f, %1.2f, %1.2f>\r\n", object->getName().GetString(), position.x, position.y, position.z);
 
 			warning += buffer;
 		}

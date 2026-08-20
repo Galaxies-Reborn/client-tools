@@ -78,7 +78,8 @@ namespace DialogDirectoryNamespace
 
 			if (!finder.IsDots())
 			{
-				if ((finder.IsDirectory() && shouldAddDirectory(finder.GetFileName())) || (!finder.IsDirectory() && shouldAddFile(finder.GetFileName())))
+				CString const fileName = finder.GetFileName();
+				if ((finder.IsDirectory() && shouldAddDirectory(fileName)) || (!finder.IsDirectory() && shouldAddFile(fileName)))
 				{
 					int const openIcon = finder.IsDirectory() ? DDIT_closedFolder : DDIT_file;
 					int const closedIcon = finder.IsDirectory() ? DDIT_closedFolder : DDIT_file;
@@ -111,14 +112,14 @@ namespace DialogDirectoryNamespace
 
 					HTREEITEM treeItem = 0;
 					if (refresh)
-						treeItem = findChildTreeItem(treeCtrl, rootItem, finder.GetFileName());
+						treeItem = findChildTreeItem(treeCtrl, rootItem, fileName);
 
 					if (!treeItem)
-						treeItem = treeCtrl.InsertItem(finder.GetFileName(), closedIcon, openIcon, rootItem, afterItem);
+						treeItem = treeCtrl.InsertItem(fileName, closedIcon, openIcon, rootItem, afterItem);
 
 					if (finder.IsDirectory())
 					{
-						sprintf(subDirectory, "%s%s%s", directory, directory[n-1] != '/' ? "/" : "", finder.GetFileName());
+						sprintf(subDirectory, "%s%s%s", directory, directory[n-1] != '/' ? "/" : "", fileName.GetString());
 
 						addDirectory(subDirectory, treeCtrl, treeItem, refresh);
 					}
@@ -284,10 +285,11 @@ void DialogDirectory::OnDblclkTreeview(NMHDR * const /*pNMHDR*/, LRESULT * const
 	if (treeItem && GetTreeCtrl().GetParentItem(treeItem) != 0 && !GetTreeCtrl().ItemHasChildren(treeItem) && name.GetLength() != 0)
 	{
 		CString const rootPath = Configuration::getServerMissionDataTablePath();
-		if (!AfxGetApp()->OpenDocumentFile(rootPath +(rootPath[rootPath.GetLength() - 1] == '/' ? "" : "/") + name))
+		CString const fullPath = rootPath + (rootPath[rootPath.GetLength() - 1] == '/' ? "" : "/") + name;
+		if (!AfxGetApp()->OpenDocumentFile(fullPath))
 		{
 			CString buffer;
-			buffer.Format("%s could not be opened\n", rootPath +(rootPath[rootPath.GetLength() - 1] == '/' ? "" : "/") + name);
+			buffer.Format("%s could not be opened\n", fullPath.GetString());
 			CONSOLE_OUTPUT(buffer);
 		}
 		else

@@ -71,7 +71,7 @@ namespace TemplateNewDialogNamespace
 
 				std::string const cwd (_getcwd(buf, buf_size));
 				_chdir(tpfDirPath.c_str());
-				snprintf(buf, buf_size, "TemplateCompiler %s", tpfFileName);
+				snprintf(buf, buf_size, "TemplateCompiler %s", tpfFileName.c_str());
 				system(buf);
 				_chdir(cwd.c_str());
 			}

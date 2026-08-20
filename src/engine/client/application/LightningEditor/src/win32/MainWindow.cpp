@@ -257,7 +257,7 @@ void MainWindow::slotFileSaveAsAction()
 			if (!FileNameUtils::isWritable(newPath.latin1()))
 			{
 				QString text;
-				text.sprintf("Error saving: \"%s\". Make sure the file is not read only.", FileNameUtils::get(newPath.latin1(), FileNameUtils::fileName | FileNameUtils::extension));
+				text.sprintf("Error saving: \"%s\". Make sure the file is not read only.", FileNameUtils::get(newPath.latin1(), FileNameUtils::fileName | FileNameUtils::extension).c_str());
 				QMessageBox::warning(this, "Error Saving File", text, "OK.");
 		
 				// Offer them to choose a new filename
@@ -318,7 +318,7 @@ void MainWindow::save(QString const &path)
 	else if (!newPath.isEmpty())
 	{
 		QString text;
-		text.sprintf("Error saving: \"%s\". Make sure the file is not read only.", FileNameUtils::get(newPath.latin1(), FileNameUtils::fileName | FileNameUtils::extension));
+		text.sprintf("Error saving: \"%s\". Make sure the file is not read only.", FileNameUtils::get(newPath.latin1(), FileNameUtils::fileName | FileNameUtils::extension).c_str());
 		QMessageBox::warning(this, "Error Saving File", text, "OK.");
 	}
 }

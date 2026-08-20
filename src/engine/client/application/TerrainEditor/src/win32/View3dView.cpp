@@ -243,7 +243,7 @@ void View3dView::OnDestroy()
 {
 	CView::OnDestroy();
 
-	IGNORE_RETURN (KillTimer (static_cast<int> (timer)));
+	IGNORE_RETURN (KillTimer (timer));
 
 	// TODO: Add your message handler code here
 	delete camera;
@@ -252,7 +252,7 @@ void View3dView::OnDestroy()
 
 //-------------------------------------------------------------------
 
-void View3dView::OnTimer(UINT nIDEvent) 
+void View3dView::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: Add your message handler code here and/or call default
 	if (nIDEvent == timer)

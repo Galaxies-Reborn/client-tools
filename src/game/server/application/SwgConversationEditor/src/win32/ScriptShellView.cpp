@@ -72,16 +72,16 @@ void ScriptShellView::OnUpdate(CView * const pSender, LPARAM const lHint, CObjec
 						CString const commandLine = mochaCommand + releaseOption + shellData->m_fullScriptFileName;
 
 						CString buffer;
-						buffer.Format ("-------------------- Compilation: %s %s --------------------\r\n", shellData->m_shortFileName, shellData->m_debug ? "Debug" : "Release");
+						buffer.Format ("-------------------- Compilation: %s %s --------------------\r\n", shellData->m_shortFileName.GetString (), shellData->m_debug ? "Debug" : "Release");
 						AddTexts (buffer);
 
-						buffer.Format ("Created %s.stf\r\n", shellData->m_shortFileName);
+						buffer.Format ("Created %s.stf\r\n", shellData->m_shortFileName.GetString ());
 						AddTexts (buffer);
 
-						buffer.Format ("Created %s.java\r\n", shellData->m_shortFileName);
+						buffer.Format ("Created %s.java\r\n", shellData->m_shortFileName.GetString ());
 						AddTexts (buffer);
 
-						buffer.Format ("Compiling %s.java\r\n", shellData->m_shortFileName);
+						buffer.Format ("Compiling %s.java\r\n", shellData->m_shortFileName.GetString ());
 						AddTexts (buffer);
 
 						CreateShellRedirect (commandLine);

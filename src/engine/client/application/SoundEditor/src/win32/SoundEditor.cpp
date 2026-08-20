@@ -284,7 +284,7 @@ void SoundEditorNamespace::addSpreadSheetData(QDir const &directory, QFile &file
 
 				// Fade out
 
-				if (soundTemplate->getFadeOutSampleRate() == SoundTemplate::FISR_noFade)
+				if (soundTemplate->getFadeOutSampleRate() == SoundTemplate::FOSR_noFade)
 				{
 					stream << "none" << '\t';
 				}
@@ -292,8 +292,8 @@ void SoundEditorNamespace::addSpreadSheetData(QDir const &directory, QFile &file
 				{
 					switch (soundTemplate->getFadeOutSampleRate())
 					{
-						case SoundTemplate::FISR_firstSample: { stream << "first "; } break;
-						case SoundTemplate::FISR_everySample: { stream << "every "; } break;
+						case SoundTemplate::FOSR_lastSample:  { stream << "last "; } break;
+						case SoundTemplate::FOSR_everySample: { stream << "every "; } break;
 						default:                              { stream << "invalid "; } break;
 					}
 
@@ -519,7 +519,7 @@ SoundEditor::SoundEditor(QWidget *parent, char const *name)
 
 	// Display the Miles version
 
-	sprintf(text, "Miles sound system version: %s\n", Audio::getMilesVersion());
+	sprintf(text, "Miles sound system version: %s\n", Audio::getMilesVersion().c_str());
 	m_debugInformationWidget->append(text);
 
 	// Display the max digital mixer channels

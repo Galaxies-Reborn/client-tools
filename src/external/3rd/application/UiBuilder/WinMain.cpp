@@ -180,11 +180,11 @@ extern unsigned long      gGridMajorTicks;
 
 extern bool               gDrawCursor;
 
-BOOL CALLBACK UIWindowDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
-BOOL CALLBACK GridSettingsDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
-BOOL CALLBACK HighlightSettingsDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
-BOOL CALLBACK ModificationLogDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
-BOOL CALLBACK ImportImageDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
+INT_PTR CALLBACK UIWindowDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
+INT_PTR CALLBACK GridSettingsDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
+INT_PTR CALLBACK HighlightSettingsDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
+INT_PTR CALLBACK ModificationLogDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
+INT_PTR CALLBACK ImportImageDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam );
 void          SizeWindowToCurrentPageSelection( void );
 void          SetSelection( UIBaseObject *NewSelection, bool pushHistory );
 bool          RemoveFromSelection( const UIBaseObject *NewSelection);
@@ -325,18 +325,18 @@ void SetMainWindowTitle( void )
 
 //-----------------------------------------------------------------
 
-void AddTooltipFromControlID( HWND TooltipWindow, HWND ParentWindow, UINT ControlID, char *Tooltip )
+void AddTooltipFromControlID( HWND TooltipWindow, HWND ParentWindow, UINT ControlID, const char *Tooltip )
 {
 	TOOLINFO ti			  = {sizeof(ti)};
 	HWND		 hControl = GetDlgItem( ParentWindow, ControlID );
 
 	ti.uFlags   = TTF_IDISHWND;
 	ti.hwnd     = ParentWindow;
-	ti.uId      = (UINT)hControl;	
+	ti.uId      = reinterpret_cast<UINT_PTR>( hControl );
 	ti.hinst    = GetModuleHandle(0);
-	ti.lpszText = Tooltip;
+	ti.lpszText = const_cast<char *>( Tooltip );
 			
-	SendMessage( TooltipWindow, TTM_ADDTOOL, 0, (LPARAM)&ti );
+	SendMessage( TooltipWindow, TTM_ADDTOOL, 0, reinterpret_cast<LPARAM>( &ti ) );
 }
 
 
@@ -421,7 +421,7 @@ void SavePreferencesToRegistry( void )
 	DWORD		dwAction;
 	HRESULT hr;
 
-	hr = RegCreateKeyEx( HKEY_CURRENT_USER, s_regKeyPreferences, 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, 0, &hKey, &dwAction );
+	hr = RegCreateKeyEx( HKEY_CURRENT_USER, s_regKeyPreferences, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, 0, &hKey, &dwAction );
 
 	if( hr == ERROR_SUCCESS )
 	{
@@ -504,7 +504,7 @@ void SaveMRUListToRegistry( void )
 	DWORD		dwAction;
 	HRESULT hr;
 
-	hr = RegCreateKeyEx( HKEY_CURRENT_USER, s_regKeyMRU, 0, "", REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, 0, &hKey, &dwAction );
+	hr = RegCreateKeyEx( HKEY_CURRENT_USER, s_regKeyMRU, 0, nullptr, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, 0, &hKey, &dwAction );
 
 	if( hr == ERROR_SUCCESS )
 	{
@@ -1027,7 +1027,7 @@ HTREEITEM LoadObjectStructureToTreeControl( HWND hTree, UIBaseObject * const Roo
 		tvis.item.iImage             = I_IMAGECALLBACK;
 		tvis.item.iSelectedImage     = I_IMAGECALLBACK;
 		tvis.item.cChildren          = I_CHILDRENCALLBACK;
-		tvis.item.lParam             = (DWORD)RootObject;
+		tvis.item.lParam             = reinterpret_cast<LPARAM>( RootObject );
 
 		hItem = TreeView_InsertItem( hTree, &tvis );
 
@@ -1086,7 +1086,7 @@ void LoadTopLevelObjectsToTabControl( void )
 				TCITEM	 tci;
 
 				tci.mask   = TCIF_PARAM | TCIF_TEXT;
-				tci.lParam = reinterpret_cast<DWORD>( *i );
+				tci.lParam = reinterpret_cast<LPARAM>( *i );
 
 				if( !tci.lParam )
 					continue;
@@ -1109,7 +1109,7 @@ void LoadTopLevelObjectsToTabControl( void )
 
 //-----------------------------------------------------------------
 
-BOOL CALLBACK CreatePageDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam )
+INT_PTR CALLBACK CreatePageDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam )
 {
 	UI_UNREF (lParam);
 
@@ -1139,7 +1139,7 @@ BOOL CALLBACK CreatePageDlgProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM 
 
 					thePage->SetProperty( UIBaseObject::PropertyName::SourceFile, UIUnicode::narrowToWide( Buffer ) );
 				}
-				EndDialog( hwndDlg, (long)thePage );
+				EndDialog( hwndDlg, reinterpret_cast<INT_PTR>( thePage ) );
 			}
 			else if( LOWORD( wParam ) == IDCANCEL )
 				EndDialog( hwndDlg, 0 );
@@ -1695,7 +1695,7 @@ void UnloadObjects( HWND hwndDlg )
 
 //-----------------------------------------------------------------
 
-UINT CALLBACK SaveAsHookProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam )
+UINT_PTR CALLBACK SaveAsHookProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam )
 {
 	UI_UNREF (lParam);
 
@@ -2403,7 +2403,7 @@ void PasteObjectFromClipboard( HWND hTree )
  
 //-----------------------------------------------------------------
 
-BOOL CALLBACK MainWindowProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam )
+INT_PTR CALLBACK MainWindowProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam )
 {
 	switch( uMsg )
 	{
@@ -3322,8 +3322,8 @@ BOOL CALLBACK MainWindowProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 					style |= ES_WANTRETURN;
 					SetWindowLong(hEdit, GWL_STYLE, style);
 					
-					mOldLabelEditWindowProc = (WNDPROC)GetWindowLong( hEdit, GWL_WNDPROC );
-					SetWindowLong( hEdit, GWL_WNDPROC, (long)LabelEditWindowProc );
+					mOldLabelEditWindowProc = reinterpret_cast<WNDPROC>( GetWindowLongPtr( hEdit, GWLP_WNDPROC ) );
+					SetWindowLongPtr( hEdit, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>( LabelEditWindowProc ) );
 				}
 				else if (GenericHeader->code == TVN_ENDLABELEDIT )
 				{
@@ -3453,7 +3453,7 @@ int __stdcall WinMain( HINSTANCE hInst, HINSTANCE hPrevInst, LPSTR lpCmdLine, in
 
 	theManager.AddCanvasFactory( &theDDSCanvasFactory );
 
-	CreateDialog( hInst, MAKEINTRESOURCE( IDD_MAINWINDOW ), 0, (DLGPROC)MainWindowProc );
+	CreateDialog( hInst, MAKEINTRESOURCE( IDD_MAINWINDOW ), 0, MainWindowProc );
 
 	theManager.SetSoundCanvas ( new SimpleSoundCanvas ());
 

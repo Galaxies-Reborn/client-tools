@@ -369,7 +369,7 @@ void SwgSpaceQuestEditorDoc::scan(bool const showHeader)
 						CString const & navPoint = m_spaceQuest.getProperty(propertyTemplate.m_columnName);
 
 						if (!navPoint.IsEmpty() && !Configuration::isValidNavPoint(spaceZone, navPoint, missionTemplate->getAllowNavPointsInMultipleZones()))
-							warningList.push_back("ERROR: property [" + propertyTemplate.m_columnName + "] points invalid nav point " + (!navPoint.IsEmpty() ? navPoint : "<blank>") + " for space zone " + (!spaceZone.IsEmpty() ? spaceZone : "<blank>") + "\n");
+							warningList.push_back("ERROR: property [" + propertyTemplate.m_columnName + "] points invalid nav point " + (!navPoint.IsEmpty() ? navPoint : CString("<blank>")) + " for space zone " + (!spaceZone.IsEmpty() ? spaceZone : CString("<blank>")) + "\n");
 					}
 					break;
 
@@ -384,7 +384,7 @@ void SwgSpaceQuestEditorDoc::scan(bool const showHeader)
 							CString const & navPoint = navPointList[i];
 
 							if (!Configuration::isValidNavPoint(spaceZone, navPoint, missionTemplate->getAllowNavPointsInMultipleZones()))
-								warningList.push_back("ERROR: property [" + propertyTemplate.m_columnName + "] points invalid nav point " + navPoint + " for space zone " + (!spaceZone.IsEmpty() ? spaceZone : "<blank>") + "\n");
+								warningList.push_back("ERROR: property [" + propertyTemplate.m_columnName + "] points invalid nav point " + navPoint + " for space zone " + (!spaceZone.IsEmpty() ? spaceZone : CString("<blank>")) + "\n");
 						}
 					}
 					break;
@@ -454,7 +454,7 @@ void SwgSpaceQuestEditorDoc::scan(bool const showHeader)
 							}
 
 							if (!valid)
-								warningList.push_back("ERROR: cargo " + (!cargo.IsEmpty() ? cargo : "<None>") + " is not valid for space mobile " + (!spaceMobilePropertyName.IsEmpty() ? spaceMobilePropertyName : "<None>") + "\n");
+								warningList.push_back("ERROR: cargo " + (!cargo.IsEmpty() ? cargo : CString("<None>")) + " is not valid for space mobile " + (!spaceMobilePropertyName.IsEmpty() ? spaceMobilePropertyName : CString("<None>")) + "\n");
 						}
 					}
 					break;

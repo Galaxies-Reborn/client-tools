@@ -780,7 +780,7 @@ void LayerView::OnButtonDeleteLayer()
 	CString name = GetTreeCtrl ().GetItemText (selection);
 
 	CString tmp;
-	tmp.Format ("Are you sure you want to delete %s?", name);
+	tmp.Format ("Are you sure you want to delete %s?", name.GetString ());
 
 	if (MessageBox (tmp, 0, MB_YESNO) == IDYES)
 	{
@@ -850,7 +850,7 @@ HTREEITEM LayerView::addBoundaryToTree (HTREEITEM parent, TerrainGenerator::Boun
 	TerrainEditorDoc::Item* item      = new TerrainEditorDoc::Item;
 	item->type      = TerrainEditorDoc::Item::T_boundary;
 	item->layerItem = boundary;
-	IGNORE_RETURN (GetTreeCtrl ().SetItemData (boundaryItem, reinterpret_cast<DWORD> (item)));
+	IGNORE_RETURN (GetTreeCtrl ().SetItemData (boundaryItem, reinterpret_cast<DWORD_PTR> (item)));
 
 	return boundaryItem;
 }
@@ -898,7 +898,7 @@ HTREEITEM LayerView::addFilterToTree (HTREEITEM parent, TerrainGenerator::Filter
 	TerrainEditorDoc::Item* item      = new TerrainEditorDoc::Item;
 	item->type      = TerrainEditorDoc::Item::T_filter;
 	item->layerItem = filter;
-	IGNORE_RETURN (GetTreeCtrl ().SetItemData (filterItem, reinterpret_cast<DWORD> (item)));
+	IGNORE_RETURN (GetTreeCtrl ().SetItemData (filterItem, reinterpret_cast<DWORD_PTR> (item)));
 
 	return filterItem;
 }
@@ -946,7 +946,7 @@ HTREEITEM LayerView::addAffectorToTree (HTREEITEM parent, TerrainGenerator::Affe
 	TerrainEditorDoc::Item* item      = new TerrainEditorDoc::Item;
 	item->type      = TerrainEditorDoc::Item::T_affector;
 	item->layerItem = affector;
-	IGNORE_RETURN (GetTreeCtrl ().SetItemData (affectorItem, reinterpret_cast<DWORD> (item)));
+	IGNORE_RETURN (GetTreeCtrl ().SetItemData (affectorItem, reinterpret_cast<DWORD_PTR> (item)));
 
 	return affectorItem;
 }
@@ -965,7 +965,7 @@ HTREEITEM LayerView::addLayerToTree (HTREEITEM parent, HTREEITEM afterItem, Terr
 	TerrainEditorDoc::Item* item      = new TerrainEditorDoc::Item;
 	item->type      = TerrainEditorDoc::Item::T_layer;
 	item->layerItem = layer;
-	IGNORE_RETURN (GetTreeCtrl ().SetItemData (sublayerItem, reinterpret_cast<DWORD> (item)));
+	IGNORE_RETURN (GetTreeCtrl ().SetItemData (sublayerItem, reinterpret_cast<DWORD_PTR> (item)));
 
 	//-- walk boundaries, filters and affectors
 	int i;
@@ -1641,7 +1641,7 @@ void LayerView::OnLButtonUpForCopy ()
 
 	if (m_idTimer)
 	{
-		IGNORE_RETURN (KillTimer (static_cast<int> (m_idTimer)));
+		IGNORE_RETURN (KillTimer (m_idTimer));
 		m_idTimer = 0;
 	}
 
@@ -1829,7 +1829,7 @@ void LayerView::OnLButtonUpForMove ()
 
 	if (m_idTimer)
 	{
-		IGNORE_RETURN (KillTimer (static_cast<int> (m_idTimer)));
+		IGNORE_RETURN (KillTimer (m_idTimer));
 		m_idTimer = 0;
 	}
 
@@ -2087,7 +2087,7 @@ void LayerView::OnMouseMove(UINT nFlags, CPoint point)
 
 			if( m_idTimer && hti == m_htiOldDrop )
 			{
-				IGNORE_RETURN (KillTimer( static_cast<int> (m_idTimer) ));
+				IGNORE_RETURN (KillTimer (m_idTimer));
 				m_idTimer = 0;
 			}
 
@@ -2105,7 +2105,7 @@ void LayerView::OnDestroy()
 {
 	if( m_idTimer )
 	{
-		IGNORE_RETURN (KillTimer (static_cast<int> (m_idTimer)));
+		IGNORE_RETURN (KillTimer (m_idTimer));
 		m_idTimer = 0;
 	}
 
@@ -2114,7 +2114,7 @@ void LayerView::OnDestroy()
 
 //-------------------------------------------------------------------
 
-void LayerView::OnTimer(UINT nIDEvent)
+void LayerView::OnTimer(UINT_PTR nIDEvent)
 {
     if( nIDEvent == m_idTimer )
     {

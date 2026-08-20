@@ -42,7 +42,7 @@ namespace
 }
 
 
-UINT CALLBACK ColorDialogHookProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
+UINT_PTR CALLBACK ColorDialogHookProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 {
 	UI_UNREF (lParam);
 	UI_UNREF (wParam);
@@ -77,9 +77,9 @@ ObjectInspector::ObjectInspector( HWND hWnd )
 
 	SetWindowLong( mPropertyListbox, GWL_STYLE, GetWindowLong( mPropertyListbox, GWL_STYLE ) | WS_CLIPCHILDREN );
 
-	mOldWindowProc = (WNDPROC)GetWindowLong( hParent, GWL_WNDPROC );
+	mOldWindowProc = reinterpret_cast<WNDPROC>( GetWindowLongPtr( hParent, GWLP_WNDPROC ) );
 	SetProp( hParent, "ObjectInspector::this", this );
-	SetWindowLong( hParent, GWL_WNDPROC, (long)StaticWindowProc );
+	SetWindowLongPtr( hParent, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>( StaticWindowProc ) );
 
 	SetTimer( hParent, mTimerID, 100, 0 );
 
@@ -105,8 +105,8 @@ ObjectInspector::ObjectInspector( HWND hWnd )
 	SendMessage( mTextOverlay, WM_SETFONT, (WPARAM)fixedFont, 0 );
 
 	SetProp( mTextOverlay, "ObjectInspector::this", this );
-	mOldTextboxWindowProc = (WNDPROC)GetWindowLong( mTextOverlay, GWL_WNDPROC );
-	SetWindowLong( mTextOverlay, GWL_WNDPROC, (long)StaticTextboxWindowProc );
+	mOldTextboxWindowProc = reinterpret_cast<WNDPROC>( GetWindowLongPtr( mTextOverlay, GWLP_WNDPROC ) );
+	SetWindowLongPtr( mTextOverlay, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>( StaticTextboxWindowProc ) );
 	
 	UpdateButtonEnabledState();
 }
@@ -115,10 +115,10 @@ ObjectInspector::~ObjectInspector( void )
 {
 	HWND hParent = GetParent( mPropertyListbox );
 
-	assert( (WNDPROC)GetWindowLong( hParent, GWL_WNDPROC ) == StaticWindowProc );
+	assert( reinterpret_cast<WNDPROC>( GetWindowLongPtr( hParent, GWLP_WNDPROC ) ) == StaticWindowProc );
 
 	KillTimer( hParent, mTimerID );
-	SetWindowLong( hParent, GWL_WNDPROC, (long)mOldWindowProc );
+	SetWindowLongPtr( hParent, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>( mOldWindowProc ) );
 	RemoveProp( hParent, "ObjectInspector::this" );
 
 	RemoveProp( mTextOverlay, "ObjectInspector::this" );
@@ -129,7 +129,7 @@ ObjectInspector::~ObjectInspector( void )
 
 void ObjectInspector::SetObject( UIBaseObject *o )
 {
-	if( o != mObject )
+	if( o != mObject.pointer() )
 	{
 		s_updateAllFromTextControl = false;
 		UpdatePropertyFromTextControl();
@@ -230,7 +230,7 @@ void ObjectInspector::LoadListboxWithObjectProperties( void )
 		if (lname != UIBaseObject::PropertyName::SourceFile && 
 			(_stricmp( lname.c_str (), gVisualEditLockPropertyName ) != 0) &&
 			(lnameStr && *lnameStr != '!'))
-			SendMessage( mPropertyListbox, LB_ADDSTRING, 0, (long)lname.c_str () );
+			SendMessage( mPropertyListbox, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>( lname.c_str () ) );
 	}
 
 	SendMessage( mPropertyListbox, LB_SETCURSEL, Selection, 0 );
@@ -242,7 +242,7 @@ void ObjectInspector::LoadListboxWithObjectProperties( void )
 	SetWindowText( GetDlgItem( hParent, IDC_OBJECTTYPE ), ObjectType );
 
 	UIString sourcePath;
-	if (UIManager::gUIManager().GetRootPage() == mObject) 
+	if (UIManager::gUIManager().GetRootPage() == mObject.pointer())
 	{
 		sourcePath = Unicode::narrowToWide("ui_root");
 	}
@@ -251,7 +251,7 @@ void ObjectInspector::LoadListboxWithObjectProperties( void )
 		mObject->GetProperty(UIBaseObject::PropertyName::SourceFile, sourcePath);
 	}
 
-	sprintf(ObjectType, "%s", Unicode::wideToNarrow(sourcePath).c_str(), mObject->GetTypeName());
+	sprintf(ObjectType, "%s", Unicode::wideToNarrow(sourcePath).c_str());
 	SetWindowText(GetDlgItem( hParent, IDC_OBJECTPROPERTIES_LABEL), ObjectType);
 
 	UpdateButtonEnabledState();
@@ -350,7 +350,7 @@ LRESULT ObjectInspector::WindowProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 		if( pdis->itemID != -1 )
 		{
 			char *PropertyName = new char[ SendMessage( mPropertyListbox, LB_GETTEXTLEN, pdis->itemID, 0 ) + 1 ];
-			SendMessage( mPropertyListbox, LB_GETTEXT, pdis->itemID, (long)PropertyName );
+			SendMessage( mPropertyListbox, LB_GETTEXT, pdis->itemID, reinterpret_cast<LPARAM>( PropertyName ) );
 			DrawText( DoubleBufferDC, PropertyName, -1, &rcClip, DT_SINGLELINE );
 			
 			rcClip.left  = rcClip.right;
@@ -615,7 +615,7 @@ void ObjectInspector::UpdateTextControlFromProperty( void )
 		if( itemID != -1 )
 		{
 			char *PropertyName = new char[ SendMessage( mPropertyListbox, LB_GETTEXTLEN, itemID, 0 ) + 1 ];
-			SendMessage( mPropertyListbox, LB_GETTEXT, itemID, (long)PropertyName );
+			SendMessage( mPropertyListbox, LB_GETTEXT, itemID, reinterpret_cast<LPARAM>( PropertyName ) );
 
 			mCurrentPropertyName = PropertyName;
 

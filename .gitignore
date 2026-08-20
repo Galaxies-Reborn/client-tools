@@ -110,6 +110,8 @@ deps/qt3-win64-src/src/Makefile.main
 deps/qt3-win64-src/src/moc/Makefile
 deps/qt3-win64-src/src/moc/*.obj
 deps/qt3-win64-src/src/tmp/
+deps/qt3-win64-src/tools/designer/uilib/Makefile
+deps/qt3-win64-src/tools/designer/uilib/tmp/
 
 # Local MSBuild and helper outputs.
 src/build/win32/x64/
