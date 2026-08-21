@@ -178,7 +178,7 @@ def normalize(value: str) -> str:
 
 def read_manifest(path: Path) -> list[ManifestRow]:
     with path.open(encoding="utf-8", newline="") as handle:
-        header = handle.readline().removeprefix("# ").rstrip("\n").split("\t")
+        header = handle.readline().removeprefix("# ").rstrip("\r\n").split("\t")
         rows = [
             ManifestRow(
                 path=normalize(row["path"]),

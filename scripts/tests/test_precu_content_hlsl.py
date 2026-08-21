@@ -14,12 +14,13 @@ class PrecuContentHlslTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         with MANIFEST.open(encoding="utf-8", newline="") as handle:
-            header = handle.readline().removeprefix("# ").rstrip("\n").split("\t")
+            header = handle.readline().removeprefix("# ").rstrip("\r\n").split("\t")
             cls.rows = list(csv.DictReader(handle, fieldnames=header, delimiter="\t"))
 
     def test_manifest_is_the_bounded_nge_content_shader_surface(self):
         self.assertEqual(len(self.rows), 29)
         self.assertEqual(len({row["path"] for row in self.rows}), 29)
+        self.assertTrue(all("\r" not in row["source_tre"] for row in self.rows))
         self.assertTrue(
             all(
                 row["path"].startswith(("pixel_program/", "vertex_program/"))
