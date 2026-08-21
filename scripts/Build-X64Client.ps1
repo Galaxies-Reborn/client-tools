@@ -90,9 +90,18 @@ Write-Host "MSBuild: $msbuild"
 Write-Host "Solution: $solution"
 Write-Host "Configuration: $Configuration|x64 ($PlatformToolset)"
 
-& $msbuild @arguments
+$buildLog = Join-Path ([IO.Path]::GetTempPath()) ("swg-x64-build-{0}-{1}.log" -f $Configuration, $PID)
+& $msbuild @arguments | Tee-Object -FilePath $buildLog
 if ($LASTEXITCODE -ne 0) {
-    throw "The x64 client build failed with exit code $LASTEXITCODE."
+    throw "The x64 client build failed with exit code $LASTEXITCODE. Full log: $buildLog"
+}
+
+# SwgClient links with ForceFileOutput (/FORCE), which can downgrade unresolved
+# externals to warnings and still emit a binary. Treat any such binary as failed.
+$unresolved = @(Select-String -LiteralPath $buildLog -Pattern "unresolved external symbol" -SimpleMatch)
+if ($unresolved.Count -gt 0) {
+    $unresolved | Select-Object -First 10 | ForEach-Object { Write-Host $_.Line }
+    throw "The x64 client link left $($unresolved.Count) unresolved external symbol reference(s); /FORCE emitted a binary anyway. Full log: $buildLog"
 }
 
 $clientExecutableName = @{

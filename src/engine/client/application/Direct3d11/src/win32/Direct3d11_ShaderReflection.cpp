@@ -102,6 +102,7 @@ namespace Direct3d11_ShaderReflectionNamespace
 
 	int const cms_vertexConstantCount = sizeof(cms_vertexConstants) / sizeof(cms_vertexConstants[0]);
 	int const cms_pixelConstantCount  = sizeof(cms_pixelConstants) / sizeof(cms_pixelConstants[0]);
+	unsigned int const cms_constantRegisterBytes = 16u;
 
 	bool ms_warnedAboutVacuousGuard;
 
@@ -164,14 +165,19 @@ void Direct3d11_ShaderReflectionNamespace::checkConstantBuffer(ID3D11ShaderRefle
 		if (FAILED(variable->GetDesc(&variableDescription)) || !variableDescription.Name)
 			continue;
 
-		// Every constant in this buffer must start on a sixteen-byte row,
-		// recognised or not: the register file is addressed in rows.
-		FATAL((variableDescription.StartOffset & 15) != 0, ("Direct3d11: in '%s', constant '%s' starts at byte %u, which is not a multiple of 16. The register file is addressed in 16-byte rows, so this constant cannot be addressed by any register number.", name, variableDescription.Name, variableDescription.StartOffset));
+		// A constant off the sixteen-byte row grid cannot be addressed by any
+		// register number -- which only matters for constants this backend
+		// actually addresses by register: the named tables below, whose exact
+		// placement the FATAL inside the table loop still enforces. A content
+		// shader's own loose globals (a packed float2 texture-coordinate set,
+		// say) land mid-row routinely, are uploaded by nothing here, and read
+		// zeros; that is a wrong-looking shader, not a dead client.
+		WARNING((variableDescription.StartOffset & (cms_constantRegisterBytes - 1u)) != 0, ("Direct3d11: in '%s', constant '%s' starts at byte %u (mid-row); no register number can address it, so nothing this backend uploads will ever reach it.", name, variableDescription.Name, variableDescription.StartOffset));
 
 		for (int t = 0; t < tableCount; ++t)
 			if (strcmp(variableDescription.Name, table[t].name) == 0)
 			{
-				unsigned int const expected = static_cast<unsigned int>(table[t].registerIndex) * 16;
+				unsigned int const expected = static_cast<unsigned int>(table[t].registerIndex) * cms_constantRegisterBytes;
 				FATAL(variableDescription.StartOffset != expected, ("Direct3d11: in '%s', constant '%s' landed at byte offset %u but the shader assets require %u (register %d times 16). The register(cN) to $Globals offset correspondence has broken -- every constant in the corpus is now suspect. Check that D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY is still being passed.", name, variableDescription.Name, variableDescription.StartOffset, expected, table[t].registerIndex));
 
 				++result.checkedConstantCount;

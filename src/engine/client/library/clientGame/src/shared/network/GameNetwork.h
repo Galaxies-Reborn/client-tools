@@ -110,6 +110,7 @@ public:
 	static void                        setAcceptSceneCommand   (bool b);
 
 	static int                         getWeatherUpdateInterval();
+	static int                         getEntertainerCaptchaPercent();
 
 	static void                        updateServerWithJediSlotInfo();
 
@@ -153,6 +154,7 @@ private:
 	StationId                m_stationId;
 	TaskConnection *         m_taskConnection;
 	int                      m_weatherUpdateInterval;
+	int                      m_entertainerCaptchaPercent;
 };
 
 //-------------------------------------------------------------------

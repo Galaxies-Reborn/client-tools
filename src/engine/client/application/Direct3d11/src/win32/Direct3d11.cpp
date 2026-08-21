@@ -727,6 +727,10 @@ void Direct3d11Namespace::fillApiTable()
 	ms_glApi.remove                            = remove;
 	ms_glApi.displayModeChanged                = displayModeChanged;
 
+	// Optional consumer overlay callbacks (Gl_api v35 tail slots).
+	ms_glApi.setFrameCallback                   = Direct3d11_SwapChain::setConsumerFrameCallback;
+	ms_glApi.setResizeCallback                  = Direct3d11_SwapChain::setConsumerResizeCallback;
+
 	ms_glApi.getShaderCapability               = getShaderCapability;
 	ms_glApi.requiresVertexAndPixelShaders     = requiresVertexAndPixelShaders;
 	ms_glApi.getOtherAdapterRects              = getOtherAdapterRects;
