@@ -878,6 +878,27 @@ void SwgCuiAvatarCreationHelper::onCompleted (bool success, const NetworkId & ne
 
 		s_creature->setNetworkId (oldId);
 	}
+	else if (success && s_lastCreationAutomatic)
+	{
+		Object * const object = ObjectTemplate::createObject ("object/creature/player/shared_human_male.iff");
+		CreatureObject * const automaticCreature = dynamic_cast<CreatureObject *> (object);
+
+		if (automaticCreature)
+		{
+			automaticCreature->setObjectName (s_automaticName);
+			CuiLoginManager::addAvatarToList (*automaticCreature, networkId);
+
+			REPORT_LOG (true, ("TCG integration: automatic-avatar-cache-insert clusterId=%lu result=success.\n",
+				static_cast<unsigned long> (CuiLoginManager::getConnectedClusterId ())));
+		}
+		else
+		{
+			WARNING (true, ("TCG integration: automatic-avatar-cache-insert clusterId=%lu result=template-create-failed.\n",
+				static_cast<unsigned long> (CuiLoginManager::getConnectedClusterId ())));
+		}
+
+		delete object;
+	}
 	
 	if(m_messageBox)
 		m_messageBox->closeMessageBox();

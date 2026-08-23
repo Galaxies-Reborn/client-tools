@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Imported by Microsoft.Cpp.targets after each legacy project has supplied
+       its configuration-specific paths, but before the C++ targets derive
+       normalized output and intermediate paths from them. -->
+  <PropertyGroup Condition="'$(SwgExternalOutputRoot)' != ''">
+    <SwgExternalOutputPropsImported>true</SwgExternalOutputPropsImported>
+    <SwgOutputSuffix Condition="'$(Configuration)' == 'Release'">r</SwgOutputSuffix>
+    <SwgOutputSuffix Condition="'$(Configuration)' == 'Optimized'">o</SwgOutputSuffix>
+    <SwgOutputSuffix Condition="'$(Configuration)' == 'Debug'">d</SwgOutputSuffix>
+
+    <TargetName Condition="'$(MSBuildProjectName)' == 'SwgClient'">SwgClient_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(MSBuildProjectName)' == 'Direct3d9'">gl05_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(MSBuildProjectName)' == 'Direct3d9_ffp'">gl06_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(MSBuildProjectName)' == 'Direct3d9_vsps'">gl07_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(MSBuildProjectName)' == 'Direct3d11'">gl11_$(SwgOutputSuffix)</TargetName>
+    <TargetName Condition="'$(MSBuildProjectName)' == 'Headless'">gl00_$(SwgOutputSuffix)</TargetName>
+
+    <OutDir>$(SwgExternalOutputRoot)\artifacts\$(Platform)\$(Configuration)\$(SwgAudioBackend)\</OutDir>
+    <IntDir>$(SwgExternalOutputRoot)\intermediate\$(Platform)\$(Configuration)\$(SwgAudioBackend)\$(MSBuildProjectName)\</IntDir>
+    <OutputPath>$(OutDir)</OutputPath>
+    <IntermediateOutputPath>$(IntDir)</IntermediateOutputPath>
+    <TargetDir>$(OutDir)</TargetDir>
+    <TargetPath>$(OutDir)$(TargetName)$(TargetExt)</TargetPath>
+    <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
+    <LocalDebuggerWorkingDirectory Condition="'$(MSBuildProjectName)' == 'SwgClient'">$(SwgRuntimeRoot)</LocalDebuggerWorkingDirectory>
+    <RemoteDebuggerWorkingDirectory Condition="'$(MSBuildProjectName)' == 'SwgClient'">$(SwgRuntimeRoot)</RemoteDebuggerWorkingDirectory>
+    <GenerateDesktopDeployRecipeFile>false</GenerateDesktopDeployRecipeFile>
+    <PostBuildEventUseInBuild Condition="'$(MSBuildProjectName)' == 'Direct3d9' or '$(MSBuildProjectName)' == 'Direct3d9_ffp' or '$(MSBuildProjectName)' == 'Direct3d9_vsps'">false</PostBuildEventUseInBuild>
+  </PropertyGroup>
+</Project>

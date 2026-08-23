@@ -23,6 +23,7 @@ public:
 	static void createWebBrowserPage(bool useHomePage = true);
 	static void debugOutput();
 	static void setURL(std::string url, bool clearCachedURL = false, char const * postData = NULL, int postDataLength = 0);
+	static void beginIntegrationBrowserProbe(char const * nonce);
 
 	static void navigateForward();
 	static void navigateBack();

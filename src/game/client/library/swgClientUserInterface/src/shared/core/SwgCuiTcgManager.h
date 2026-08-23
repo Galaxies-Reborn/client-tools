@@ -13,10 +13,19 @@
 class SwgCuiTcgManager
 {
 public:
+	enum LaunchResult
+	{
+		LR_failed,
+		LR_embedded
+	};
+
 	static void install();
 	static void remove();
 	static void update(float deltaTimeSecs);
-	static void launch();
+	static LaunchResult performAction(char const * integrationActionNonce = 0);
+	static bool isIntegrationGameActionDispatch();
+	static char const * getIntegrationGameActionNonce();
+	static LaunchResult launch();
 	static void setLoginInfo(char const * const username, char const * const sessionId);
 
 private: //disabled

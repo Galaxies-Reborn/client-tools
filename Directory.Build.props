@@ -5,6 +5,17 @@
   <PropertyGroup>
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
     <SwgAudioBackend Condition="'$(SwgAudioBackend)' == ''">Juce</SwgAudioBackend>
+    <SwgWritableOutputRoot>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..\_whitengold_client'))</SwgWritableOutputRoot>
+    <SwgExternalOutputRoot Condition="'$(SwgExternalOutputRoot)' == ''">$(SwgWritableOutputRoot)build\tcg-reborn</SwgExternalOutputRoot>
+    <SwgNormalizedExternalOutputRoot Condition="'$(SwgExternalOutputRoot)' != ''">$([MSBuild]::NormalizeDirectory('$(SwgExternalOutputRoot)'))</SwgNormalizedExternalOutputRoot>
+    <BaseIntermediateOutputPath Condition="'$(SwgExternalOutputRoot)' != ''">$(SwgExternalOutputRoot)\project-extensions\$(Platform)\$(Configuration)\$(SwgAudioBackend)\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath Condition="'$(SwgExternalOutputRoot)' != ''">$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+    <SwgRuntimeArchitecture Condition="'$(Platform)' == 'Win32'">win32</SwgRuntimeArchitecture>
+    <SwgRuntimeArchitecture Condition="'$(Platform)' == 'x64'">x64</SwgRuntimeArchitecture>
+    <SwgConfigurationLower>$([System.String]::Copy('$(Configuration)').ToLowerInvariant())</SwgConfigurationLower>
+    <SwgAudioBackendLower>$([System.String]::Copy('$(SwgAudioBackend)').ToLowerInvariant())</SwgAudioBackendLower>
+    <SwgRuntimeRoot Condition="'$(SwgRuntimeRoot)' == '' and '$(SwgRuntimeArchitecture)' != ''">$(SwgWritableOutputRoot)runtime\$(SwgRuntimeArchitecture)-dx11-$(SwgConfigurationLower)-$(SwgAudioBackendLower)</SwgRuntimeRoot>
+    <ForceImportBeforeCppTargets>$(MSBuildThisFileDirectory)scripts\SwgExternalOutput.props</ForceImportBeforeCppTargets>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Platform)' == 'x64'">
     <SwgDependenciesDir>$(MSBuildThisFileDirectory)deps\x64</SwgDependenciesDir>
@@ -30,6 +41,17 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(MSBuildThisFileDirectory)src\external\3rd\library\stlport453\lib\win32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Platform)' == 'Win32' and ('$(MSBuildProjectName)' == 'Direct3d9' or '$(MSBuildProjectName)' == 'Direct3d9_ffp' or '$(MSBuildProjectName)' == 'Direct3d9_vsps')">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(DXSDK_DIR)Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <!-- Use the SDK's explicit x86 library path.  The legacy renderer
+           projects also search the repository's x64 dependency directory,
+           where a bare DxErr.lib name resolves to the wrong machine type. -->
+      <AdditionalDependencies>$(DXSDK_DIR)Lib\x86\DxErr.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 </Project>

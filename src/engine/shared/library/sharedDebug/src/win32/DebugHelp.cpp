@@ -500,12 +500,22 @@ void DebugHelp::getCallStack(uint64 *callStack, int sizeOfCallStack)
 	//	return;
 
 	EnterCriticalSection(&criticalSection);
-	// Was: x86 inline asm `call GetEIP; pop eax; mov context.Eip, eax;
-	// mov context.Esp, esp; mov context.Ebp, ebp` to seed the CONTEXT
-	// with the current thread's instruction/stack/frame pointers.
-	// RtlCaptureContext does the same thing portably (fills Eip/Esp/Ebp
-	// on x86, Rip/Rsp/Rbp on x64).
+	#if defined(_M_IX86)
+		// RtlCaptureContext faults in this legacy 32-bit client during warning
+		// handling.  Preserve the original x86 capture sequence while keeping
+		// the portable implementation for x64.
+		__asm
+		{
+			call GetEIP
+		GetEIP:
+			pop eax
+			mov context.Eip, eax
+			mov context.Esp, esp
+			mov context.Ebp, ebp
+		}
+	#else
 	RtlCaptureContext(&context);
+	#endif
 	LeaveCriticalSection(&criticalSection);
 
 	STACKFRAME64 stackFrame;

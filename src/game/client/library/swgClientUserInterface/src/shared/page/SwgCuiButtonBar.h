@@ -44,6 +44,8 @@ public:
 	void                toggleMenu();
 	bool                isCompositeVisible();
 	void                onOpacityCallback();
+	static bool         isTcgButtonReadyForIntegrationTest();
+	static bool         pressTcgButtonForIntegrationTest(char const * nonce);
 protected:
 
 	void                performActivate              ();
@@ -64,6 +66,7 @@ private:
 	void updateMenuPosition();
 	void updateMenuEffector();
 	void updateMenuHighlight();
+	void refreshMenuRows();
 
 	void updateSkinnedImageState();
 
@@ -88,7 +91,7 @@ private:
 	UIButton *           m_shipDetailsButton;
 	UIButton *           m_homePortButton;
 	UIButton *           m_myCollectionsButton;
-	//UIButton *           m_tcgButton;
+	UIButton *           m_tcgButton;
 	UIButton *           m_appearanceButton;
 	UIButton *			 m_questBuilderButton;
 	UIButton *           m_gcwInfoButton;

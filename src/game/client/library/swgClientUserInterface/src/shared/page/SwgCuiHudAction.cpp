@@ -64,6 +64,7 @@
 #include "sharedMessageDispatch/Transceiver.h"
 #include "sharedFoundation/ApplicationVersion.h"
 #include "sharedFoundation/Clock.h"
+#include "sharedFoundation/Os.h"
 #include "sharedFoundation/Production.h"
 #include "sharedGame/TextIterator.h"
 #include "sharedNetworkMessages/MessageQueueSpatialChat.h"
@@ -104,7 +105,6 @@
 #include "swgClientUserInterface/SwgCuiResourceExtraction.h"
 #include "swgClientUserInterface/SwgCuiSpaceConversation.h"
 #include "swgClientUserInterface/SwgCuiTcgManager.h"
-#include "swgClientUserInterface/SwgCuiTcgWindow.h"
 #include "swgClientUserInterface/SwgCuiToolbar.h"
 #include "swgClientUserInterface/SwgCuiWebBrowserManager.h"
 #include "swgClientUserInterface/SwgCuiVoiceFlyBar.h"
@@ -285,7 +285,7 @@ m_toggleDownTimeNames          (0.0f)
 	CuiActionManager::addAction(CuiActions::sendSavedPlayerInterestsToServer, this, false);
 	CuiActionManager::addAction (SwgCuiActions::toggleVoiceFlyBar, this, false);
 
-	//CuiActionManager::addAction (CuiActions::tcg, this, false);
+	CuiActionManager::addAction (CuiActions::tcg, this, false);
 
 	CuiActionManager::addAction (CuiActions::appearanceTab, this, false);
 
@@ -1605,22 +1605,24 @@ bool  SwgCuiHudAction::performAction (const std::string & id, const Unicode::Str
 	//{
 	//	CuiMediatorFactory::toggleInWorkspace(CuiMediatorTypes::WS_VoiceActiveSpeakers);
 	//}
-	//else if (id == CuiActions::tcg)
-	//{
-		//SwgCuiTcgWindow * tcgWindow = safe_cast<SwgCuiTcgWindow * >(CuiMediatorFactory::getInWorkspace(CuiMediatorTypes::WS_TcgWindow, false, false, false));
-	
-		//if (tcgWindow && tcgWindow->isActive())
-		//{
-			//CuiMediatorFactory::deactivateInWorkspace(CuiMediatorTypes::WS_TcgWindow);
-		//}
-		//else
-		//{
-			//SwgCuiTcgManager::setLoginInfo(GameNetwork::getUserName().c_str(), CuiLoginManager::getSessionIdKey(true));
-			//SwgCuiTcgManager::launch();
-
-			//tcgWindow = safe_cast<SwgCuiTcgWindow * >(CuiMediatorFactory::activateInWorkspace(CuiMediatorTypes::WS_TcgWindow, false, false));
-		//}
-	//}
+	else if (id == CuiActions::tcg)
+	{
+		if (SwgCuiTcgManager::isIntegrationGameActionDispatch())
+		{
+			std::string nonce = Unicode::wideToNarrow(params);
+			if (nonce.empty())
+			{
+				char const * const activeNonce = SwgCuiTcgManager::getIntegrationGameActionNonce();
+				if (activeNonce)
+					nonce = activeNonce;
+			}
+			REPORT_LOG(true, ("TCG integration: game-action-hud-handler nonce=[%s] pid=%lu.\n",
+				nonce.c_str(), static_cast<unsigned long>(Os::getProcessId())));
+			IGNORE_RETURN(SwgCuiTcgManager::performAction(nonce.c_str()));
+		}
+		else
+			IGNORE_RETURN(SwgCuiTcgManager::performAction());
+	}
 	else if (id == CuiActions::appearanceTab)
 	{
 		CuiMediatorFactory::toggleInWorkspace(CuiMediatorTypes::WS_AppearanceTab);

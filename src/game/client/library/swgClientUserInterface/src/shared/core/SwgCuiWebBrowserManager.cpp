@@ -48,8 +48,32 @@ namespace SwgCuiWebBrowserManagerNamespace
 	std::string              s_URL;
 	std::string              s_postData;
 	int                      s_postDataLength;
+	std::string              s_integrationProbeNonce;
 
 	Timer                    s_timer;
+
+#ifndef _DEBUG
+	bool isValidIntegrationProbeNonce(char const * nonce)
+	{
+		if (!nonce)
+			return false;
+		std::string const value(nonce);
+		if (value.empty() || value.length() > 64)
+			return false;
+		for (std::string::const_iterator iterator = value.begin(); iterator != value.end(); ++iterator)
+		{
+			char const character = *iterator;
+			if (!((character >= 'A' && character <= 'Z') ||
+				(character >= 'a' && character <= 'z') ||
+				(character >= '0' && character <= '9') ||
+				character == '_' || character == '-'))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+#endif
 }
 
 using namespace SwgCuiWebBrowserManagerNamespace;
@@ -63,6 +87,7 @@ void SwgCuiWebBrowserManager::install()
 	s_Widget = NULL;
 	s_Window = NULL;
 	s_type = WBT_Invalid;
+	s_integrationProbeNonce.clear();
 	s_timer.setExpireTime(0.1f);
 
 	libMozilla::setUserAgent("StarWarsGalaxies");
@@ -90,6 +115,7 @@ void SwgCuiWebBrowserManager::remove()
 	}
 
 	s_Widget = NULL;
+	s_integrationProbeNonce.clear();
 #endif
 }
 
@@ -142,6 +168,7 @@ void SwgCuiWebBrowserManager::createWebBrowserPage(bool useHomePage)
 	
 	if(s_Window && isValidPage)
 	{
+		s_integrationProbeNonce.clear();
 		CuiWorkspace * const workspace = CuiWorkspace::getGameWorkspace();
 		if (workspace)
 		{
@@ -178,6 +205,7 @@ void SwgCuiWebBrowserManager::createWebBrowserPage(bool useHomePage)
 
 	if (!prototype)
 	{
+		s_integrationProbeNonce.clear();
 		WARNING (true, ("Bad browser page name <%s> given", templateName.c_str()));
 		return;
 	}
@@ -211,15 +239,11 @@ void SwgCuiWebBrowserManager::createWebBrowserPage(bool useHomePage)
 	if (browserWidgetParent)
 	{
 		SwgCuiWebBrowserWidget * const browserWidget = new SwgCuiWebBrowserWidget;
+		if (!s_integrationProbeNonce.empty())
+			browserWidget->setIntegrationProbeNonce(s_integrationProbeNonce.c_str());
 
 		if(!s_homePage.empty())
 			browserWidget->setHomePage(s_homePage);
-		
-		// This is very strange behavior from Mozilla.
-		// If we want to instantly send the web browser somewhere(and the mozilla window has never been created before)
-		// then we need to create it now instead of new frame - otherwise our setURL command will fail due to internal mozilla shenanigans.
-		if(!useHomePage)
-			browserWidget->createMozillaWindow();
 
 		browserWidget->SetSize(browserWidgetParent->GetSize());
 		browserWidget->SetVisible(true);
@@ -246,8 +270,20 @@ void SwgCuiWebBrowserManager::createWebBrowserPage(bool useHomePage)
 
 		browserWidget->setUIText(urlTextField);
 
+		if (!s_integrationProbeNonce.empty())
+		{
+			REPORT_LOG(true, ("TCG integration: browser-probe-page-created nonce=[%s] pid=%lu.\n",
+				s_integrationProbeNonce.c_str(), static_cast<unsigned long>(Os::getProcessId())));
+		}
+
+		// If navigation is already queued, create the browser now so the next
+		// manager update can issue it without losing the first request.
+		if(!useHomePage)
+			browserWidget->createMozillaWindow();
+
 		browserWindow->SetBrowserWidget(browserWidget);
 	}
+	s_integrationProbeNonce.clear();
 
 	browserWindow->activate();
 	browserWindow->setEnabled(true);
@@ -317,5 +353,17 @@ void SwgCuiWebBrowserManager::setHomePage(std::string const & home)
 {
 #ifndef _DEBUG
 	s_homePage = home;
+#endif
+}
+
+void SwgCuiWebBrowserManager::beginIntegrationBrowserProbe(char const * nonce)
+{
+#ifndef _DEBUG
+	if (isValidIntegrationProbeNonce(nonce))
+		s_integrationProbeNonce = nonce;
+	else
+		s_integrationProbeNonce.clear();
+#else
+	UNREF(nonce);
 #endif
 }

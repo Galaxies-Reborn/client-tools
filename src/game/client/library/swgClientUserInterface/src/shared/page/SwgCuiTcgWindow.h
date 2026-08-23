@@ -27,6 +27,7 @@ class SwgCuiTcgWindow : public CuiMediator
 public:
 	SwgCuiTcgWindow(UIPage & page);
 	virtual ~SwgCuiTcgWindow();
+	bool dispatchIntegrationTestClick(unsigned normalizedX, unsigned normalizedWidth, unsigned normalizedY, unsigned normalizedHeight);
 
 protected:
 	virtual void performActivate();

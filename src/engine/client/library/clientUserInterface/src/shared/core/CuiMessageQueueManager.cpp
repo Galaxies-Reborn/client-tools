@@ -17,6 +17,7 @@
 #include "clientUserInterface/CuiInputNames.h"
 #include "sharedFoundation/MessageQueue.h"
 #include "sharedFoundation/MessageQueueDataTemplate.h"
+#include "sharedFoundation/Os.h"
 #include "sharedInputMap/InputMap_Command.h"
 #include "sharedMessageDispatch/Transceiver.h"
 
@@ -78,13 +79,31 @@ void CuiMessageQueueManager::scanMessageQueue ()
 
 bool CuiMessageQueueManager::executeCommandByName   (const std::string & str)
 {
+	bool const isTcgCommand = _stricmp(str.c_str(), "CMD_uiTcg") == 0;
 	InputMap * const imap = Game::getGameInputMap ();
 	if (imap)
 	{
+		if (isTcgCommand)
+		{
+			InputMap::Command const * const command = imap->findCommandByName(str.c_str(), true);
+			bool const expectedRoute = command && command->pressEvent.message == CM_clientCommandParser &&
+				_stricmp(command->pressEvent.str.c_str(), "/ui action tcg") == 0;
+			REPORT_LOG(true, ("TCG integration: game-action-input-map pid=%lu command=CMD_uiTcg mapping=%s route=%s.\n",
+				static_cast<unsigned long>(Os::getProcessId()), command ? "present" : "missing",
+				expectedRoute ? "ui-action-tcg" : "unexpected"));
+		}
+
 		if (imap->executeCommandByName (str.c_str (), 0, 0, 0))
+		{
+			REPORT_LOG(isTcgCommand, ("TCG integration: game-action-input-execute pid=%lu command=CMD_uiTcg result=queued.\n",
+				static_cast<unsigned long>(Os::getProcessId())));
 			return true;
+		}
 		
 	}
+	else
+		REPORT_LOG(isTcgCommand, ("TCG integration: game-action-input-map pid=%lu command=CMD_uiTcg mapping=no-active-map route=unexpected.\n",
+			static_cast<unsigned long>(Os::getProcessId())));
 
 	// Pre-CU restore: commands added via the command_table override aren't in the
 	// input map (it carries only inputmap-config commands), so the dispatch above
@@ -252,6 +271,9 @@ void CuiMessageQueueManager::scanMessageQueue (MessageQueue & queue)
 				NOT_NULL (mqds);
 
 				const std::string & str = mqds->getData ();
+				REPORT_LOG(_stricmp(str.c_str(), "/ui action tcg") == 0,
+					("TCG integration: game-action-message-queue pid=%lu route=ui-action-tcg result=observed.\n",
+					static_cast<unsigned long>(Os::getProcessId())));
 				if (!executeCommandByString (str, true))
 					WARNING (true, ("CM_clientCommandParser failed for command '%s'", str.c_str ()));
 

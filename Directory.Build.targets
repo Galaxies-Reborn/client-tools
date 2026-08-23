@@ -1,8 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
+         InitialTargets="ValidateSwgBuildProperties">
   <Target Name="ValidateSwgBuildProperties" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(SwgAudioBackend)' != 'Juce' and '$(SwgAudioBackend)' != 'Miles'"
            Text="SwgAudioBackend must be Juce or Miles (received '$(SwgAudioBackend)')." />
+    <Error Condition="'$(SwgExternalOutputRoot)' == ''"
+           Text="SwgExternalOutputRoot is required; builds must stay under the writable _whitengold_client tree." />
+    <Error Condition="'$(SwgExternalOutputPropsImported)' != 'true'"
+           Text="The external-output property import did not run; refusing a build that could write into the source checkout." />
+
+    <ItemGroup>
+      <!-- Sentinel children let the canonical root itself pass while retaining
+           a trailing-directory boundary that rejects similarly named siblings. -->
+      <_SwgWritableDirectory Include="$(SwgWritableOutputRoot)\.__swg_path_guard__"><PropertyName>SwgWritableOutputRoot</PropertyName><PropertyValue>$(SwgWritableOutputRoot)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(SwgExternalOutputRoot)\.__swg_path_guard__"><PropertyName>SwgExternalOutputRoot</PropertyName><PropertyValue>$(SwgExternalOutputRoot)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(BaseIntermediateOutputPath)\.__swg_path_guard__"><PropertyName>BaseIntermediateOutputPath</PropertyName><PropertyValue>$(BaseIntermediateOutputPath)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(MSBuildProjectExtensionsPath)\.__swg_path_guard__"><PropertyName>MSBuildProjectExtensionsPath</PropertyName><PropertyValue>$(MSBuildProjectExtensionsPath)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(OutDir)\.__swg_path_guard__"><PropertyName>OutDir</PropertyName><PropertyValue>$(OutDir)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(IntDir)\.__swg_path_guard__"><PropertyName>IntDir</PropertyName><PropertyValue>$(IntDir)</PropertyValue></_SwgWritableDirectory>
+
+      <_SwgWritableDirectory Include="$(SwgNormalizedExternalOutputRoot)\.__swg_path_guard__" Condition="'$(SwgNormalizedExternalOutputRoot)' != ''"><PropertyName>SwgNormalizedExternalOutputRoot</PropertyName><PropertyValue>$(SwgNormalizedExternalOutputRoot)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(OutDirFullPath)\.__swg_path_guard__" Condition="'$(OutDirFullPath)' != ''"><PropertyName>OutDirFullPath</PropertyName><PropertyValue>$(OutDirFullPath)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(OutputPath)\.__swg_path_guard__" Condition="'$(OutputPath)' != ''"><PropertyName>OutputPath</PropertyName><PropertyValue>$(OutputPath)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(IntDirFullPath)\.__swg_path_guard__" Condition="'$(IntDirFullPath)' != ''"><PropertyName>IntDirFullPath</PropertyName><PropertyValue>$(IntDirFullPath)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(IntermediateOutputPath)\.__swg_path_guard__" Condition="'$(IntermediateOutputPath)' != ''"><PropertyName>IntermediateOutputPath</PropertyName><PropertyValue>$(IntermediateOutputPath)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(TargetDir)\.__swg_path_guard__" Condition="'$(TargetDir)' != ''"><PropertyName>TargetDir</PropertyName><PropertyValue>$(TargetDir)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(TLogLocation)\.__swg_path_guard__" Condition="'$(TLogLocation)' != ''"><PropertyName>TLogLocation</PropertyName><PropertyValue>$(TLogLocation)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(TrackerLogDirectory)\.__swg_path_guard__" Condition="'$(TrackerLogDirectory)' != ''"><PropertyName>TrackerLogDirectory</PropertyName><PropertyValue>$(TrackerLogDirectory)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(DesignTimeIntermediateOutputPath)\.__swg_path_guard__" Condition="'$(DesignTimeIntermediateOutputPath)' != ''"><PropertyName>DesignTimeIntermediateOutputPath</PropertyName><PropertyValue>$(DesignTimeIntermediateOutputPath)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(SwgRuntimeRoot)\.__swg_path_guard__" Condition="'$(SwgRuntimeRoot)' != ''"><PropertyName>SwgRuntimeRoot</PropertyName><PropertyValue>$(SwgRuntimeRoot)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(LocalDebuggerWorkingDirectory)\.__swg_path_guard__" Condition="'$(MSBuildProjectName)' == 'SwgClient' and '$(LocalDebuggerWorkingDirectory)' != ''"><PropertyName>LocalDebuggerWorkingDirectory</PropertyName><PropertyValue>$(LocalDebuggerWorkingDirectory)</PropertyValue></_SwgWritableDirectory>
+      <_SwgWritableDirectory Include="$(RemoteDebuggerWorkingDirectory)\.__swg_path_guard__" Condition="'$(MSBuildProjectName)' == 'SwgClient' and '$(RemoteDebuggerWorkingDirectory)' != ''"><PropertyName>RemoteDebuggerWorkingDirectory</PropertyName><PropertyValue>$(RemoteDebuggerWorkingDirectory)</PropertyValue></_SwgWritableDirectory>
+
+      <_SwgWritableFile Include="$(TargetPath)" Condition="'$(TargetPath)' != ''"><PropertyName>TargetPath</PropertyName><PropertyValue>$(TargetPath)</PropertyValue></_SwgWritableFile>
+      <_SwgWritableFile Include="$(OutDir)$(TargetName)$(TargetExt)" Condition="'$(OutDir)' != '' and '$(TargetName)' != ''"><PropertyName>effective tool output</PropertyName><PropertyValue>$(OutDir)$(TargetName)$(TargetExt)</PropertyValue></_SwgWritableFile>
+      <_SwgWritableFile Include="$(TargetDir)$(TargetFileName)" Condition="'$(TargetDir)' != '' and '$(TargetFileName)' != ''"><PropertyName>TargetDir+TargetFileName</PropertyName><PropertyValue>$(TargetDir)$(TargetFileName)</PropertyValue></_SwgWritableFile>
+      <_SwgWritableFile Include="$(CodeAnalysisLogFile)" Condition="'$(CodeAnalysisLogFile)' != ''"><PropertyName>CodeAnalysisLogFile</PropertyName><PropertyValue>$(CodeAnalysisLogFile)</PropertyValue></_SwgWritableFile>
+      <_SwgWritableFile Include="$(AnalysisResultManifestFile)" Condition="'$(AnalysisResultManifestFile)' != ''"><PropertyName>AnalysisResultManifestFile</PropertyName><PropertyValue>$(AnalysisResultManifestFile)</PropertyValue></_SwgWritableFile>
+      <_SwgWritableFile Include="$(BuildLogFile)" Condition="'$(BuildLogFile)' != ''"><PropertyName>BuildLogFile</PropertyName><PropertyValue>$(BuildLogFile)</PropertyValue></_SwgWritableFile>
+    </ItemGroup>
+
+    <Error Condition="$([System.String]::Copy('%(_SwgWritableDirectory.FullPath)').StartsWith('$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..\_whitengold_client'))', System.StringComparison.OrdinalIgnoreCase)) != 'true'"
+           Text="%(_SwgWritableDirectory.PropertyName) must stay under the canonical sibling _whitengold_client tree (received '%(_SwgWritableDirectory.PropertyValue)')." />
+    <Error Condition="$([System.String]::Copy('%(_SwgWritableFile.FullPath)').StartsWith('$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..\_whitengold_client'))', System.StringComparison.OrdinalIgnoreCase)) != 'true'"
+           Text="%(_SwgWritableFile.PropertyName) must stay under the canonical sibling _whitengold_client tree (received '%(_SwgWritableFile.PropertyValue)')." />
   </Target>
 
   <PropertyGroup Condition="'$(Platform)' == 'x64'">
@@ -17,6 +58,16 @@
     <TargetName Condition="'$(MSBuildProjectName)' == 'Direct3d9_vsps'">gl07_$(SwgOutputSuffix)</TargetName>
     <TargetName Condition="'$(MSBuildProjectName)' == 'Direct3d11'">gl11_$(SwgOutputSuffix)</TargetName>
     <TargetName Condition="'$(MSBuildProjectName)' == 'Headless'">gl00_$(SwgOutputSuffix)</TargetName>
+  </PropertyGroup>
+
+  <!-- Keep opt-in build products outside the checkout.  This is evaluated in
+       each project, so MSBuildProjectName expands before IntDir is consumed. -->
+  <PropertyGroup Condition="'$(SwgExternalOutputRoot)' != ''">
+    <OutDir>$(SwgExternalOutputRoot)\artifacts\$(Platform)\$(Configuration)\$(SwgAudioBackend)\</OutDir>
+    <IntDir>$(SwgExternalOutputRoot)\intermediate\$(Platform)\$(Configuration)\$(SwgAudioBackend)\$(MSBuildProjectName)\</IntDir>
+    <TargetDir>$(OutDir)</TargetDir>
+    <TargetPath>$(OutDir)$(TargetName)$(TargetExt)</TargetPath>
+    <GenerateDesktopDeployRecipeFile>false</GenerateDesktopDeployRecipeFile>
   </PropertyGroup>
 
   <ItemDefinitionGroup Condition="'$(Platform)' == 'x64'">
@@ -52,6 +103,35 @@
     <Link>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
       <ProgramDatabaseFile>$(OutDir)$(TargetName).pdb</ProgramDatabaseFile>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- Legacy Win32 projects frequently hard-code tool output paths instead of
+       deriving them from OutDir/IntDir.  Override the tools last when an
+       external root is requested so no compiler or linker product lands in
+       the source checkout. -->
+  <ItemDefinitionGroup Condition="'$(SwgExternalOutputRoot)' != ''">
+    <ClCompile>
+      <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
+      <ObjectFileName>$(IntDir)</ObjectFileName>
+      <PrecompiledHeaderOutputFile>$(IntDir)$(MSBuildProjectName).pch</PrecompiledHeaderOutputFile>
+      <ProgramDataBaseFileName>$(IntDir)$(MSBuildProjectName).pdb</ProgramDataBaseFileName>
+    </ClCompile>
+    <ResourceCompile>
+      <ResourceOutputFileName>$(IntDir)%(Filename).res</ResourceOutputFileName>
+    </ResourceCompile>
+    <Bscmake>
+      <OutputFile>$(IntDir)$(MSBuildProjectName).bsc</OutputFile>
+    </Bscmake>
+    <Lib>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+    </Lib>
+    <Link>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+      <ImportLibrary>$(OutDir)$(TargetName).lib</ImportLibrary>
+      <ProgramDatabaseFile>$(OutDir)$(TargetName).pdb</ProgramDatabaseFile>
+      <MapFileName>$(OutDir)$(TargetName).map</MapFileName>
+      <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
 </Project>

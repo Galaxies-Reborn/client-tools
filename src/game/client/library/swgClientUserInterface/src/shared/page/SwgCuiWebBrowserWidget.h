@@ -55,6 +55,7 @@ public:
 	void    RefreshPage();
 
 	void    createMozillaWindow();
+	void    setIntegrationProbeNonce(char const * nonce);
 
 	void    setHomePage(std::string const & home);
 
@@ -85,6 +86,9 @@ private: //disabled
 
 	Timer                     m_caratBlink;
 	bool                      m_drawCarat;
+	mutable std::string       m_integrationProbeNonce;
+	bool                      m_reportedIntegrationProxyWindow;
+	mutable bool              m_reportedIntegrationFirstNonzeroFrame;
 };
 
 inline void SwgCuiWebBrowserWidget::setUIText(UIText *text)

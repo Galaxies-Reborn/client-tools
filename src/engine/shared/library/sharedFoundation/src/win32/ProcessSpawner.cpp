@@ -8,7 +8,9 @@
 
 #include "sharedFoundation/Os.h"
 
+#include <cstring>
 #include <minmax.h>
+#include <vector>
 
 ProcessSpawner::ProcessSpawner()
 {
@@ -135,18 +137,27 @@ bool ProcessSpawner::create(const char *commandLine, const char *startupFolder, 
 	}
 
 	PROCESS_INFORMATION pinfo;
-	BOOL result = CreateProcess(
-		0,
-		(char *)commandLine,
-		0,
-		0,
-		TRUE,
-		CREATE_NEW_CONSOLE,
-		0,
-		startupFolder,
-		&sinfo,
-		&pinfo
-	);
+	BOOL result;
+	DWORD createProcessError = ERROR_SUCCESS;
+	{
+		// CreateProcess may modify its command-line buffer.  Keep the public API
+		// const-safe while providing writable storage for the duration of the call.
+		std::vector<char> mutableCommandLine(commandLine, commandLine + std::strlen(commandLine) + 1);
+		result = CreateProcess(
+			0,
+			&mutableCommandLine[0],
+			0,
+			0,
+			asConsole ? TRUE : FALSE,
+			asConsole ? CREATE_NEW_CONSOLE : 0,
+			0,
+			startupFolder,
+			&sinfo,
+			&pinfo
+		);
+		if (!result)
+			createProcessError = GetLastError();
+	}
 
 	if (asConsole)
 	{
@@ -169,6 +180,9 @@ bool ProcessSpawner::create(const char *commandLine, const char *startupFolder, 
 	{
 		// Failed to launch turf
 		hProcess=0;
+		// Preserve CreateProcess's diagnostic across pipe cleanup and the
+		// mutable command-line buffer's destruction for callers that log it.
+		SetLastError(createProcessError);
 		return false;
 	}
 }

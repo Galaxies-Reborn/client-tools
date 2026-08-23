@@ -139,7 +139,7 @@ namespace libEverQuestTCG
     static const char userNameArgHeader[] = "--username=";
     static const char sessionIdArgHeader[] = "--sessionID=";
     static const char challengeArgHeader[] = "--challenge=";
-    static const char charnameArgHeader[] = "--character=";
+    static const char charnameArgHeader[] = "--characterID=";
 
     namespace PrivateData
     {
@@ -436,7 +436,7 @@ namespace libEverQuestTCG
         strncpy( fullpath, PrivateData::szApplicationDirectory, sizeof( fullpath ) );
         fullpath[ sizeof( fullpath ) - 1 ] = 0;
 
-        strncat( fullpath, SELECT_RELEASE_OR_DEBUG( "\\SWGTCG.dll", "\\SWGTCG.dll" ), sizeof( fullpath ) - strlen( fullpath ) );
+        strncat( fullpath, SELECT_RELEASE_OR_DEBUG( "\\SWGTCG.dll", "\\SWGTCG.dll" ), sizeof( fullpath ) - strlen( fullpath ) - 1 );
         fullpath[ sizeof( fullpath ) - 1 ] = 0;
 
         m_hDLL = LoadLibraryEx( fullpath, 0, LOAD_WITH_ALTERED_SEARCH_PATH );
@@ -445,7 +445,7 @@ namespace libEverQuestTCG
 		{
 			char buffer[256];
 			memset(buffer, 0, 256);
-			sprintf(buffer, "Failed to load SWGTCG.dll from %s. Please check your install.\n", fullpath);
+			_snprintf_s(buffer, sizeof(buffer), _TRUNCATE, "Failed to load SWGTCG.dll from %s. Please check your install.\n", fullpath);
 			MessageBox(NULL, buffer, "Failed to load DLL", MB_OK);
             return false;
 		}
@@ -477,7 +477,7 @@ namespace libEverQuestTCG
             m_hDLL = 0;
 			char buffer[256];
 			memset(buffer, 0, 256);
-			sprintf(buffer, "Could not map to SWGTCG.dll processes. Please check your install and make sure you have the latest version.\n", fullpath);
+			_snprintf_s(buffer, sizeof(buffer), _TRUNCATE, "Could not map SWGTCG.dll processes from [%s]. Please check your install and make sure you have the latest version.\n", fullpath);
 			MessageBox(NULL, buffer, "Failed to load DLL", MB_OK);
             return false;
         }

@@ -19,6 +19,86 @@
 
 #include "UIImage.h"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
+// ======================================================================
+
+namespace
+{
+#if defined(_WIN64)
+	bool mapNativeWindowRectToControl(
+		SwgCuiTcgControl const & mainControl,
+		libEverQuestTCG::Window & mainWindow,
+		UIPage const & pageParent,
+		int nativeX,
+		int nativeY,
+		unsigned nativeWidth,
+		unsigned nativeHeight,
+		UIPoint & mappedLocation,
+		UISize & mappedSize)
+	{
+		int const controlWidth = mainControl.GetWidth();
+		int const controlHeight = mainControl.GetHeight();
+		if (controlWidth <= 0 || controlHeight <= 0 || nativeWidth == 0 || nativeHeight == 0)
+			return false;
+
+		void * surfaceBits = 0;
+		unsigned surfaceWidth = 0;
+		unsigned surfaceHeight = 0;
+		unsigned surfaceStride = 0;
+		if (!mainWindow.getWindowSurfaceData(&surfaceBits, &surfaceWidth, &surfaceHeight, &surfaceStride) ||
+			!surfaceBits || surfaceWidth == 0 || surfaceHeight == 0 ||
+			static_cast<unsigned long long>(surfaceWidth) * 4u > surfaceStride)
+		{
+			return false;
+		}
+
+		int mainNativeX = 0;
+		int mainNativeY = 0;
+		unsigned mainNativeWidth = 0;
+		unsigned mainNativeHeight = 0;
+		mainWindow.getRect(mainNativeX, mainNativeY, mainNativeWidth, mainNativeHeight);
+		UNREF(mainNativeWidth);
+		UNREF(mainNativeHeight);
+
+		UIPoint const controlWorldLocation = mainControl.GetWorldLocation();
+		UIPoint const parentWorldLocation = pageParent.GetWorldLocation();
+		double const scaleX = static_cast<double>(controlWidth) / static_cast<double>(surfaceWidth);
+		double const scaleY = static_cast<double>(controlHeight) / static_cast<double>(surfaceHeight);
+		double const nativeLeftOffset = static_cast<double>(static_cast<long long>(nativeX) - mainNativeX);
+		double const nativeTopOffset = static_cast<double>(static_cast<long long>(nativeY) - mainNativeY);
+		double const nativeRightOffset = nativeLeftOffset + nativeWidth;
+		double const nativeBottomOffset = nativeTopOffset + nativeHeight;
+
+		double const mappedLeftWorld = std::floor(controlWorldLocation.x + nativeLeftOffset * scaleX);
+		double const mappedTopWorld = std::floor(controlWorldLocation.y + nativeTopOffset * scaleY);
+		double const mappedRightWorld = std::ceil(controlWorldLocation.x + nativeRightOffset * scaleX);
+		double const mappedBottomWorld = std::ceil(controlWorldLocation.y + nativeBottomOffset * scaleY);
+		double const mappedLocalX = mappedLeftWorld - parentWorldLocation.x;
+		double const mappedLocalY = mappedTopWorld - parentWorldLocation.y;
+		double const mappedWidth = mappedRightWorld - mappedLeftWorld;
+		double const mappedHeight = mappedBottomWorld - mappedTopWorld;
+		double const longMinimum = static_cast<double>(std::numeric_limits<long>::min());
+		double const longMaximum = static_cast<double>(std::numeric_limits<long>::max());
+		if (!std::isfinite(mappedLocalX) || !std::isfinite(mappedLocalY) ||
+			!std::isfinite(mappedWidth) || !std::isfinite(mappedHeight) ||
+			mappedLocalX < longMinimum || mappedLocalX > longMaximum ||
+			mappedLocalY < longMinimum || mappedLocalY > longMaximum ||
+			mappedWidth < 1.0 || mappedWidth > longMaximum ||
+			mappedHeight < 1.0 || mappedHeight > longMaximum)
+		{
+			return false;
+		}
+
+		mappedLocation = UIPoint(static_cast<long>(mappedLocalX), static_cast<long>(mappedLocalY));
+		mappedSize = UISize(static_cast<long>(mappedWidth), static_cast<long>(mappedHeight));
+		return true;
+	}
+#endif
+}
+
 // ======================================================================
 
 SwgCuiTcgWindow::SwgCuiTcgWindow(UIPage & page)
@@ -42,6 +122,18 @@ SwgCuiTcgWindow::~SwgCuiTcgWindow()
 
 	delete m_callbacks;
 	m_callbacks = 0;
+}
+
+// ----------------------------------------------------------------------
+
+bool SwgCuiTcgWindow::dispatchIntegrationTestClick(
+	unsigned normalizedX,
+	unsigned normalizedWidth,
+	unsigned normalizedY,
+	unsigned normalizedHeight)
+{
+	return m_tcgControl && m_tcgControl->dispatchIntegrationTestClick(
+		normalizedX, normalizedWidth, normalizedY, normalizedHeight);
 }
 
 // ----------------------------------------------------------------------
@@ -256,9 +348,17 @@ void SwgCuiTcgWindow::update(float deltaTimeSecs)
 				int x, y;
 				unsigned w, h;
 				pWindow->getRect( x, y, w, h );
-
-				UISize deltaSize( UISize( w, h ) - rWindow.pPage->GetSize() );
-				UIPoint deltaLoc( UIPoint( x, y ) - rWindow.pPage->GetLocation() );
+				UIPoint targetLocation(x, y);
+				UISize targetSize(w, h);
+#if defined(_WIN64)
+				UIPage const * const parentPage = safe_cast<UIPage const *>(m_tcgParent);
+				if (parentPage)
+				{
+					IGNORE_RETURN(mapNativeWindowRectToControl(
+						*m_tcgControl, *m_pMainTCGWindow, *parentPage,
+						x, y, w, h, targetLocation, targetSize));
+				}
+#endif
 
 #ifdef _DEBUG
 				UISize pageSize = rWindow.pPage->GetSize();
@@ -266,21 +366,20 @@ void SwgCuiTcgWindow::update(float deltaTimeSecs)
 
 				DEBUG_REPORT_PRINT(true, ("Wx = %d, Wy = %d, Ww = %d, Wh = %d\n", x, y, w, h));
 				DEBUG_REPORT_PRINT(true, ("Px = %d, Py = %d, Pw = %d, Ph = %d\n", pageLoc.x, pageLoc.y, pageSize.x, pageSize.y));
-				DEBUG_REPORT_PRINT(true, ("Dx = %d, Dy = %d\n", deltaLoc.x, deltaLoc.y));
+				DEBUG_REPORT_PRINT(true, ("Tx = %d, Ty = %d, Tw = %d, Th = %d\n",
+					targetLocation.x, targetLocation.y, targetSize.x, targetSize.y));
 #endif
-				if( deltaSize.x | deltaSize.y )
+				if (rWindow.pPage->GetSize() != targetSize)
 				{
-					UIPoint newSize( rWindow.pPage->GetSize() + deltaSize );
-					DEBUG_REPORT_PRINT(true, ("Sizing page 0x%08X to %d, %d", rWindow.pPage, newSize.x, newSize.y));
-					rWindow.pPage->SetSize( newSize );
-					rWindow.pTCGControl->SetSize( newSize );
+					DEBUG_REPORT_PRINT(true, ("Sizing page 0x%08X to %d, %d", rWindow.pPage, targetSize.x, targetSize.y));
+					rWindow.pPage->SetSize(targetSize);
+					rWindow.pTCGControl->SetSize(targetSize);
 				}
 
-				if( deltaLoc.x | deltaLoc.y )
+				if (rWindow.pPage->GetLocation() != targetLocation)
 				{
-					UIPoint newLoc( rWindow.pPage->GetLocation() + deltaLoc );
-					DEBUG_REPORT_PRINT(true, ("Moving page 0x%08X to %d, %d", rWindow.pPage, newLoc.x, newLoc.y));
-					rWindow.pPage->SetLocation( newLoc );
+					DEBUG_REPORT_PRINT(true, ("Moving page 0x%08X to %d, %d", rWindow.pPage, targetLocation.x, targetLocation.y));
+					rWindow.pPage->SetLocation(targetLocation);
 				}
 			}
 
@@ -297,7 +396,15 @@ void SwgCuiTcgWindow::update(float deltaTimeSecs)
 		{
 			// Existing window, push location into lib
 			UIPoint pt( pTCGControl->GetWorldLocation() );
+#if defined(_WIN64)
+			// Child pages are scaled into the main control's coordinate space. Their
+			// native host positions remain authoritative and must not be overwritten
+			// with the scaled UI positions.
+			if (pWindow == m_pMainTCGWindow)
+				pWindow->setLocation(pt.x, pt.y);
+#else
 			pWindow->setLocation( pt.x, pt.y );
+#endif
 		}
 		else
 		{
@@ -310,6 +417,17 @@ void SwgCuiTcgWindow::update(float deltaTimeSecs)
 			int iX, iY;
 			unsigned uWidth, uHeight;
 			pWindow->getRect( iX, iY, uWidth, uHeight );
+			UIPoint targetLocation(iX, iY);
+			UISize targetSize(uWidth, uHeight);
+#if defined(_WIN64)
+			UIPage const * const parentPage = safe_cast<UIPage const *>(m_tcgParent);
+			if (m_pMainTCGWindow && pWindow != m_pMainTCGWindow && parentPage)
+			{
+				IGNORE_RETURN(mapNativeWindowRectToControl(
+					*m_tcgControl, *m_pMainTCGWindow, *parentPage,
+					iX, iY, uWidth, uHeight, targetLocation, targetSize));
+			}
+#endif
 
 			Window newWindow;
 			newWindow.pTCGControl = new SwgCuiTcgControl;
@@ -333,7 +451,7 @@ void SwgCuiTcgWindow::update(float deltaTimeSecs)
 			}
 
 			newWindow.pTCGControl->setEqTcgWindow( pWindow );
-			newWindow.pTCGControl->SetSize( UISize( uWidth, uHeight ) );
+			newWindow.pTCGControl->SetSize(targetSize);
 			newWindow.pTCGControl->SetVisible( true );
 
 #ifdef _DEBUG
@@ -356,9 +474,9 @@ void SwgCuiTcgWindow::update(float deltaTimeSecs)
 			{
 				newWindow.pPage = new UIPage;
 				newWindow.pPage->SetVisible( true );
-				newWindow.pPage->SetSize( UISize( uWidth, uHeight ) );
+				newWindow.pPage->SetSize(targetSize);
 				
-				newWindow.pPage->SetLocation( iX, iY );
+				newWindow.pPage->SetLocation(targetLocation);
 
 				newWindow.pPage->AddChild( newWindow.pTCGControl );
 			}
@@ -422,7 +540,7 @@ void SwgCuiTcgWindow::onMessageBoxClose(const CuiMessageBox& box)
 {
 	if(box.completedAffirmative())
 	{
-		if(m_tcgControl)
+		if(m_tcgControl && m_tcgControl->getEqTcgWindow())
 		    m_tcgControl->getEqTcgWindow()->close();
 
 	   //m_tcgPage = 0;

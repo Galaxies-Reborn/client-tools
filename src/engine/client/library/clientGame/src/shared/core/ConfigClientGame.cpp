@@ -20,6 +20,8 @@
 #include "sharedMath/Vector.h"
 #include "sharedUtility/LocalMachineOptionManager.h"
 
+#include <windows.h>
+
 //===================================================================
 
 namespace ConfigClientGameNamespace
@@ -63,6 +65,51 @@ namespace ConfigClientGameNamespace
 	const char*     ms_loginClientID;              //-- the login id to use to autoconnect to the login server
 	const char*     ms_loginClientPassword;        //-- the login passwd to use to autoconnect to the login server
 	bool            ms_autoConnectToLoginServer;
+	char const      cs_integrationAutoLoginPasswordEnvironment[] = "SWGTCG_TEST_SWG_LOGIN_PASSWORD";
+	char            ms_integrationAutoLoginPassword[64] = { 0 };
+	bool            ms_integrationAutoLoginPasswordLoaded = false;
+
+	void clearIntegrationAutoLoginPassword()
+	{
+		if (ms_integrationAutoLoginPasswordLoaded)
+			ms_loginClientPassword = "";
+
+		SecureZeroMemory(ms_integrationAutoLoginPassword, sizeof(ms_integrationAutoLoginPassword));
+		ms_integrationAutoLoginPasswordLoaded = false;
+		IGNORE_RETURN(SetEnvironmentVariableA(cs_integrationAutoLoginPasswordEnvironment, 0));
+	}
+
+	void consumeIntegrationAutoLoginPassword()
+	{
+		SecureZeroMemory(ms_integrationAutoLoginPassword, sizeof(ms_integrationAutoLoginPassword));
+		DWORD const length = GetEnvironmentVariableA(
+			cs_integrationAutoLoginPasswordEnvironment,
+			ms_integrationAutoLoginPassword,
+			static_cast<DWORD>(sizeof(ms_integrationAutoLoginPassword)));
+		BOOL const removed = SetEnvironmentVariableA(cs_integrationAutoLoginPasswordEnvironment, 0);
+
+		bool const integrationEnabled =
+			ConfigFile::getKeyBool("ClientGame/TcgIntegrationTest", "enabled", false);
+		bool const loopbackLogin =
+			ms_loginServerAddress == "127.0.0.1" ||
+			ms_loginServerAddress == "localhost" ||
+			ms_loginServerAddress == "::1";
+		bool const valid =
+			removed && length > 0 &&
+			length < static_cast<DWORD>(sizeof(ms_integrationAutoLoginPassword)) &&
+			integrationEnabled && ms_autoConnectToLoginServer &&
+			loopbackLogin && ms_loginServerPort == 44453;
+		if (valid)
+		{
+			ms_loginClientPassword = ms_integrationAutoLoginPassword;
+			ms_integrationAutoLoginPasswordLoaded = true;
+		}
+		else
+		{
+			SecureZeroMemory(ms_integrationAutoLoginPassword, sizeof(ms_integrationAutoLoginPassword));
+			ms_integrationAutoLoginPasswordLoaded = false;
+		}
+	}
 
 	std::string     ms_centralServerName;          //-- the central server name to autoconnect to
 	bool            ms_autoConnectToCentralServer;
@@ -1000,6 +1047,7 @@ void ConfigClientGame::install(void)
 	KEY_BOOL   (autoConnectToGameServer,        false);
 	KEY_BOOL   (nextAutoConnectToGameServer,    false);
 	KEY_BOOL   (autoQuitAfterLoadScreen,        false);
+	consumeIntegrationAutoLoginPassword();
 	KEY_INT    (networkTrafficMetricsResetTimeSecond, 60);
 	KEY_INT    (networkTrafficMetricsResetScaleFactor, 8);
 
@@ -1246,6 +1294,7 @@ void ConfigClientGame::install(void)
 //-----------------------------------------------------------------------------
 void ConfigClientGame::remove(void)
 {
+	clearIntegrationAutoLoginPassword();
 	DebugFlags::unregisterFlag(ms_showMatchMakingDebug);
 }
 

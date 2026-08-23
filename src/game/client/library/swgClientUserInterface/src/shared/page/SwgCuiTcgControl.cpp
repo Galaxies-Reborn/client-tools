@@ -22,6 +22,57 @@
 #include "UIImage.h"
 #include "UIMessage.h"
 
+#include <algorithm>
+#include <limits>
+
+// ======================================================================
+
+namespace
+{
+	size_t const cs_tcgBytesPerPixel = 4;
+
+	bool isValidSurfaceLayout(size_t width, size_t height, size_t pitch)
+	{
+		if (width == 0 || height == 0 || pitch == 0 || width > std::numeric_limits<size_t>::max() / cs_tcgBytesPerPixel)
+			return false;
+
+		size_t const rowBytes = width * cs_tcgBytesPerPixel;
+		if (pitch < rowBytes)
+			return false;
+
+		return height == 1 || (height - 1) <= (std::numeric_limits<size_t>::max() - rowBytes) / pitch;
+	}
+
+	int mapMouseCoordinate(int coordinate, int controlExtent, unsigned surfaceExtent)
+	{
+		if (controlExtent <= 0 || surfaceExtent == 0 || surfaceExtent > static_cast<unsigned>(std::numeric_limits<int>::max()))
+			return coordinate;
+
+		// Preserve an out-of-control coordinate as out of bounds so drag/leave behavior remains intact.
+		if (coordinate < 0)
+			return -1;
+		if (coordinate >= controlExtent)
+			return static_cast<int>(surfaceExtent);
+
+		unsigned long long const mapped =
+			static_cast<unsigned long long>(static_cast<unsigned>(coordinate)) * surfaceExtent /
+			static_cast<unsigned>(controlExtent);
+		return static_cast<int>(mapped);
+	}
+
+#if defined(_WIN64)
+	int addNativeMouseCoordinate(int origin, int localCoordinate)
+	{
+		long long const value = static_cast<long long>(origin) + static_cast<long long>(localCoordinate);
+		if (value < static_cast<long long>(std::numeric_limits<int>::min()))
+			return std::numeric_limits<int>::min();
+		if (value > static_cast<long long>(std::numeric_limits<int>::max()))
+			return std::numeric_limits<int>::max();
+		return static_cast<int>(value);
+	}
+#endif
+}
+
 // ======================================================================
 
 SwgCuiTcgControl::SwgCuiTcgControl()
@@ -29,6 +80,12 @@ SwgCuiTcgControl::SwgCuiTcgControl()
 , m_eqTcgWindow(0)
 , m_image(0)
 , m_texture(0)
+, m_reportedFirstFrame(false)
+, m_reportedInputDispatch(false)
+, m_reportedInputMapping(false)
+, m_horizontalSampleOffsets()
+, m_horizontalMapSourceWidth(0)
+, m_horizontalMapDestinationWidth(0)
 {
 }
 
@@ -36,6 +93,9 @@ SwgCuiTcgControl::SwgCuiTcgControl()
 
 SwgCuiTcgControl::~SwgCuiTcgControl()
 {
+	if (m_texture)
+		m_texture->release();
+
 	m_eqTcgWindow = 0;
 	m_image = 0;
 	m_texture = 0;
@@ -51,7 +111,7 @@ void SwgCuiTcgControl::alter(float deltaTime)
 
 	if (m_eqTcgWindow && numWindows < 1)
 	{
-		m_eqTcgWindow = 0;
+		setEqTcgWindow(0);
 		libEverQuestTCG::release();
 		return;
 	}
@@ -80,59 +140,137 @@ void SwgCuiTcgControl::Render(UICanvas & canvas) const
 
 	bool const result = m_eqTcgWindow->getWindowSurfaceData(reinterpret_cast<void **>(&sourceBits), &sourceWidth, &sourceHeight, &sourceStride);
 
-	if (result)
+	int const textureWidth = m_texture->getWidth();
+	int const textureHeight = m_texture->getHeight();
+	if (!result || !sourceBits || textureWidth <= 0 || textureHeight <= 0 ||
+		!isValidSurfaceLayout(sourceWidth, sourceHeight, sourceStride))
+		return;
+
+	Texture::LockData lockData(TF_XRGB_8888, 0, 0, 0, textureWidth, textureHeight, true);
+	m_texture->lock(lockData);
+
+	char * const textureData = static_cast<char *>(lockData.getPixelData());
+	if (!textureData)
 	{
-		Texture::LockData lockData(TF_XRGB_8888, 0, 0, 0, m_texture->getWidth(), m_texture->getHeight(), true);
+		m_texture->unlock(lockData);
+		return;
+	}
 
-		m_texture->lock(lockData);
+	int const destinationPitchValue = lockData.getPitch();
+	if (destinationPitchValue <= 0 ||
+		!isValidSurfaceLayout(static_cast<size_t>(textureWidth), static_cast<size_t>(textureHeight), static_cast<size_t>(destinationPitchValue)))
+	{
+		m_texture->unlock(lockData);
+		return;
+	}
 
-		char * textureData = static_cast<char *>(lockData.getPixelData());
+	size_t const destinationPitch = static_cast<size_t>(destinationPitchValue);
+	size_t const sourceWidthValue = static_cast<size_t>(sourceWidth);
+	size_t const sourceHeightValue = static_cast<size_t>(sourceHeight);
+	size_t const destinationWidth = static_cast<size_t>(textureWidth);
+	size_t const destinationHeight = static_cast<size_t>(textureHeight);
+	size_t const destinationVisibleBytes = destinationWidth * cs_tcgBytesPerPixel;
 
-		if (sourceHeight/sourceStride == 4)
-			memcpy(textureData, sourceBits, sourceStride * sourceHeight);
-		else
+	if (sourceWidthValue == destinationWidth && sourceHeightValue == destinationHeight &&
+		sourceStride == destinationVisibleBytes && destinationPitch == destinationVisibleBytes)
+	{
+		memcpy(textureData, sourceBits, destinationVisibleBytes * destinationHeight);
+	}
+	else if (sourceWidthValue == destinationWidth && sourceHeightValue == destinationHeight)
+	{
+		for (size_t row = 0; row < destinationHeight; ++row)
 		{
-			unsigned int const destStride = lockData.getPitch();
-			int const copyLength = destStride < sourceStride ? destStride : sourceStride;
-			unsigned int const copyHeight = static_cast<unsigned int>(m_texture->getHeight()) < sourceHeight ? static_cast<unsigned int>(m_texture->getHeight()) : sourceHeight;
-			for (unsigned int i = 0; i < copyHeight; ++i)
-			{
-				memcpy(textureData + i * destStride, sourceBits + i * sourceStride, copyLength);
-			}
+			memcpy(textureData + row * destinationPitch,
+				sourceBits + row * static_cast<size_t>(sourceStride), destinationVisibleBytes);
+		}
+	}
+	else
+	{
+		// SWGTCG can retain its native surface size after the embedded control requests a resize.
+		// Scale the complete surface into the control so visible pixels and forwarded input agree.
+		// Cache the exact nearest-neighbor horizontal map, then advance source rows with a
+		// quotient/remainder accumulator. This removes integer division and tiny memcpy calls
+		// from the per-pixel hot loop while retaining bounds-checked byte access.
+		if (!prepareHorizontalSampleMap(sourceWidthValue, destinationWidth))
+		{
+			m_texture->unlock(lockData);
+			return;
 		}
 
-		m_texture->unlock(lockData);
+		size_t const sourceRowAdvance = sourceHeightValue / destinationHeight;
+		size_t const sourceRowRemainder = sourceHeightValue % destinationHeight;
+		size_t sourceY = 0;
+		size_t sourceRowError = 0;
+		size_t const * const horizontalSampleOffsets = &m_horizontalSampleOffsets.front();
 
-		CuiLayer::TextureCanvas const * constCanvas = safe_cast<CuiLayer::TextureCanvas const *>(m_image->GetCanvas());
-
-		CuiLayer::TextureCanvas * textureCanvas = const_cast<CuiLayer::TextureCanvas *>(constCanvas);
-
-		if (textureCanvas)
+		for (size_t destinationY = 0; destinationY < destinationHeight; ++destinationY)
 		{
-			ShaderTemplate const * const shaderTemplate = ShaderTemplateList::fetch("shader/uicanvas_filtered.sht");
+			unsigned char const * const sourceRow = reinterpret_cast<unsigned char const *>(
+				sourceBits + sourceY * static_cast<size_t>(sourceStride));
+			unsigned char * const destinationRow = reinterpret_cast<unsigned char *>(
+				textureData + destinationY * destinationPitch);
+			size_t destinationOffset = 0;
+			for (size_t destinationX = 0; destinationX < destinationWidth; ++destinationX)
+			{
+				unsigned char const * const sourcePixel = sourceRow + horizontalSampleOffsets[destinationX];
+				destinationRow[destinationOffset] = sourcePixel[0];
+				destinationRow[destinationOffset + 1] = sourcePixel[1];
+				destinationRow[destinationOffset + 2] = sourcePixel[2];
+				destinationRow[destinationOffset + 3] = sourcePixel[3];
+				destinationOffset += cs_tcgBytesPerPixel;
+			}
 
-			NOT_NULL(shaderTemplate);
+			sourceY += sourceRowAdvance;
+			sourceRowError += sourceRowRemainder;
+			if (sourceRowError >= destinationHeight)
+			{
+				sourceRowError -= destinationHeight;
+				++sourceY;
+			}
+		}
+	}
 
-			if (!shaderTemplate)
-				return;
+	m_texture->unlock(lockData);
 
-			StaticShader * const newShader = safe_cast<StaticShader *>(NON_NULL(shaderTemplate->fetchModifiableShader()));
+	CuiLayer::TextureCanvas const * constCanvas = safe_cast<CuiLayer::TextureCanvas const *>(m_image->GetCanvas());
 
-			if (!newShader)
-				return;
+	CuiLayer::TextureCanvas * textureCanvas = const_cast<CuiLayer::TextureCanvas *>(constCanvas);
 
-			newShader->setTexture(TAG(M,A,I,N), *m_texture);
+	if (textureCanvas)
+	{
+		ShaderTemplate const * const shaderTemplate = ShaderTemplateList::fetch("shader/uicanvas_filtered.sht");
 
-			textureCanvas->SetSize(UISize(GetWidth(), GetHeight()));
+		NOT_NULL(shaderTemplate);
 
-			if (textureCanvas->getShader() != newShader)
-				textureCanvas->SetShader(newShader);
+		if (!shaderTemplate)
+			return;
 
-			textureCanvas->SetTextureName(m_texture->getName());
+		StaticShader * const newShader = safe_cast<StaticShader *>(NON_NULL(shaderTemplate->fetchModifiableShader()));
 
-			canvas.BltFrom(textureCanvas, UIPoint::zero, UIPoint::zero, GetSize());
-
+		if (!newShader)
+		{
 			shaderTemplate->release();
+			return;
+		}
+
+		newShader->setTexture(TAG(M,A,I,N), *m_texture);
+
+		textureCanvas->SetSize(UISize(GetWidth(), GetHeight()));
+
+		if (textureCanvas->getShader() != newShader)
+			textureCanvas->SetShader(newShader);
+
+		textureCanvas->SetTextureName(m_texture->getName());
+
+		canvas.BltFrom(textureCanvas, UIPoint::zero, UIPoint::zero, GetSize());
+
+		shaderTemplate->release();
+
+		if (!m_reportedFirstFrame)
+		{
+			m_reportedFirstFrame = true;
+			REPORT_LOG(true, ("TCG integration: embedded-control-frame source=%ux%u stride=%u destination=%dx%d pitch=%d.\n",
+				sourceWidth, sourceHeight, sourceStride, textureWidth, textureHeight, destinationPitchValue));
 		}
 	}
 }
@@ -167,10 +305,15 @@ void SwgCuiTcgControl::OnSizeChanged(const UISize &newSize, const UISize &oldSiz
 {
 	UIWidget::OnSizeChanged(newSize, oldSize);
 
-	if (m_eqTcgWindow)
+	// The retail TCG uses a fixed native layout. Resizing its hidden Win32 window in the
+	// x64 compatibility host reflows and clips controls instead of scaling them. Keep its
+	// native surface and scale it in Render(); ProcessMessage() applies the inverse map.
+#if !defined(_WIN64)
+	if (m_eqTcgWindow && GetWidth() > 0 && GetHeight() > 0)
 	{
-		m_eqTcgWindow->setSize(GetWidth(), GetHeight());
+		m_eqTcgWindow->setSize(static_cast<unsigned>(GetWidth()), static_cast<unsigned>(GetHeight()));
 	}
+#endif
 
 	if (m_image)
 		m_image->SetSize(UIPoint(GetWidth(), GetHeight()));
@@ -193,17 +336,18 @@ void SwgCuiTcgControl::initializeEqTcgWindow()
 	// use the first window
 	unsigned numWindows = libEverQuestTCG::getWindows(0, 0);
 
-	libEverQuestTCG::Window ** windows = 0;
-
 	if (numWindows > 0)
 	{
-		windows = static_cast<libEverQuestTCG::Window **>(alloca(numWindows * sizeof(libEverQuestTCG::Window *)));
-		libEverQuestTCG::getWindows(windows, numWindows);
+		libEverQuestTCG::Window * firstWindow = 0;
+		libEverQuestTCG::getWindows(&firstWindow, 1);
 
-		if (windows && windows[0])
+		if (firstWindow)
 		{
-			m_eqTcgWindow = windows[0];
-			m_eqTcgWindow->setSize(GetSize().x, GetSize().y);
+			setEqTcgWindow(firstWindow);
+#if !defined(_WIN64)
+			if (GetSize().x > 0 && GetSize().y > 0)
+				m_eqTcgWindow->setSize(static_cast<unsigned>(GetSize().x), static_cast<unsigned>(GetSize().y));
+#endif
 
 			alter(0);
 		}
@@ -234,11 +378,73 @@ bool SwgCuiTcgControl::ProcessMessage(const UIMessage & msg)
 		if (msg.Modifiers.MiddleMouseDown)
 			flags |= libEverQuestTCG::Window::MiddleButton;
 
-		int const x = msg.MouseCoords.x;
-		int const y = msg.MouseCoords.y;
+		int x = msg.MouseCoords.x;
+		int y = msg.MouseCoords.y;
 		UIPoint gpos = GetWorldLocation();
-		int const gx = x + gpos.x;
-		int const gy = y + gpos.y;
+#if defined(_WIN64)
+		bool mappedToNativeSurface = false;
+#endif
+
+		bool isMouseMessage = false;
+		switch (msg.Type)
+		{
+		case UIMessage::MouseMove:
+		case UIMessage::LeftMouseDown:
+		case UIMessage::LeftMouseUp:
+		case UIMessage::MiddleMouseDown:
+		case UIMessage::MiddleMouseUp:
+		case UIMessage::RightMouseDown:
+		case UIMessage::RightMouseUp:
+		case UIMessage::MouseWheel:
+		case UIMessage::LeftMouseDoubleClick:
+		case UIMessage::RightMouseDoubleClick:
+		case UIMessage::MiddleMouseDoubleClick:
+			isMouseMessage = true;
+			break;
+		default:
+			break;
+		}
+
+		void * surfaceBits = 0;
+		unsigned surfaceWidth = 0;
+		unsigned surfaceHeight = 0;
+		unsigned surfaceStride = 0;
+		if (isMouseMessage &&
+			m_eqTcgWindow->getWindowSurfaceData(&surfaceBits, &surfaceWidth, &surfaceHeight, &surfaceStride) &&
+			surfaceBits && isValidSurfaceLayout(surfaceWidth, surfaceHeight, surfaceStride))
+		{
+			int const controlWidth = GetWidth();
+			int const controlHeight = GetHeight();
+			x = mapMouseCoordinate(x, controlWidth, surfaceWidth);
+			y = mapMouseCoordinate(y, controlHeight, surfaceHeight);
+#if defined(_WIN64)
+			mappedToNativeSurface = true;
+#endif
+
+			if (!m_reportedInputMapping)
+			{
+				m_reportedInputMapping = true;
+				REPORT_LOG(true, ("TCG integration: embedded-control-input-map control=%dx%d surface=%ux%u.\n",
+					controlWidth, controlHeight, surfaceWidth, surfaceHeight));
+			}
+		}
+
+		int gx = x + gpos.x;
+		int gy = y + gpos.y;
+#if defined(_WIN64)
+		if (isMouseMessage && mappedToNativeSurface)
+		{
+			int nativeX = 0;
+			int nativeY = 0;
+			unsigned nativeWidth = 0;
+			unsigned nativeHeight = 0;
+			m_eqTcgWindow->getRect(nativeX, nativeY, nativeWidth, nativeHeight);
+			UNREF(nativeWidth);
+			UNREF(nativeHeight);
+			gx = addNativeMouseCoordinate(nativeX, x);
+			gy = addNativeMouseCoordinate(nativeY, y);
+		}
+#endif
 
 #ifdef _DEBUG
 		bool const enablePrintLog = false;
@@ -252,6 +458,11 @@ bool SwgCuiTcgControl::ProcessMessage(const UIMessage & msg)
 		{
 		case UIMessage::MouseMove:
 			{
+				if (!m_reportedInputDispatch)
+				{
+					m_reportedInputDispatch = true;
+					REPORT_LOG(true, ("TCG integration: embedded-control-input-dispatched.\n"));
+				}
 				DEBUG_REPORT_LOG(enablePrintLog, ("%s got a Mouse Move Down Message. Params: X = %i Y= %i gx = %i gy = %i\n", GetName().c_str(), x, y, gx, gy));
 				m_eqTcgWindow->onMouseMove(x, y, gx, gy, flags);
 				return true;
@@ -381,6 +592,53 @@ bool SwgCuiTcgControl::ProcessMessage(const UIMessage & msg)
 
 // ----------------------------------------------------------------------
 
+bool SwgCuiTcgControl::dispatchIntegrationTestClick(
+	unsigned normalizedX,
+	unsigned normalizedWidth,
+	unsigned normalizedY,
+	unsigned normalizedHeight)
+{
+	int const width = GetWidth();
+	int const height = GetHeight();
+	if (!m_eqTcgWindow || width <= 0 || height <= 0 ||
+		normalizedWidth == 0 || normalizedHeight == 0 ||
+		normalizedX >= normalizedWidth || normalizedY >= normalizedHeight)
+	{
+		return false;
+	}
+
+	unsigned long long const scaledXValue =
+		static_cast<unsigned long long>(static_cast<unsigned>(width)) * normalizedX / normalizedWidth;
+	unsigned long long const scaledYValue =
+		static_cast<unsigned long long>(static_cast<unsigned>(height)) * normalizedY / normalizedHeight;
+	if (scaledXValue >= static_cast<unsigned long long>(width) ||
+		scaledYValue >= static_cast<unsigned long long>(height))
+	{
+		return false;
+	}
+
+	UIPoint const clickPoint(static_cast<long>(scaledXValue), static_cast<long>(scaledYValue));
+	UIMessage mouseMove;
+	mouseMove.Type = UIMessage::MouseMove;
+	mouseMove.MouseCoords = clickPoint;
+	if (!ProcessMessage(mouseMove))
+		return false;
+
+	UIMessage leftDown;
+	leftDown.Type = UIMessage::LeftMouseDown;
+	leftDown.MouseCoords = clickPoint;
+	leftDown.Modifiers.LeftMouseDown = true;
+	if (!ProcessMessage(leftDown))
+		return false;
+
+	UIMessage leftUp;
+	leftUp.Type = UIMessage::LeftMouseUp;
+	leftUp.MouseCoords = clickPoint;
+	return ProcessMessage(leftUp);
+}
+
+// ----------------------------------------------------------------------
+
 void SwgCuiTcgControl::SetSelected(const bool selected)
 {		
 	if (IsSelected() != selected && m_eqTcgWindow && m_eqTcgWindow->canGetFocus())
@@ -392,9 +650,72 @@ void SwgCuiTcgControl::SetSelected(const bool selected)
 
 // ----------------------------------------------------------------------
 
+void SwgCuiTcgControl::setEqTcgWindow(libEverQuestTCG::Window * eqTcgWindow)
+{
+	if (m_eqTcgWindow == eqTcgWindow)
+		return;
+
+	m_eqTcgWindow = eqTcgWindow;
+	m_reportedFirstFrame = false;
+	m_reportedInputDispatch = false;
+	m_reportedInputMapping = false;
+
+	if (m_eqTcgWindow)
+		REPORT_LOG(true, ("TCG integration: embedded-control-bound focus-capable=%d.\n", m_eqTcgWindow->canGetFocus() ? 1 : 0));
+}
+
+// ----------------------------------------------------------------------
+
+bool SwgCuiTcgControl::prepareHorizontalSampleMap(size_t sourceWidth, size_t destinationWidth) const
+{
+	if (sourceWidth == 0 || destinationWidth == 0 ||
+		sourceWidth > std::numeric_limits<size_t>::max() / cs_tcgBytesPerPixel)
+	{
+		return false;
+	}
+
+	if (m_horizontalMapSourceWidth == sourceWidth &&
+		m_horizontalMapDestinationWidth == destinationWidth &&
+		m_horizontalSampleOffsets.size() == destinationWidth)
+	{
+		return true;
+	}
+
+	m_horizontalSampleOffsets.resize(destinationWidth);
+	size_t const sourceAdvance = sourceWidth / destinationWidth;
+	size_t const sourceRemainder = sourceWidth % destinationWidth;
+	size_t sourceX = 0;
+	size_t sourceError = 0;
+	for (size_t destinationX = 0; destinationX < destinationWidth; ++destinationX)
+	{
+		if (sourceX >= sourceWidth)
+		{
+			m_horizontalSampleOffsets.clear();
+			m_horizontalMapSourceWidth = 0;
+			m_horizontalMapDestinationWidth = 0;
+			return false;
+		}
+
+		m_horizontalSampleOffsets[destinationX] = sourceX * cs_tcgBytesPerPixel;
+		sourceX += sourceAdvance;
+		sourceError += sourceRemainder;
+		if (sourceError >= destinationWidth)
+		{
+			sourceError -= destinationWidth;
+			++sourceX;
+		}
+	}
+
+	m_horizontalMapSourceWidth = sourceWidth;
+	m_horizontalMapDestinationWidth = destinationWidth;
+	return true;
+}
+
+// ----------------------------------------------------------------------
+
 void SwgCuiTcgControl::fetchTexture()
 {
-	if (!m_texture)
+	if (!m_texture && GetWidth() > 0 && GetHeight() > 0)
 	{
 		TextureFormat const runtimeFormats[] = {TF_XRGB_8888};
 		int const numberOfRuntimeFormats = sizeof(runtimeFormats) / sizeof(runtimeFormats[0]);

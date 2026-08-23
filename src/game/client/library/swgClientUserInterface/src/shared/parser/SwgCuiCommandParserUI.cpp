@@ -33,6 +33,7 @@
 #include "clientUserInterface/CuiMediatorFactory.h"
 #include "clientUserInterface/CuiMessageBox.h"
 #include "clientUserInterface/CuiPreferences.h"
+#include "sharedFoundation/Os.h"
 #include "clientUserInterface/CuiSettings.h"
 #include "clientUserInterface/CuiSkillManager.h"
 #include "clientUserInterface/CuiSocialsManager.h"
@@ -455,6 +456,9 @@ bool SwgCuiCommandParserUI::performParsing (const NetworkId & userId, const Stri
 		const std::string command (Unicode::wideToNarrow (argv [1]));
 		Unicode::String str;
 		reconstructString (argv, 2, argv.size (), true, str);
+		REPORT_LOG(_stricmp(command.c_str(), "tcg") == 0,
+			("TCG integration: game-action-ui-parser pid=%lu action=tcg result=dispatching.\n",
+			static_cast<unsigned long>(Os::getProcessId())));
 		return CuiActionManager::performAction (command, str);
 #endif
 	}

@@ -11,6 +11,9 @@
 #include "clientUserInterface/CuiLayer.h"
 #include "UIWidget.h"
 
+#include <cstddef>
+#include <vector>
+
 // ----------------------------------------------------------------------
 
 namespace libEverQuestTCG
@@ -43,6 +46,7 @@ public:
 	UIImage * getImage() const;
 
 	void alter(float deltaTime);
+	bool dispatchIntegrationTestClick(unsigned normalizedX, unsigned normalizedWidth, unsigned normalizedY, unsigned normalizedHeight);
 
 	virtual void OnSizeChanged(UISize const & newSize, UISize const & oldSize);
 	virtual void OnLocationChanged(UIPoint const & newLocation, UIPoint const & oldLocation);
@@ -53,6 +57,7 @@ protected:
 
 private: //disabled
 	void fetchTexture();
+	bool prepareHorizontalSampleMap(std::size_t sourceWidth, std::size_t destinationWidth) const;
 
 	SwgCuiTcgControl(SwgCuiTcgControl const & rhs);
 	SwgCuiTcgControl& operator= (SwgCuiTcgControl const & rhs);
@@ -62,14 +67,13 @@ private:
 	libEverQuestTCG::Window * m_eqTcgWindow;
 	UIImage * m_image;
 	Texture * m_texture;
+	mutable bool m_reportedFirstFrame;
+	bool m_reportedInputDispatch;
+	bool m_reportedInputMapping;
+	mutable std::vector<std::size_t> m_horizontalSampleOffsets;
+	mutable std::size_t m_horizontalMapSourceWidth;
+	mutable std::size_t m_horizontalMapDestinationWidth;
 };
-
-// ----------------------------------------------------------------------
-
-inline void SwgCuiTcgControl::setEqTcgWindow(libEverQuestTCG::Window * eqTcgWindow)
-{
-	m_eqTcgWindow = eqTcgWindow;
-}
 
 // ----------------------------------------------------------------------
 

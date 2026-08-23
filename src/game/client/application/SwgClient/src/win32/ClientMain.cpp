@@ -81,6 +81,10 @@
 #include "swgClientUserInterface/SwgCuiManager.h"
 #include "swgSharedNetworkMessages/SetupSwgSharedNetworkMessages.h"
 
+#if !defined(_DEBUG)
+#include "libMozilla/libMozilla.h"
+#endif
+
 
 #include "Resource.h"
 
@@ -145,6 +149,10 @@ int ClientMain(
 {
 	UNREF(hPrevInstance);
 	UNREF(nCmdShow);
+
+#if !defined(_DEBUG)
+	bool mozillaInitialized = false;
+#endif
 
 
 	//-- thread
@@ -331,6 +339,24 @@ int ClientMain(
 		setupGraphicsData.alphaBufferBitDepth = 0;
 		SetupClientGraphics::setupDefaultGameData(setupGraphicsData);
 
+#if !defined(_DEBUG)
+		// Use the browser runtime staged beside this executable.  The original
+		// implementation used the process current directory, which made TCG
+		// navigation callbacks dependent on how the client was launched.
+#if defined(_WIN64)
+		// x64 uses a contained Win32 compatibility broker and a private writable
+		// copy of the final legacy Mozilla runtime.  The _client reference tree is
+		// intentionally never loaded or modified.
+		std::string const mozillaDirectory = std::string(Os::getProgramStartupDirectory()) + "\\runtime\\mozilla-broker";
+#else
+		std::string const mozillaDirectory = std::string(Os::getProgramStartupDirectory()) + "\\mozilla";
+#endif
+		mozillaInitialized = libMozilla::init(Os::getWindow(), mozillaDirectory.c_str());
+		REPORT_LOG(true, ("ClientMain: embedded browser initialization result=%s directory=[%s].\n",
+			mozillaInitialized ? "ready" : "failed", mozillaDirectory.c_str()));
+		WARNING(!mozillaInitialized, ("The in-game browser could not be initialized from [%s].\n", mozillaDirectory.c_str()));
+#endif
+
 		if (SetupClientGraphics::install(setupGraphicsData))
 		{
 			VideoList::install(Audio::getMilesDigitalDriver());
@@ -405,6 +431,11 @@ int ClientMain(
 
 	SetupSharedFoundation::remove();
 	SetupSharedThread::remove();
+
+#if !defined(_DEBUG)
+	if (mozillaInitialized)
+		libMozilla::release();
+#endif
 
 	if (semaphore)
 		CloseHandle(semaphore);

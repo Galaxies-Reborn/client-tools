@@ -267,7 +267,7 @@ namespace CommandCppFuncsNamespace
 	void commandFuncVoiceInvite(Command const & command, NetworkId const & actor, NetworkId const & target, Unicode::String const & params);
 	void commandFuncVoiceKick(Command const & command, NetworkId const & actor, NetworkId const & target, Unicode::String const & params);
 
-	//void commandFuncTcg(Command const & command, NetworkId const & , NetworkId const & target, Unicode::String const &);
+	void commandFuncTcg(Command const & command, NetworkId const & , NetworkId const & target, Unicode::String const &);
 
 	void commandFuncToggleOutOfCharacter(Command const & command, NetworkId const & actor, NetworkId const & target, Unicode::String const &);
 
@@ -2471,10 +2471,10 @@ void CommandCppFuncsNamespace::commandFuncVoiceKick(Command const &, NetworkId c
 
 //----------------------------------------------------------------------
 
-//void CommandCppFuncsNamespace::commandFuncTcg(Command const & , NetworkId const & , NetworkId const & , Unicode::String const & params)
-//{
-//	CuiActionManager::performAction(CuiActions::tcg, params);
-//}
+void CommandCppFuncsNamespace::commandFuncTcg(Command const & , NetworkId const & , NetworkId const & , Unicode::String const & params)
+{
+	CuiActionManager::performAction(CuiActions::tcg, params);
+}
 
 //----------------------------------------------------------------------
 
@@ -2659,7 +2659,7 @@ void CommandCppFuncs::install()
 	CommandTable::addCppFunction("voiceInvite", commandFuncVoiceInvite);
 	CommandTable::addCppFunction("voiceKick", commandFuncVoiceKick);
 
-	//CommandTable::addCppFunction("tcg", commandFuncTcg);
+	CommandTable::addCppFunction("tcg", commandFuncTcg);
 
 	CommandTable::addCppFunction("equipAppearance", commandFuncEquipAppearance);
 	CommandTable::addCppFunction("unequipAppearance", commandFuncUnequipAppearance);

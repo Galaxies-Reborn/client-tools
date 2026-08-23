@@ -36,6 +36,12 @@
 #include "UIPage.h"
 #include "UIMessage.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+
 // ======================================================================
 
 #if DEBUG == 0
@@ -79,36 +85,179 @@ public:
 class UIMozillaCanvasBlitter : public libMozilla::IBlitter
 {
 	Texture *m_pTexture;
+	bool m_inspectNonzeroPixels;
+	bool m_hasNonzeroPixels;
+	bool m_blitComplete;
 
 public:
 
-	UIMozillaCanvasBlitter(Texture* texture)
+	UIMozillaCanvasBlitter(Texture* texture, bool inspectNonzeroPixels)
 		: m_pTexture( texture )
+		, m_inspectNonzeroPixels(inspectNonzeroPixels)
+		, m_hasNonzeroPixels(false)
+		, m_blitComplete(false)
 	{
 	}
 
-	void operator()( void *pSource, unsigned /*uSourceWidth*/, unsigned uSourceHeight, unsigned uSourceStride, unsigned /*uSourceBytesPerRow*/ )
+	void operator()( void *pSource, unsigned uSourceWidth, unsigned uSourceHeight, unsigned uSourceStride, unsigned uSourceBytesPerRow )
 	{
-		Texture::LockData lockData(TF_XRGB_8888, 0, 0, 0, m_pTexture->getWidth(), m_pTexture->getHeight(), true);
+		m_blitComplete = false;
 
+		if (!m_pTexture || !pSource || uSourceWidth == 0u || uSourceHeight == 0u ||
+			uSourceStride == 0u || uSourceBytesPerRow == 0u)
+			return;
+
+		int const destinationWidth = m_pTexture->getWidth();
+		int const destinationHeight = m_pTexture->getHeight();
+		if (destinationWidth <= 0 || destinationHeight <= 0)
+			return;
+
+		std::size_t const maximumSize = (std::numeric_limits<std::size_t>::max)();
+		std::size_t const sourceWidth = static_cast<std::size_t>(uSourceWidth);
+		std::size_t const sourceHeight = static_cast<std::size_t>(uSourceHeight);
+		std::size_t const sourceStride = static_cast<std::size_t>(uSourceStride);
+		std::size_t const sourceBytesPerRow = static_cast<std::size_t>(uSourceBytesPerRow);
+		if (sourceWidth > maximumSize / 4u)
+			return;
+
+		std::size_t const requiredFourByteRow = sourceWidth * 4u;
+		std::size_t const requiredThreeByteRow = sourceWidth * 3u;
+		std::size_t const readableSourceRow = (std::min)(sourceStride, sourceBytesPerRow);
+		std::size_t sourcePixelBytes = 0u;
+		if (readableSourceRow >= requiredFourByteRow)
+			sourcePixelBytes = 4u;
+		else if (readableSourceRow >= requiredThreeByteRow)
+			sourcePixelBytes = 3u;
+		else
+			return;
+
+		std::size_t const requiredSourceRow = sourceWidth * sourcePixelBytes;
+		if ((sourceHeight - 1u) > maximumSize / sourceStride)
+			return;
+		std::size_t const lastSourceRowOffset = (sourceHeight - 1u) * sourceStride;
+		if (requiredSourceRow > maximumSize - lastSourceRowOffset)
+			return;
+
+		std::size_t const destinationWidthSize = static_cast<std::size_t>(destinationWidth);
+		std::size_t const destinationHeightSize = static_cast<std::size_t>(destinationHeight);
+		if (destinationWidthSize > maximumSize / 4u)
+			return;
+		std::size_t const requiredDestinationRow = destinationWidthSize * 4u;
+
+		Texture::LockData lockData(TF_XRGB_8888, 0, 0, 0, destinationWidth, destinationHeight, true);
 		m_pTexture->lock(lockData);
 
-		char* textureData = static_cast<char*>(lockData.getPixelData());
-
-		if(uSourceHeight/uSourceStride == 4)
-			memcpy(textureData, static_cast<char*>(pSource), uSourceStride * uSourceHeight );
-		else
+		unsigned char * const textureData = static_cast<unsigned char *>(lockData.getPixelData());
+		if (!textureData)
 		{
-			unsigned int destStride = lockData.getPitch();
-			int copyLength = destStride < uSourceStride ? destStride : uSourceStride;
-			for(unsigned int i = 0; i < uSourceHeight; ++i)
+			m_pTexture->unlock(lockData);
+			return;
+		}
+
+		int const destinationPitchValue = lockData.getPitch();
+		if (destinationPitchValue <= 0)
+		{
+			m_pTexture->unlock(lockData);
+			return;
+		}
+
+		std::size_t const destinationPitch = static_cast<std::size_t>(destinationPitchValue);
+		if (destinationPitch < requiredDestinationRow ||
+			(destinationHeightSize - 1u) > maximumSize / destinationPitch)
+		{
+			m_pTexture->unlock(lockData);
+			return;
+		}
+		std::size_t const lastDestinationRowOffset = (destinationHeightSize - 1u) * destinationPitch;
+		if (requiredDestinationRow > maximumSize - lastDestinationRowOffset)
+		{
+			m_pTexture->unlock(lockData);
+			return;
+		}
+
+		unsigned char const * const source = static_cast<unsigned char const *>(pSource);
+		if (sourceWidth == destinationWidthSize && sourceHeight == destinationHeightSize)
+		{
+			for (std::size_t row = 0u; row < destinationHeightSize; ++row)
 			{
-				memcpy(textureData + i * destStride, static_cast<char*>(pSource) + i * uSourceStride, copyLength);
+				unsigned char const * const sourceRow = source + row * sourceStride;
+				unsigned char * const destinationRow = textureData + row * destinationPitch;
+				if (sourcePixelBytes == 4u)
+				{
+					std::memcpy(destinationRow, sourceRow, requiredDestinationRow);
+				}
+				else
+				{
+					for (std::size_t column = 0u; column < destinationWidthSize; ++column)
+					{
+						unsigned char const * const sourcePixel = sourceRow + column * 3u;
+						unsigned char * const destinationPixel = destinationRow + column * 4u;
+						destinationPixel[0] = sourcePixel[0];
+						destinationPixel[1] = sourcePixel[1];
+						destinationPixel[2] = sourcePixel[2];
+						destinationPixel[3] = 0xffu;
+					}
+				}
+
+				if (m_inspectNonzeroPixels && !m_hasNonzeroPixels)
+				{
+					for (std::size_t column = 0u; column < destinationWidthSize; ++column)
+					{
+						unsigned char const * const sourcePixel = sourceRow + column * sourcePixelBytes;
+						if (sourcePixel[0] != 0u || sourcePixel[1] != 0u || sourcePixel[2] != 0u)
+						{
+							m_hasNonzeroPixels = true;
+							break;
+						}
+					}
+				}
+			}
+
+			m_blitComplete = true;
+			m_pTexture->unlock(lockData);
+			return;
+		}
+
+		for (std::size_t destinationY = 0u; destinationY < destinationHeightSize; ++destinationY)
+		{
+			std::size_t const sourceY = static_cast<std::size_t>(
+				(static_cast<std::uint64_t>(destinationY) * uSourceHeight) /
+				static_cast<std::uint64_t>(destinationHeightSize));
+			unsigned char const * const sourceRow = source + sourceY * sourceStride;
+			unsigned char * const destinationRow = textureData + destinationY * destinationPitch;
+
+			for (std::size_t destinationX = 0u; destinationX < destinationWidthSize; ++destinationX)
+			{
+				std::size_t const sourceX = static_cast<std::size_t>(
+					(static_cast<std::uint64_t>(destinationX) * uSourceWidth) /
+					static_cast<std::uint64_t>(destinationWidthSize));
+				unsigned char const * const sourcePixel = sourceRow + sourceX * sourcePixelBytes;
+				unsigned char * const destinationPixel = destinationRow + destinationX * 4u;
+				destinationPixel[0] = sourcePixel[0];
+				destinationPixel[1] = sourcePixel[1];
+				destinationPixel[2] = sourcePixel[2];
+				destinationPixel[3] = 0xffu;
+
+				if (m_inspectNonzeroPixels && !m_hasNonzeroPixels &&
+					(sourcePixel[0] != 0u || sourcePixel[1] != 0u || sourcePixel[2] != 0u))
+				{
+					m_hasNonzeroPixels = true;
+				}
 			}
 		}
 
+		m_blitComplete = true;
 		m_pTexture->unlock(lockData);
+	}
 
+	bool hasNonzeroPixels() const
+	{
+		return m_hasNonzeroPixels;
+	}
+
+	bool isBlitComplete() const
+	{
+		return m_blitComplete;
 	}
 
 };
@@ -123,7 +272,10 @@ m_Image(NULL),
 m_Text(NULL),
 m_Shader (NULL),
 m_caratBlink (0.5f),
-m_drawCarat (false)
+m_drawCarat (false),
+m_integrationProbeNonce(),
+m_reportedIntegrationProxyWindow(false),
+m_reportedIntegrationFirstNonzeroFrame(false)
 {
 
 
@@ -147,6 +299,7 @@ SwgCuiWebBrowserWidget::~SwgCuiWebBrowserWidget()
 		delete m_Callbacks;
 		m_Callbacks = NULL;
 	}
+	m_integrationProbeNonce.clear();
 }
 
 void SwgCuiWebBrowserWidget::alter(float deltaTime)
@@ -181,14 +334,25 @@ void SwgCuiWebBrowserWidget::Render(UICanvas & canvas) const
 
 		CuiLayer::TextureCanvas * textureCanvas = const_cast<CuiLayer::TextureCanvas*>(constCanvas);
 
-		UIMozillaCanvasBlitter blit(m_Texture);
+		bool const inspectNonzeroPixels = !m_integrationProbeNonce.empty() && !m_reportedIntegrationFirstNonzeroFrame;
+		UIMozillaCanvasBlitter blit(m_Texture, inspectNonzeroPixels);
 
 		if(m_MozillaWindow && textureCanvas)
 		{
-			bool renderComplete = m_MozillaWindow->render(&blit);
+			bool const renderComplete = m_MozillaWindow->render(&blit) && blit.isBlitComplete();
 			
 			if(renderComplete)
 			{
+				if (inspectNonzeroPixels && blit.hasNonzeroPixels())
+				{
+					m_reportedIntegrationFirstNonzeroFrame = true;
+					REPORT_LOG(true, ("TCG integration: browser-probe-first-nonzero-frame nonce=[%s] pid=%lu width=%d height=%d.\n",
+						m_integrationProbeNonce.c_str(),
+						static_cast<unsigned long>(Os::getProcessId()),
+						m_Texture->getWidth(),
+						m_Texture->getHeight()));
+					m_integrationProbeNonce.clear();
+				}
 
 				const ShaderTemplate * const shaderTemplate = ShaderTemplateList::fetch("shader/uicanvas_filtered.sht");
 
@@ -251,17 +415,30 @@ libMozilla::Window* SwgCuiWebBrowserWidget::getMozillaWindow()
 		
 		if(m_MozillaWindow)
 		{
+			if (!m_integrationProbeNonce.empty() && !m_reportedIntegrationProxyWindow)
+			{
+				m_reportedIntegrationProxyWindow = true;
+				REPORT_LOG(true, ("TCG integration: browser-probe-proxy-window-created nonce=[%s] pid=%lu width=%d height=%d.\n",
+					m_integrationProbeNonce.c_str(),
+					static_cast<unsigned long>(Os::getProcessId()),
+					GetWidth(),
+					GetHeight()));
+			}
+
 			if(!m_Callbacks)
 				m_Callbacks = new UIMozillaCallbacks(this);
 
 			m_MozillaWindow->setCallback(m_Callbacks);
 
-			Unicode::String uri16 = Unicode::narrowToWide(s_homePage);
+			if (m_integrationProbeNonce.empty())
+			{
+				Unicode::String uri16 = Unicode::narrowToWide(s_homePage);
 
-			m_MozillaWindow->navigateTo(
-				reinterpret_cast<const wchar_t *>(uri16.c_str()),
-				nullptr,
-				0);
+				m_MozillaWindow->navigateTo(
+					reinterpret_cast<const wchar_t *>(uri16.c_str()),
+					nullptr,
+					0);
+			}
 		}
 	}
 
@@ -469,6 +646,13 @@ void SwgCuiWebBrowserWidget::createMozillaWindow()
 {
    if(!m_MozillaWindow)
 	   m_MozillaWindow = getMozillaWindow();
+}
+
+void SwgCuiWebBrowserWidget::setIntegrationProbeNonce(char const * nonce)
+{
+	m_integrationProbeNonce = nonce ? nonce : "";
+	m_reportedIntegrationProxyWindow = false;
+	m_reportedIntegrationFirstNonzeroFrame = false;
 }
 
 void SwgCuiWebBrowserWidget::RefreshPage()

@@ -36,6 +36,15 @@ Build a specific architecture and require a specific renderer output:
 .\scripts\Build-Client.ps1 -Architecture x64 -Renderer DX11
 ```
 
+For the restored embedded TCG/browser runtime, build and stage from fresh artifacts:
+
+```powershell
+.\scripts\Build-Client.ps1 -Architecture x64 -Renderer DX11 -Configuration Release -AudioBackend Juce
+.\scripts\Stage-TcgClient.ps1 -Architecture x64 -Configuration Release -AudioBackend Juce -LocalDevKit
+```
+
+The x64 build also produces contained Win32 TCG and Mozilla compatibility hosts. Staging writes only below `..\_whitengold_client`; it never writes to the protected final-live `..\_client` reference. The player-facing TCG and browser remain inside SWG—there is no WPF launcher, standalone TCG client, system browser, or other external UI fallback. The integrated x64 acceptance lane has verified the real HUD action through the retail TCG callback and a rendered in-game browser frame against the local dev kit. See [SWG TCG Reborn](docs/tcg-reborn.md) for architecture, dev-kit, staging, evidence, and validation commands.
+
 Select the legacy audio path instead of the default JUCE backend:
 
 ```powershell
@@ -57,10 +66,11 @@ Numeric values that encode a limit, capacity, interval, unit conversion, binary 
 ## Shared Files
 Please note that certain projects and files are prepended with `shared` which means they are files that are used in both the game engine ([the `src` repository](https://github.com/swg-source/src)) and the client. There are many enums, for instance, that must match between the client and server or there may be crashes, errors, unintended functionality or some combination thereof. ***If you make changes to any of these shared files, you must make the changes both in the src and in client-tools.***
 
-## Deprecated Components
-Some specific features have been removed or disabled from the client as they are either no longer needed or outside the scope of the development work of SWG Source. Those removals include:
-* The In-Game Web Browser (which uses libmozilla) and any UI elements or commands to activate it
-* The Trading Card Game and any UI elements or commands to activate it
+## Restored and Deprecated Components
+Some features were removed or disabled upstream. On `x64-dx11-tcg-reborn`:
+
+* The Trading Card Game entry point, embedded surface/input path, and navigation callbacks are restored. Win32 loads the final-live TCG DLL in process; x64 uses a contained Win32 compatibility host while keeping the same in-game mediator.
+* The in-game browser used by TCG navigation is restored. Win32 uses the legacy libMozilla runtime directly; x64 uses a contained, windowless Win32 Mozilla broker and renders its surface in the existing SWG browser page.
 * The Customer Service "Help" Context Menu and the Bug Reporting Form, and any UI elements or commands to activate it
 * Any references to Perforce, a version control solution that is no longer used.
 
@@ -82,7 +92,7 @@ Contributions and improvements are welcome and encouraged, please submit a pull 
 Most of the development tools use the [Qt framework](https://www.qt.io/) to render their user interface. You may wish to install the [Qt VS Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TheQtCompany.QtVisualStudioTools-19123) to ease development. 
 
 ## Known Issues
-* For the debug build, and possibly the optimized versions, you will get linker errors about libmozilla, and in release, possibly Vivox - if you alter the project settings you can disable this from killing the output of an exe, as libmozilla is only needed for the ingame browser.
+* Legacy Debug/Optimized configurations can still expose third-party dependency issues. Release is the primary TCG/browser integration target; do not remove libMozilla from a TCG build because TCG navigation depends on the in-game browser.
 * Other linker errors sometimes throw, you have to work on these case by case. Please pull request any changes you make.
 * cmd.exe issues sometimes occur as SOE originally had the build setup copying files to a proper game bin directory. You can just remove these from projects that complain about them, just copy the output files manually.
 * Plenty of warnings and sometimes even errors regarding deprecated libs happen. Fixes for these are case by case.

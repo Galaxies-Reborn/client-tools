@@ -72,6 +72,7 @@ void CuiActionManager::install ()
 {
 	DEBUG_FATAL (s_installed, ("already installed.\n"));
 
+	s_currentIndex = c_coreActionIndex;
 	ms_actionMapMap = new ActionMapMap;
 
 	IGNORE_RETURN(createActionMap(c_coreActionIndex));

@@ -27,6 +27,7 @@
 #include "clientGame/RoadmapManager.h"
 #include "clientGraphics/ConfigClientGraphics.h"
 #include "clientUserInterface/CuiManager.h"
+#include "clientUserInterface/CuiDragInfo.h"
 #include "clientUserInterface/CuiMessageBox.h"
 #include "clientUserInterface/CuiMediatorFactory.h"
 #include "clientUserInterface/CuiPersistentMessageManager.h"
@@ -38,6 +39,7 @@
 #include "clientUserInterface/CuiTextManager.h"
 #include "clientUserInterface/CuiWorkspace.h"
 #include "sharedGame/HyperspaceManager.h"
+#include "sharedFoundation/Os.h"
 #include "sharedMessageDispatch/Transceiver.h"
 #include "sharedObject/VolumeContainer.h"
 #include "sharedUtility/Callback.h"
@@ -54,11 +56,7 @@ namespace SwgCuiButtonBarNamespace
 	const StringId inventory_full = StringId("ui_inv", "inventory_full");
 	const StringId squelched = StringId("ui_chatroom", "squelched");
 	const StringId lotsOverLimitSpam = StringId("ui", "lots_over_limit_spam");
-
-	// these numbers were reduced based on the removal of the help/cs and tcg menu buttons otherwise the hover offset is fucked
-	// also for some reason these numbers need to be 2 less than the actual number of menu items, thanks SOE
-	const int NORMAL_NUMBER_BUTTONS_SPACE = 16;
-	const int NORMAL_NUMBER_BUTTONS_GROUND = 14;
+	SwgCuiButtonBar * s_activeButtonBar = 0;
 
 	void onConfirmGoHomeClosed(const CuiMessageBox & box);
 
@@ -124,7 +122,7 @@ m_submenuButton(0),
 m_shipDetailsButton(0),
 m_homePortButton(0),
 m_myCollectionsButton(0),
-//m_tcgButton(0),
+m_tcgButton(0),
 m_appearanceButton(0),
 m_questBuilderButton(0),
 m_gcwInfoButton(0),
@@ -159,7 +157,7 @@ m_opacityCallback      (0)
 	getCodeDataObject (TUIButton,     m_shipDetailsButton,       "buttonShipDetails",    true);
 	getCodeDataObject (TUIButton,     m_homePortButton,          "buttonHomePort",       true);
 	getCodeDataObject (TUIButton,     m_myCollectionsButton,     "buttonMyCollections");
-	//getCodeDataObject (TUIButton,     m_tcgButton,               "buttonTcg");
+	getCodeDataObject (TUIButton,     m_tcgButton,               "buttonTcg", true);
 	getCodeDataObject (TUIButton,     m_appearanceButton,        "buttonAppearance");
 	getCodeDataObject (TUIButton,     m_questBuilderButton,		 "buttonQuestBuilder");
 	getCodeDataObject (TUIButton,     m_gcwInfoButton,           "buttonGCW");
@@ -208,7 +206,8 @@ m_opacityCallback      (0)
 		registerMediatorObject(*m_submenuButton, true);
 	if (m_myCollectionsButton)
 		registerMediatorObject(*m_myCollectionsButton, true);
-	//registerMediatorObject (*m_tcgButton,            true);
+	if (m_tcgButton)
+		registerMediatorObject (*m_tcgButton, true);
 	if (m_appearanceButton)
 		registerMediatorObject(*m_appearanceButton, true);
 	if (m_questBuilderButton)
@@ -260,6 +259,8 @@ m_opacityCallback      (0)
 
 SwgCuiButtonBar::~SwgCuiButtonBar                ()
 {
+	if (s_activeButtonBar == this)
+		s_activeButtonBar = 0;
 	m_communityButton       = 0;
 	m_mailButton            = 0;
 	m_inventoryButton       = 0;
@@ -282,6 +283,7 @@ SwgCuiButtonBar::~SwgCuiButtonBar                ()
 
 void SwgCuiButtonBar::performActivate()
 {
+	s_activeButtonBar = this;
 	if (m_menuButtonPage)
 		m_menuButtonPage->SetOpacity(CuiPreferences::getCommandButtonOpacity());
 	if (m_opacityCallback)
@@ -293,6 +295,8 @@ void SwgCuiButtonBar::performActivate()
 
 void  SwgCuiButtonBar::performDeactivate()
 {
+	if (s_activeButtonBar == this)
+		s_activeButtonBar = 0;
 	if (m_opacityCallback)
 		CuiPreferences::getCommandButtonOpacityCallback().detachReceiver(*m_opacityCallback);
 	setIsUpdating (false);
@@ -314,6 +318,55 @@ void  SwgCuiButtonBar::performDeactivate()
 	m_effectingExpertise = false;
 
 	m_journalMissionCount = 0;
+}
+
+//----------------------------------------------------------------------
+
+bool SwgCuiButtonBar::isTcgButtonReadyForIntegrationTest()
+{
+	SwgCuiButtonBar * const buttonBar = s_activeButtonBar;
+	if (!buttonBar || !buttonBar->m_tcgButton || !buttonBar->m_buttonsComposite ||
+		!buttonBar->isActive() || !buttonBar->m_tcgButton->IsEnabled())
+	{
+		return false;
+	}
+
+	std::string commandName;
+	return buttonBar->m_tcgButton->GetPropertyNarrow(CuiDragInfo::Properties::CommandName, commandName) &&
+		_stricmp(commandName.c_str(), "CMD_uiTcg") == 0;
+}
+
+//----------------------------------------------------------------------
+
+bool SwgCuiButtonBar::pressTcgButtonForIntegrationTest(char const * nonce)
+{
+	SwgCuiButtonBar * const buttonBar = s_activeButtonBar;
+	if (!nonce || !*nonce || !isTcgButtonReadyForIntegrationTest() || !buttonBar)
+		return false;
+
+	buttonBar->ensureMenuIsVisible();
+	UIPage * const buttonBarPage = &buttonBar->getPage();
+	bool visible = buttonBarPage->WillDraw() && buttonBar->m_buttonsComposite->WillDraw() &&
+		buttonBar->m_tcgButton->WillDraw();
+	bool reachedButtonBarPage = false;
+	for (UIWidget * ancestor = buttonBar->m_tcgButton->GetParentWidget(); ancestor;
+		ancestor = ancestor->GetParentWidget())
+	{
+		visible = visible && ancestor->WillDraw();
+		if (ancestor == buttonBarPage)
+		{
+			reachedButtonBarPage = true;
+			break;
+		}
+	}
+	visible = visible && reachedButtonBarPage;
+	if (!visible)
+		return false;
+
+	REPORT_LOG(true, ("TCG integration: game-action-button-press nonce=[%s] pid=%lu button=buttonTcg visible=true enabled=true command=CMD_uiTcg.\n",
+		nonce, static_cast<unsigned long>(Os::getProcessId())));
+	buttonBar->m_tcgButton->Press();
+	return true;
 }
 
 //----------------------------------------------------------------------
@@ -561,7 +614,7 @@ bool SwgCuiButtonBar::isCompositeVisible()
 
 void SwgCuiButtonBar::updateMenuHighlight()
 {
-	if (!m_buttonsComposite || !m_mouseoverPage)
+	if (!m_buttonsComposite || !m_mouseoverPage || m_numberButtons <= 0)
 		return;
 	if(!m_buttonsComposite->IsVisible())
 		return;
@@ -634,6 +687,42 @@ bool SwgCuiButtonBar::OnMessage (UIWidget * context, const UIMessage & msg)
 	return true;
 }
 
+//----------------------------------------------------------------------
+
+void SwgCuiButtonBar::refreshMenuRows()
+{
+	if (!m_buttonsComposite)
+		return;
+
+	bool const isNewCharacter = RoadmapManager::playerIsNewCharacter();
+	if (m_roadmapButton && m_roadmapButton->GetParentWidget())
+		m_roadmapButton->GetParentWidget()->SetVisible(!isNewCharacter && RoadmapManager::playerIsOnRoadmap());
+	if (m_expertiseButton && m_expertiseButton->GetParentWidget())
+	{
+		bool const showExpertise = !isNewCharacter && ClientExpertiseManager::hasExpertiseTrees() && ClientExpertiseManager::getExpertisePointsTotalForPlayer() > 0;
+		m_expertiseButton->GetParentWidget()->SetVisible(showExpertise);
+	}
+
+	// Count the visible rows in the loaded HUD asset instead of relying on the
+	// historical constants.  The final-live skinned asset has one selectable
+	// row per direct child, including its existing TCG row.
+	UIBaseObject::UIObjectList children;
+	m_buttonsComposite->GetChildren(children);
+	int visibleChildren = 0;
+	for (UIBaseObject::UIObjectList::const_iterator iterator = children.begin(); iterator != children.end(); ++iterator)
+	{
+		UIBaseObject const * const child = *iterator;
+		if (child && child->IsA(TUIWidget) && static_cast<UIWidget const *>(child)->WillDraw())
+			++visibleChildren;
+	}
+	m_numberButtons = visibleChildren > 0 ? visibleChildren : 1;
+
+	m_buttonsComposite->Pack();
+	m_buttonsComposite->Pack();
+}
+
+//----------------------------------------------------------------------
+
 void SwgCuiButtonBar::toggleMenu()
 {
 	// Bail out entirely if the post-NGE-retail UI doesn't have the
@@ -657,46 +746,7 @@ void SwgCuiButtonBar::toggleMenu()
 		m_buttonsComposite->SetVisible(true);
 		m_mouseoverPage->SetVisible(true);
 
-		//Only show the roadmap and expertise options if the correct conditions are met.
-		m_numberButtons = Game::isHudSceneTypeSpace() ? NORMAL_NUMBER_BUTTONS_SPACE : NORMAL_NUMBER_BUTTONS_GROUND;
-
-		if(RoadmapManager::playerIsNewCharacter())
-		{
-			if (m_expertiseButton && m_expertiseButton->GetParentWidget())
-				m_expertiseButton->GetParentWidget()->SetVisible(false);
-			if (m_roadmapButton && m_roadmapButton->GetParentWidget())
-				m_roadmapButton->GetParentWidget()->SetVisible(false);
-		}
-		else
-		{
-			if (m_roadmapButton && m_roadmapButton->GetParentWidget())
-			{
-				if (RoadmapManager::playerIsOnRoadmap())
-				{
-					m_roadmapButton->GetParentWidget()->SetVisible(true);
-					++m_numberButtons;
-				}
-				else
-				{
-					m_roadmapButton->GetParentWidget()->SetVisible(false);
-				}
-			}
-			if (m_expertiseButton && m_expertiseButton->GetParentWidget())
-			{
-				if (ClientExpertiseManager::hasExpertiseTrees() && ClientExpertiseManager::getExpertisePointsTotalForPlayer() > 0)
-				{
-					m_expertiseButton->GetParentWidget()->SetVisible(true);
-					++m_numberButtons;
-				}
-				else
-				{
-					m_expertiseButton->GetParentWidget()->SetVisible(false);
-				}
-			}
-		}
-
-		m_buttonsComposite->Pack();
-		m_buttonsComposite->Pack();
+		refreshMenuRows();
 
 		//Position the menu appropriately; detect if menu is on left or top of screen
 		UIPoint screenLoc = m_menuButton->GetWorldLocation();
@@ -762,6 +812,7 @@ void SwgCuiButtonBar::ensureMenuIsVisible()
 	m_buttonsComposite->SetVisible(true);
 	if (m_mouseoverPage)
 		m_mouseoverPage->SetVisible(true);
+	refreshMenuRows();
 
 	CuiManager::requestPointer(true);
 }
