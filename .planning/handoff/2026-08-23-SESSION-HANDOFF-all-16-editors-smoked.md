@@ -1597,3 +1597,31 @@ Captures worth keeping: `D:\Code\Galaxies-Reborn\stage-B-x64\Capture250.rdc`
 (magenta, pre-fix) and `Capture251.rdc` (oversaturated, pre-alpha-fix). The
 post-fix capture is in this session's scratchpad and will be orphaned — recapture
 is now cheap, so no loss.
+
+## LATE ADDENDUM — the interrupted smoke got through 9/16 before it was killed
+
+Partial output survived. Amends the "UNVERIFIED" warning above: the first **9 of
+16 tools are confirmed alive against TODAY'S binaries** (the clear-alpha
+`gl11_r.dll` and the rebuilt `clientTerrain`).
+
+| # | tool | verdict |
+|---|------|---------|
+| 1 | SwgGodClient_r | w |
+| 2 | TerrainEditor_r | w |
+| 3 | UIBuilder | `?` — known false negative, its `#32770` IS the main window |
+| 4 | ParticleEditor_r | w |
+| 5 | AnimationEditor_r | w |
+| 6 | LightningEditor_r | w |
+| 7 | SwooshEditor_r | w |
+| 8 | NpcEditor_r | w — full title `Npc Editor (Aug 20 2026 - 18:51:54) : Default` |
+| 9 | SoundEditor_r | w |
+
+That covers the three that mattered most for regression risk: **both editors
+changed this session** (ParticleEditor, AnimationEditor) and **NpcEditor**, the
+most fragile tool in the set — all still reach a real main window. No regression
+from the D3D11 clear-alpha fix is visible in the first 9.
+
+**Still to confirm: tools 10-16** — ClientEffectEditor, QuestEditor,
+ShipComponentEditor, SwgConversationEditor, SwgDraftSchematicEditor,
+SwgSpaceQuestEditor, SwgSpaceZoneEditor. Re-run the smoke to close those out; it
+is the first task next session either way.
