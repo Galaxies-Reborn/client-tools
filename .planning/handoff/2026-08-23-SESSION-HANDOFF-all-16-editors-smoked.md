@@ -1468,3 +1468,132 @@ Rewritten. Reads v0005 and v0006, treats compressor 1 and 2 both as zlib,
 reports empty-but-valid archives as empty rather than as errors, prints a
 per-version census, and exposes `find()` / `extract()` for import. Usage
 unchanged: `python scripts/trelist.py <dir> [substring] [--dump [outdir]]`.
+
+# ===== SESSION END 2026-08-24 — POWER-LOSS SHUTDOWN — START HERE =====
+
+Written under an imminent power cut. **Everything below the line is committed and
+safe.** Working tree was clean at the last commit.
+
+## What this session did (7 commits, all pushed to the branch)
+
+| commit | what |
+|---|---|
+| `d80c55ae9` | magenta sky root-caused via RenderDoc — it is the CLEAR COLOUR; no skybox draw exists |
+| `03c006ad0` | `EnvironmentBlock`: warn in release when a colour ramp fails to load |
+| `2a368d829` | `groundScene` made permanent for ParticleEditor **and** AnimationEditor |
+| `9d2a534ba` | tool cfgs TRACKED — 21 config files no longer lost on a clean checkout |
+| `18d589c75` | oversaturated sky root-caused: bloom overflow, not gamma |
+| `de6bf4161` | **Direct3d11: decode clear alpha instead of forcing it to 1.0** (the real port fix) |
+| `81dc6b286` | `trelist.py` reads TRE v0006; the 137-archive question CLOSED |
+
+**Both original renderer symptoms are closed.** Magenta sky + wrong terrain were
+one bug — a missing `groundScene` config key, not a port defect. The
+oversaturated sky WAS a genuine D3D11 port defect and is fixed and verified.
+
+## IN FLIGHT AND LOST — re-run this first
+
+A full 16-tool smoke run (`_smoke-auto.ps1 -WaitSeconds 30`) was running in the
+background when the shutdown came. **Its results are lost — re-run it.**
+
+It matters more than usual this time: today's `gl11_r.dll` (clear-alpha fix) and
+`clientTerrain` (ramp diagnostic) rebuilds sit underneath **every** editor with a
+3D viewport, and nothing has confirmed the other 15 tools still launch cleanly
+since. Treat the 16/16 result as UNVERIFIED against today's binaries.
+
+```
+cd D:\Code\swg-qt-tools-worktree\src\build\win32\x64\Release
+.\_smoke-auto.ps1 -WaitSeconds 30
+```
+
+Score by reading window TITLES, not window class — the CSV verdict column is
+still wrong in both directions (see the trap noted earlier in this document).
+
+## NEXT STEPS, in the order I would do them
+
+### 1. Track `ui_root_npceditor.ui` — the last clean-checkout hole (2 minutes)
+
+`NpcEditor.cfg` is now tracked and points at
+`searchPath12="D:/Code/Galaxies-Reborn/stage-B-override"`, but the 11 KB file it
+needs — `stage-B-override/ui/ui_root_npceditor.ui` — is **NOT tracked and lives
+outside the repo**. A clean checkout therefore produces a tracked cfg pointing at
+a missing file, and NpcEditor FATALs again on the absent `/AvView` page.
+
+Precedent for tracking it already exists: `NpcEditor.tab` and
+`QuestEditorConfig.xml` under `src/build/win32/exe/win32/` are tracked SOE
+originals. Do the same for this file. Verified present this session:
+11,349 bytes, dated 2026-08-23 19:37.
+
+### 2. SoundEditor — the shipped fix is HALF-TESTED
+
+`SoundEditor.cpp:449` was changed from `client.cfg` to `SoundEditor.cfg`, rebuilt
+and committed (`d17043a48`) — but **the entire point of that fix was first-file
+open**, and no sound file has ever been opened. Its known defect ("launches fine,
+mounts zero TREs, fails the moment you open a sound file") is invisible to a
+launch smoke by construction.
+
+7,677 `.snd` files are available, e.g. `sound/music_combat_loop.snd`
+(`ILM_music.tre`). Open one. This is the highest-value untested thing in the
+tree.
+
+### 3. AnimationEditor — newly changed, never exercised
+
+It received the `[ParticleEditor] groundScene` key this session (it reads that
+section, not an `[AnimationEditor]` one — see the trap recorded above) and shares
+ParticleEditor's serverless path. Smoke-passed, but nothing loaded. 7,765 `.ans`
+files available. Drive it the same way ParticleEditor was driven (Ctrl+O, type
+the path, Enter, guarded on `GetForegroundWindow()`).
+
+### 4. Functional testing generally — the big untested surface
+
+**Only ParticleEditor has ever been driven past launch** (one `.prt` load).
+Nothing else has opened or saved a file. Several tools display data parsed at
+boot (SwgDraftSchematicEditor's 749 resourceTypes, SpaceQuest's 20 categories) —
+that is startup parsing, not editing.
+
+### 5. Do NOT "fix" these
+
+* `SwgConversationEditor` / `SwgSpaceZoneEditor` scoring `c`: the
+  `<branch>\exe\win32` check is structural and can never match unless run from
+  `.../swg/<branch>/exe/win32`. Cosmetic, one click.
+* QuestEditor's blank component icons: `data/internal/.../questeditor/image/`
+  simply does not exist here. Documented, not fatal.
+
+### 6. Still open from earlier sessions
+
+Staging DLLs (08-22): staging has the newer `gl11_r.dll` beside the older exe and
+`stage-x64/gl05,06,07_r.dll` show as modified. No ABI change, harmless,
+unresolved. **Note today's rebuild produced a new `gl11_r.dll` in Release**, so
+re-check this with fresh eyes rather than against the old notes.
+
+## Two things that changed how to work here — do not miss these
+
+**Automated frame capture now WORKS.** Copy the baked shader cache into the tool's
+directory first:
+
+```
+D:\Code\Galaxies-Reborn\stage-B-x64\compiled_shader\  ->  <tool dir>\compiled_shader\
+```
+
+(already done for `x64\Release`). Then the RenderDoc MCP's `capture_frame` with
+`delayFrames: 900` completes and yields a full scene frame. No human F12 needed.
+`pixel_history` is the single highest-value call — it answers "what wrote this
+pixel" directly and settled both bugs this session.
+
+**SWG-Toolkit is the reference for anything TRE-format-shaped.** Do not
+reverse-engineer:
+* `D:/Code/swg-client-v2/tools/tre-lint/src/format.ts`
+* `D:/Code/SWG-Toolkit/.planning/handoff/2026-08-17-PROVIDER-NOTE-tre-lint-seed-and-v0006-verdict.md`
+
+## Machine state at shutdown
+
+ParticleEditor may still be running (PID 3024) plus whatever the interrupted
+smoke run left; kill any `*Editor_r.exe` / `SwgGodClient_r.exe` before trusting a
+fresh run. `warning.log` in Release holds the last smoke tool's output, not
+ParticleEditor's. Per-run logs saved this session:
+`logs/warning.pre-envtest.log`, `logs/warning.envtest-simple.log`,
+`logs/warning.envtest-tatooine.log`.
+
+Captures worth keeping: `D:\Code\Galaxies-Reborn\stage-B-x64\Capture250.rdc`
+(magenta, pre-fix) and `Capture251.rdc` (oversaturated, pre-alpha-fix). The
+post-fix capture is in this session's scratchpad and will be orphaned — recapture
+is now cheap, so no loss.
