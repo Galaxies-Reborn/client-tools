@@ -574,3 +574,119 @@ Two false signals to ignore when checking whether a load worked: a SUCCESSFUL
 load writes nothing to `warning.log` (an unchanged log is not failure), and the
 window caption updates late — it read `ParticleEditor_r` for a while after the
 load before becoming `... : pt_campfire_s01.prt`.
+
+## RenderDoc setup + capture attempts (2026-08-23, written just before a restart)
+
+Goal: find why the skybox renders magenta and the terrain looks wrong in the
+serverless-start tools. Symptom 3 (particles) is already resolved above and was
+not a defect.
+
+### MCP is registered — it should be LIVE after the restart
+
+```
+claude mcp add --scope user renderdoc \
+  "D:\Code\renderdoc-mcp\v0.3.0\renderdoc-mcp-windows-x64-v0.3.0\bin\renderdoc-mcp.exe"
+```
+
+Written to `C:\Users\kenne\.claude.json`; `claude mcp list` reports it Connected.
+It exposes **52 tools** (open_capture, list_draws, get_pipeline_state,
+get_bindings, get_shader, list_resources, export textures, pixel debug, frame
+diff...). MCP servers bind at session start, which is why the restart was needed.
+**Check the tool list first thing** — if the renderdoc tools are present, prefer
+them; they likely include attach-to-a-running-process, which solves the capture
+problem described below.
+
+### The CLI works without any MCP and is often faster
+
+`D:\Code\renderdoc-mcp\v0.3.0\renderdoc-mcp-windows-x64-v0.3.0\bin\renderdoc-cli.exe`
+
+```
+renderdoc-cli <capture.rdc> <command> [options]
+  info | events | draws [--filter T] | pipeline [-e EID] | shader STAGE [-e EID]
+  resources [--type T] | export-rt IDX -o DIR [-e EID] | pixel X Y [-e EID]
+  pick-pixel X Y | debug pixel X Y -e EID [--trace] | debug vertex VTX -e EID
+  mesh EID [--stage vs-out] | snapshot EID -o DIR | usage RES_ID | tex-stats
+  assert-pixel EID X Y --expect R G B A | assert-state | assert-image
+  capture EXE [-w DIR] [-a ARGS] [-d N] [-o PATH]
+```
+
+### THE CAPTURE PROBLEM — read this before retrying `capture`
+
+`capture -d N` waits N **presented frames** then grabs one. There is no
+`--timeout` flag and the internal timeout is fixed. Results measured:
+
+| -d N  | outcome |
+|-------|---------|
+| 120   | SUCCEEDED, but the frame is mid-load: **2 events, 1 draw** — useless |
+| 400   | timed out |
+| 700   | timed out (even with the window force-foregrounded) |
+| 1500  | timed out |
+| 2500  | timed out |
+
+Not linear, and the log says why:
+`Direct3d11: no compiled shader manifest at 'compiled_shader/manifest.txt';
+every program will be compiled at first use.` The first frames that actually
+draw the scene each stall compiling shaders, so the frame rate collapses exactly
+when the scene appears. "Late enough to show the sky" and "fast enough to beat
+the timeout" do not overlap.
+
+Ideas for next time, roughly in order:
+1. Use the MCP's own capture tool — it may attach to an already-running process,
+   which removes the timing race completely.
+2. **Build the shader cache first** so frames stop stalling. The engine wants
+   `compiled_shader/manifest.txt`; `ShaderBuilder.exe` exists in the SOE tree at
+   `D:\SWG All Tools Working\swg\current\exe\win32\`. With a warm cache a much
+   larger `-d` should complete.
+3. Manual capture: `qrenderdoc.exe` IS installed at `C:\Program Files\RenderDoc`.
+   Launch ParticleEditor from its Launch Application tab, wait until the magenta
+   sky is visible, press **F12**. Then analyse the .rdc with the CLI — the
+   analysis is the valuable part and needs no automation.
+
+Also note: the app must be **foregrounded** to accumulate frames at a useful rate
+(a background window presents very slowly). Force it with ShowWindow/
+BringWindowToTop/SetForegroundWindow in a loop while the capture waits.
+
+### CLI quirk that will waste your time
+
+`-o foo.rdc` actually writes **`foo_frame0.rdc`**, then the CLI looks for
+`foo.rdc` and reports `error: Capture completed but file not found on disk`.
+The capture succeeded — look for the `_frame0` suffix. Confirm against the
+RenderDoc log (`%TEMP%\RenderDoc\RenderDoc_<date>.log`), which prints
+`Written to disk: <path>`.
+
+### The one capture taken is NOT worth keeping
+
+`pe_skybox_frame0.rdc` (3.6 MB, D3D11, 2 events / 1 draw) is a mid-load frame
+with no scene. It lives in this session's scratchpad
+(`%TEMP%\claude\D--Code-swg-qt-tools-worktree\<session-id>\scratchpad\`) which is
+session-scoped and will be orphaned by the restart. No loss — recapture.
+
+### The analysis plan, once a capture WITH the scene exists
+
+1. `info` — sanity check event/draw counts (a real scene frame will have many).
+2. `draws` — find the sky draw. It should be near the start of the frame,
+   full-screen, likely depth-write off.
+3. `pipeline -e EID` — what is bound: render targets, depth state, and crucially
+   the SRVs.
+4. `get_bindings` / `resources --type Texture` — is a cubemap actually bound at
+   that draw, or the default texture? `SkyBoxAppearance.cpp:97-98` sets
+   `setNumberOfTextureCoordinateSets(1)` +
+   `setTextureCoordinateSetDimension(0, 3)`, i.e. a 3-component (cube) lookup;
+   `SkyBox6SidedAppearance.cpp:271` instead builds six `texture/%s_%s.dds` names.
+5. `shader ps -e EID` — the pixel shader for that draw.
+6. `pixel X Y -e EID` — get the colour NUMERICALLY. This finally answers "is it
+   literally magenta" instead of judging a screenshot.
+7. `debug pixel X Y -e EID --trace` — trace the invocation that produced it.
+8. If it turns out to be a constant-binding problem, remember the port already
+   reports its **constant ABI guard is vacuous**
+   (`Direct3d11_ShaderReflection.cpp:449`) — constants are not verified by
+   anything, so a frame capture is the only source of truth for what is bound.
+9. When the cause is found, `assert-pixel` / `assert-state` turn it into a
+   regression check rather than something a human has to eyeball.
+
+### Machine state at restart
+
+No editor processes left running (all ParticleEditor instances stopped). The
+working tree is clean and everything is committed. `warning.log` in Release holds
+the last injected run; per-tool logs are in `logs/_smoke/`, screenshots in
+`logs/_shots/`.
