@@ -1763,3 +1763,63 @@ assume, the CRLF form was generated (11,349 -> 11,380 bytes) and run with the
 out-of-repo copy hidden: **ALIVE at 45s**. The UI parser does not care, so the
 file is left as an ordinary tracked text file, consistent with the other
 preserved SOE originals. Both copies were restored and verified byte-identical.
+
+## SoundEditor first-file open — TESTED AT LAST, and the fix HOLDS
+
+Handoff next-step #2, the "highest-value untested thing in the tree". The
+`SoundEditor.cpp:449` cfg fix (`d17043a48`) had never been exercised, because its
+whole point is first-file open and no sound file had ever been opened.
+
+**It works. The tool opens a sound template and resolves every sample out of the
+TREs.**
+
+### How it was driven
+
+`fileOpen()` uses `QFileDialog::getOpenFileNames` (`SoundEditor.cpp:648`), so it
+opens a **loose .snd from the filesystem** — not from a TRE. There are no loose
+`.snd` files in this repo or the stage dirs, but the SOE tree has **7,220** of
+them under `swg/current/data/sku.0/sys.client/compiled/game/{sound,player_music/sound,voice/sound}`.
+
+Menu accel is **Ctrl+O** — `BaseSoundEditor.ui` stores it as the integer
+`4194383`, which is `0x400000 | 0x4F` = CTRL + 'O'. The file dialog is a native
+`#32770` "Open Sound", not a Qt widget, so it takes a typed absolute path fine.
+Driver kept at `scratchpad/_drive-soundeditor.ps1`.
+
+### The prediction was made BEFORE the run, which is what makes the result mean anything
+
+Target: `sound/music_combat_loop.snd` — an `SD2D` (Sound2dTemplate) referencing
+**28** `music/mus_*.mp3` samples. All 28 were confirmed present in TREs that
+`SoundEditor.cfg` actually mounts (checked by intersecting the cfg's 70
+`searchTree0` entries against `scripts/trelist.py`; e.g.
+`music/mus_combat_f_lp.mp3` -> `patch_15_00.tre`). Note **ILM_music.tre is NOT
+mounted** by SoundEditor.cfg, so the base patch archives are doing the work.
+
+* PASS looks like: 28 samples listed with real sizes.
+* FAIL looks like: 28 x `WARNING: Unable to find the sample in the tree file
+  path and it will not be loaded` (`SoundTemplateWidget.cpp`, the `else` of
+  `TreeFile::exists` at line 441).
+
+### Result — PASS, on two independent readings
+
+1. Title `Sound Template - D:/SWG All Tools Working/.../music_combat_loop.snd`,
+   and **"Sample List (28 samples @ 27174 KB)"** — 28/28, with per-sample sizes
+   (680 KB, 1062 KB, 901 KB, ...). Sizes come from `Audio::getSampleSize()`,
+   which reads through TreeFile, so non-zero sizes already prove the mounts.
+2. Better: the **Audio Debug** panel reports `Cache Miss Count 28` /
+   `Cached Sample Count 28`. The audio subsystem actually pulled all 28 mp3
+   payloads out of the archives. That is impossible with zero mounted TREs.
+
+Template fields also populated correctly (Play Order "Random No Repeats",
+Priority 2, Category "Background Music", play count 99/99).
+
+`warning.log` stayed at its usual 6 lines of JUCE/WASAPI init, no FATAL. **Do not
+read that as evidence either way** — `SoundEditorUtility::report()` writes ONLY to
+the GUI output window (`SoundEditorUtility.cpp:110`), never to a file. Any future
+SoundEditor check has to be visual.
+
+Screenshots: `logs/_shots/SoundEditor_{a-before,b-dialog,c-after,e-output}.png`.
+
+### Not done
+
+`Play` was never pressed — audio *playback* is untested. Loading, resolution and
+caching are proven; actually hearing it is a separate question.
