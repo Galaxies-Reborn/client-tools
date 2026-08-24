@@ -1362,3 +1362,109 @@ that makes absolute colours unreliable.
 
 Visual confirmation by eye is still worth doing — the numbers are conclusive
 about the overflow, but only a human can say whether the sky now *looks* right.
+
+## 2026-08-24: trelist.py now reads v0006 — and the 137-archive open item is CLOSED
+
+### Do not reverse-engineer this format — there is a reference implementation
+
+The user pointed at **SWG-Toolkit**, which has a full TRE reader set. The
+authoritative sources on this machine:
+
+* `D:/Code/swg-client-v2/tools/tre-lint/src/format.ts` — zero-dependency TS,
+  every layout verified against real bytes and engine source.
+* `D:/Code/SWG-Toolkit/.planning/handoff/2026-08-17-PROVIDER-NOTE-tre-lint-seed-and-v0006-verdict.md`
+
+Check these FIRST for anything TRE-format-shaped. The v0006 record layout in
+particular was *arbitrated on real bytes*, not guessed.
+
+### The v0006 layout, and the model that was falsified
+
+Header is the same 36 bytes as v0005 (`token@0 version@4 numberOfFiles@8
+tocOffset@12 tocCompressor@16 sizeOfTOC@20 blockCompressor@24 sizeOfNameBlock@28
+uncompSizeOfNameBlock@32`, all LE). Only the TOC record differs:
+
+```
+v0005 -- 24 B: crc@0 length@4 offset@8 compressor@12 compressedLength@16 fileNameOffset@20
+v0006 -- 32 B: crc@0 length@4 offset@8 zero@12 zero@16 fileNameOffset@20 compressor@24 compressedLength@28
+```
+
+The v0006 form is the **REORDER** model. A competing **pad** model (compressor /
+compressedLength at 12/16, padding at 24..31) is **FALSIFIED** — it scored 0.0%
+on every populated archive while reorder won unanimously across all 46 populated
+Restoration archives. Do not swap them back. Note the GR engine's own
+`TreeVersion.h`/`TreBuilder` carry the pad assumption and are therefore wrong.
+
+Compressor codes: `0` stored, `1` zlib (Restoration dialect), `2` zlib (stock).
+Both 1 and 2 are plain zlib.
+
+Tags are big-endian-composed uint32s written little-endian, so a hex dump shows
+them mirrored: `TREE`->`EERT`, `0005`->`5000`, `0006`->`6000`. That mirroring is
+NOT corruption and not a byte-order bug.
+
+### The 137 v0006 archives contain NOTHING — item closed
+
+```
+scanned 209 tre(s) [v0005: 72, v0006: 137], 217533 entries, 137 empty, 0 unreadable
+```
+
+Zero unreadable, and the entry total is **unchanged** from the v0005-only count.
+Audited every v0006 header directly: **all 137 have an entirely zero header body**
+— `numberOfFiles`, `tocOffset`, every field. They declare nothing. This is not a
+parse failure and not a limitation of the reader.
+
+So the standing worry that "~two thirds of the corpus was never examined" is
+**resolved: there was nothing in it to examine.** Any earlier census that covered
+only v0005 archives was, for this corpus, already complete. (The populated v0006
+archives the provider note describes belong to the *Restoration* corpus, which is
+not installed here.)
+
+Some v0006 files do carry payload — `hotfix_59_client_00.tre` is 1.38 MB of
+concatenated zlib streams holding `PEFT` particle IFFs — but with no TOC
+indexing them they are containers, not mountable archives, exactly as the
+provider note's "container/Restoration; not searchTree-mountable stock" says.
+
+### colorRampFileName, chased for kicks — and a loose end worth recording
+
+`datatables/environment/tatooine.iff` is a `DTII` DataTable, 25 columns, 85 rows.
+Column 9 is `Lighting Color Ramps (256x8 tga)` = `CD_colorRampFileName`. Parsed
+it fully (row walk consumed exactly 34272 of 34272 bytes, which validates the
+layout: `s` = inline NUL-terminated, `I`/`f` = 4 bytes LE).
+
+Tatooine uses exactly **two** ramps across all 17 families:
+`tatooine_global0.tga` (weather 0-1) and `tatooine_global1.tga` (weather 2-4).
+
+**The four copies of `tatooine_global0.tga` all DIFFER** (data_other_00,
+patch_00, patch_01, patch_06 — four distinct md5s). Any analysis must use the
+highest-priority copy; here that is **patch_06**.
+
+The TGA is bottom-origin, and the loader flips it, so image row `r` = file row
+`7-r`. That mapping is self-consistent against the known ramp semantics: bounce
+= `0,0,0`, fill = `2,1,1`, mainDiffuse = `164,88,47` (a warm orange — exactly
+right for twin suns).
+
+**The loose end:** the frame's measured clear colour was `74,55,70`. Under that
+mapping the *clear* ramp at the matching time index is `96,88,106` (muted
+blue-grey), while `74,55,70` matches the **fog** ramp at the same index to within
+one bit of blue (`74,55,69`). Searching every row and all 256 time indices, the
+fog row is the only near-exact match; the clear row never takes that value.
+
+That is an observation, **not a diagnosis** — the obvious mechanism is absent:
+`GroundScene.cpp:2371` clears to `terrainObject->getClearColor()`,
+`ClientProceduralTerrainAppearance::getClearColor` returns
+`GroundEnvironment::m_clearColor`, and `GroundEnvironment.cpp:1096` builds that
+purely from the clear ramps with nothing modifying it afterwards. So there is no
+code path visible that would substitute fog for clear.
+
+Possible and untested: the flip assumption is wrong in some way the semantic
+cross-check does not catch; or the environment block in play is not one of these
+two files; or something reorders the ramp rows on load. **Cosmetically this does
+not matter** — the user judged the result "close enough" and the sky renders
+correctly — so this is logged as a curiosity for anyone who wants it, not as an
+open defect.
+
+### trelist.py
+
+Rewritten. Reads v0005 and v0006, treats compressor 1 and 2 both as zlib,
+reports empty-but-valid archives as empty rather than as errors, prints a
+per-version census, and exposes `find()` / `extract()` for import. Usage
+unchanged: `python scripts/trelist.py <dir> [substring] [--dump [outdir]]`.
