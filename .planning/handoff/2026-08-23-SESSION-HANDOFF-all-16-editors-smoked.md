@@ -1819,7 +1819,14 @@ SoundEditor check has to be visual.
 
 Screenshots: `logs/_shots/SoundEditor_{a-before,b-dialog,c-after,e-output}.png`.
 
-### Not done
+### Playback CONFIRMED BY THE USER, 2026-08-24
 
-`Play` was never pressed — audio *playback* is untested. Loading, resolution and
-caching are proven; actually hearing it is a separate question.
+`Play` was pressed by Kenny on the loaded `music_combat_loop.snd`: **"It plays."**
+
+So the whole chain is now proven end to end — cfg read -> 70 TREs mounted ->
+template parsed -> 28 samples resolved through TreeFile -> mp3 payloads decoded
+and cached -> audio out through the JUCE 8.0.14 / WASAPI backend. Nothing about
+SoundEditor's first-file-open path is outstanding.
+
+This also makes SoundEditor the **second** tool ever driven past launch, after
+ParticleEditor.
