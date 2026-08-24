@@ -1145,3 +1145,122 @@ earlier in this document (`ConfigFile` splits unquoted values on whitespace, and
 `client.cfg` is among the tracked files. It is the CLIENT config and carries the
 `_00_` sku key form. **Never copy it onto a tool cfg** — see the memory note
 `tool-cfgs-need-legacy-no-sku-treefile-keys` and the landmine section above.
+
+## 2026-08-24: the oversaturated sky is BLOOM, and the pink is a clamped overflow
+
+Capture `D:\Code\Galaxies-Reborn\stage-B-x64\Capture251.rdc` (D3D11, 351 events,
+**346 draws**, 1280x720) — the tatooine scene, taken with F12. Compare with
+Capture250's 21 draws: the environment really is loading now.
+
+### The frame's actual structure
+
+| stage | events | target |
+|---|---|---|
+| scene | 10 (clear) .. ~4030 | `212` (B8G8R8A8_UNORM) |
+| bloom downsample | 4033 | `223` (320x180) |
+| bloom blur H/V | 4050, 4055 -> `228`; 4065, 4070 -> `230` | 320x180 |
+| **bloom composite** | **4088** (reads `212` + `230`) | `214` |
+| fog/copy | 4099 (reads `214`) | `48` |
+| present blit | 4113 (reads `48`) | `960` swapchain |
+
+### It is NOT a gamma/sRGB problem — that theory is dead
+
+I floated `B8G8R8A8_UNORM` vs `_SRGB` last session as something the capture could
+test. **It tested false.** The pale pink is not a colour-space conversion, it is
+an arithmetic **overflow that clamps**:
+
+At the sky pixel (640,50), the bloom composite at 4088 outputs
+`(1.3608, 0.8078, 0.9353, alpha 2.0)` and the UNORM target clamps it to
+`(1.0, 0.808, 0.933)`. Red went past 1.0 and got cut. A clamped red channel with
+green and blue left high is exactly "washed-out pink". Nothing is being
+mis-converted; something is being added twice.
+
+### The mechanism, read off the shaders
+
+The scene's **alpha channel is the bloom mask**. Two shader disassemblies prove
+it:
+
+*Downsample (4033):* accumulates `rgb += sample.rgb * sample.a` over 16 taps and
+divides by 16. RGB is weighted **by alpha**, so a pixel only contributes bloom in
+proportion to its alpha.
+
+*Composite (4088):* `result.rgba = bloom.rgba * bloom.a + scene.rgba`.
+
+Measured values confirm the mask is working as designed:
+
+| pixel | bloom texture `230` | composite out at 4088 |
+|---|---|---|
+| sky (160,12) | `1.0, 0.612, 0.710, a=1.0` | `1.361, 0.808, 0.935, a=2.0` -> clamped |
+| ground (160,150) | `0.0, 0.0, 0.0, a=1.0` | `0.396, 0.239, 0.224, a=1.0` unchanged |
+
+Bloom **alpha** is 1.0 everywhere; it is bloom **RGB** that is zero over the
+ground and bright over the sky. That is the downsample's alpha weighting doing
+its job: ground pixels carry alpha ~0, sky pixels carry alpha 1.0.
+
+So the sky's bloom is a blurred copy of a uniformly-alpha-1.0 sky, added back at
+full weight — roughly **doubling** it. Hence the overflow. The ground is
+untouched, which matches the report exactly: sky oversaturated, terrain fine.
+
+### Sanity check against the authored data
+
+`terrain/colorramp/tatooine_global0.tga` row 5 (the clear-colour ramp) holds
+muted values — brightest `145,190,213`, most around `74,74,93`. The captured
+scene target agrees: clear `74,55,70`, after the sky dome `111,60,71`. **Dark and
+muted all the way through the scene pass.** Everything vivid appears after 4088.
+The authored content is not the problem.
+
+### A REAL port deviation found on the way — clear alpha is hardcoded
+
+`Direct3d11_SwapChain::clearViewport` builds its clear colour as
+
+```cpp
+float const color[4] = {
+    ((colorValue >> 16) & 0xff) / 255.0f,   // R
+    ((colorValue >>  8) & 0xff) / 255.0f,   // G
+    ((colorValue      ) & 0xff) / 255.0f,   // B
+    1.0f };                                 // A  <-- hardcoded
+```
+
+The alpha byte `(colorValue >> 24) & 0xff` is **discarded**. Direct3d9 passed
+`colorValue` straight to `ms_device->Clear(...)` as a D3DCOLOR, alpha byte
+included — and `GroundScene.cpp:2371` clears with `backgroundColor.asUint32()`
+where `PackedRgb::asUint32()` (PackedRgb.h:80) returns
+
+```cpp
+(r << 16) | (g << 8) | b        // alpha byte is ZERO
+```
+
+So retail cleared the scene alpha to **0** ("do not bloom"), and the port clears
+it to **1.0** ("bloom at full strength"). Every pixel not overdrawn by geometry
+is therefore marked for maximum bloom. This is a genuine, independently
+verifiable D3D9->D3D11 behavioural deviation and it is a one-line fix.
+
+### HONEST STATUS — do not treat the clear as proven to be the cause
+
+The clear is **a** cause of sky alpha being 1.0. It is not yet proven to be
+**the** cause at this pixel, because the sky dome draw itself (EID 33, 336
+indices, single texture, into `212`) also outputs **alpha 1.0** — its
+`shaderOut` is `(0.435, 0.234, 0.280, 1.0)`. It draws over the whole dome after
+the clear, so at these pixels the clear's alpha may be irrelevant unless D3D9
+masked alpha writes for that material.
+
+Two possibilities remain and they need separating before anything is called
+fixed:
+
+* **(i)** the clear alpha alone, in which case the one-line fix is sufficient;
+* **(ii)** the sky material's alpha write / colour-write mask is not being
+  honoured in the port, in which case the clear fix changes nothing at the dome.
+
+### Next step — cheap and decisive, in this order
+
+1. Fix `clearViewport` to decode alpha from `colorValue` rather than forcing
+   1.0. It is correct regardless of (i) vs (ii) — the port currently cannot
+   express "clear alpha to 0" at all.
+2. Rebuild, re-capture, and read the scene target's alpha at a sky pixel.
+   Alpha 0 -> case (i), done. Alpha still 1.0 -> case (ii), and the search moves
+   to the sky shader's alpha output and the D3D11 blend/write-mask handling.
+3. Regression check once fixed: `assert-pixel` at 4088 asserting the composite
+   output no longer exceeds 1.0 at a sky pixel.
+
+Do not skip step 2. The measured fact that the dome writes alpha 1.0 itself is
+exactly the sort of detail that made the earlier magenta theories wrong.
