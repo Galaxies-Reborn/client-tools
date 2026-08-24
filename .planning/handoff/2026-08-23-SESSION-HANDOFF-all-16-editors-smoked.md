@@ -1264,3 +1264,101 @@ fixed:
 
 Do not skip step 2. The measured fact that the dome writes alpha 1.0 itself is
 exactly the sort of detail that made the earlier magenta theories wrong.
+
+## 2026-08-24: clear-alpha FIXED and verified — case (i), the clear was the sole cause
+
+### The fix
+
+`Direct3d11_SwapChain::clearViewport` now decodes the alpha byte instead of
+forcing 1.0:
+
+```cpp
+static_cast<float>((colorValue >> 24) & 0xff) / 255.0f   // was: 1.0f
+```
+
+Checked first that this was the only such site in the D3D11 port — the other
+`{1.0f, 1.0f, 1.0f, 1.0f}` arrays are blend factors
+(`Direct3d11_ShaderImplementationData.cpp:32`, `Direct3d11_StateCache.cpp:243`)
+and an input-layout default, not clears.
+
+Rebuilt `Direct3d11.vcxproj` (Release|x64, 0 errors) -> `gl11_r.dll` in the
+Release dir. ParticleEditor smoke run afterwards: clean, 1990 log lines, no
+FATAL/ERROR lines.
+
+### It was case (i) — and the write-mask question is now ANSWERED
+
+The previous entry left open whether the sky dome's own alpha-1.0 output would
+defeat the clear fix. **It does not.** From the new capture at the sky pixel:
+
+| event | before fix | after fix |
+|---|---|---|
+| 10 (clear) postMod alpha | 1.0 | **0.0** |
+| 33 (sky dome) shaderOut alpha | 1.0 | 1.0 (unchanged) |
+| 33 (sky dome) **postMod** alpha | 1.0 | **0.0** |
+
+The dome still *outputs* alpha 1.0, but the render target's alpha is **not**
+updated — so the colour-write mask **is** correctly masking alpha for that
+material in the port. Nothing is wrong with the sky shader or the write-mask
+handling. The clear was poisoning the bloom mask, and only the clear.
+
+That is a satisfying result because it also retires the suspicion, raised
+earlier, that the port might be mishandling write masks.
+
+### End-to-end verification, all from the capture
+
+| measurement | before | after |
+|---|---|---|
+| scene alpha at sky | 1.0 | **0.0** |
+| bloom texture at sky | `1.0, 0.612, 0.710, a=1.0` | **`0, 0, 0, a=0`** |
+| bloom composite shaderOut | `1.361, 0.808, 0.935, a=2.0` (**overflow, clamped**) | **`0.361, 0.196, 0.227, a=0.0`** (no overflow) |
+| final backbuffer at sky | `1.0, 0.808, 0.937` = `255,206,239` pink | **`0.369, 0.196, 0.231` = `94,50,59`** muted |
+
+The composite output now equals the scene value passed through untouched, which
+is exactly right for a pixel that should not bloom.
+
+### CAVEAT on the before/after colour numbers
+
+The two captures are ~14 minutes apart and ParticleEditor runs a **time-of-day
+cycle** (`ParticleEditorIoWin.cpp:365` only pauses it when `timeOfDayCycle` is
+off), so the environment has moved between them. **Do not read the absolute RGB
+before/after as a like-for-like comparison** — the ground pixel also changed
+(`102,61,58` -> `64,46,43`) purely from the time shift.
+
+What *is* time-independent, and is the actual proof: alpha 0 instead of 1.0,
+bloom contribution 0 instead of full, and no overflow at the composite. Those
+hold regardless of the hour.
+
+### AUTOMATED CAPTURE NOW WORKS — the handoff's idea #2 is confirmed
+
+This capture was taken by the **MCP's `capture_frame`, not by hand**, after
+copying the baked shader cache into the Release directory:
+
+```
+D:\Code\Galaxies-Reborn\stage-B-x64\compiled_shader\  ->  ...\x64\Release\compiled_shader\
+```
+
+206 files / 231-line manifest. With the cache warm, `delayFrames: 900`
+**completed** and produced a full 54.5 MB, 346-draw scene frame — where before
+the fix every attempt above 120 frames timed out and 120 caught a useless
+2-event mid-load frame.
+
+So the capture problem that blocked several sessions is solved: **warm the
+shader cache first, then `capture_frame` with a large `delayFrames`.** No human
+F12 needed. The cache is safe to leave in place — blobs are keyed by a hash of
+the exact compile input, so any mismatch simply recompiles rather than loading a
+stale shader.
+
+The `-o foo.rdc` -> `foo_frame<N>.rdc` quirk still applies and still reports a
+false "file not found on disk". Here it wrote `alphafix_frame336.rdc`.
+
+### Suggested regression check
+
+`assert-pixel` at the bloom composite asserting the sky pixel's output stays
+below 1.0. That turns "the sky is blown out" into a numeric check that does not
+need a human to eyeball a screenshot, and it is immune to the time-of-day drift
+that makes absolute colours unreliable.
+
+### Remaining
+
+Visual confirmation by eye is still worth doing — the numbers are conclusive
+about the overflow, but only a human can say whether the sky now *looks* right.

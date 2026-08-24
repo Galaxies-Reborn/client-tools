@@ -679,12 +679,23 @@ void Direct3d11_SwapChain::clearViewport(bool clearColor, uint32 colorValue, boo
 
 	if (clearColor && colorView)
 	{
+		// colorValue is a D3DCOLOR (ARGB). Direct3d9 handed it to ID3D3DDevice9::Clear()
+		// whole, alpha byte included, so the alpha channel MUST be decoded here too --
+		// forcing it to 1.0 is not a harmless simplification.
+		//
+		// The scene's alpha channel is the BLOOM MASK: Bloom's downsample weights each
+		// tap's rgb by its alpha, and the composite adds bloom.rgb * bloom.a on top of
+		// the scene. GroundScene.cpp:2371 clears with PackedRgb::asUint32(), which
+		// (PackedRgb.h:80) packs only r/g/b and leaves the alpha byte ZERO -- i.e. "do
+		// not bloom this pixel". Hardcoding 1.0 here inverted that into "bloom at full
+		// strength" for every pixel no geometry overdraws, and the port had no way to
+		// express a zero clear alpha at all.
 		float const color[4] =
 			{
 				static_cast<float>((colorValue >> 16) & 0xff) / 255.0f,
 				static_cast<float>((colorValue >> 8) & 0xff) / 255.0f,
 				static_cast<float>((colorValue) & 0xff) / 255.0f,
-				1.0f};
+				static_cast<float>((colorValue >> 24) & 0xff) / 255.0f};
 
 		if (wholeTarget)
 			context->ClearRenderTargetView(colorView, color);
