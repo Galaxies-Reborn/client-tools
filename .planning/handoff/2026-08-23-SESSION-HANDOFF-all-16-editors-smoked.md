@@ -994,3 +994,75 @@ locked.
 4. `AnimationEditor` shares the identical code path (`A_particleEditor ||
    A_animationEditor`) and so has the same default and the same magenta sky. Any
    decision here should be applied to both.
+
+## 2026-08-24 (final): groundScene made permanent for BOTH editors, both relinked
+
+### The section name is a trap — it is `[ParticleEditor]` for both tools
+
+There is **no** AnimationEditor equivalent of this key. `Game.cpp:859` handles
+`A_particleEditor || A_animationEditor` in one branch and calls
+`ConfigClientGame::getParticleEditorGroundScene()` for both, and
+`ConfigClientGame.cpp:1088` reads it from section **`"ParticleEditor"`**.
+
+So `AnimationEditor.cfg` needs a `[ParticleEditor]` section. An
+`[AnimationEditor]` section would be **silently ignored** — no error, no warning,
+the compiled default just keeps applying and the sky stays magenta. The same
+holds for `avatarSelection` (`ConfigClientGame.cpp:1089`).
+
+### What was written
+
+The identical block was put in **both** `ParticleEditor.cfg` and
+`AnimationEditor.cfg` in `src\build\win32\x64\Release\`, replacing the
+provisional TEST block in the former:
+
+```
+[ParticleEditor]
+	groundScene=terrain/tatooine.trn
+```
+
+(with a comment block recording why, the shared-section trap, and the
+consequence of omitting it). Backup of the pre-change ParticleEditor cfg:
+`_ParticleEditor.cfg.pre-groundscene.bak`.
+
+Both files verified afterwards: sections intact
+(`SharedFile / Station / ClientGraphics / SharedFoundation / SharedLog /
+ParticleEditor`), and `diff` against the backup shows the appended block as the
+only change.
+
+### Rebuilt and verified
+
+`clientTerrain.vcxproj` (for the reshaped diagnostic), then
+`ParticleEditor.vcxproj` and `AnimationEditor.vcxproj` — Release|x64, 0 errors
+each. Exes relinked 14:54:58 and 14:55:10.
+
+Smoke run of both, 55 s each:
+
+| | ParticleEditor | AnimationEditor |
+|---|---|---|
+| starts and stays up | yes | yes |
+| log lines | 1990 | 2019 |
+| `loadColorRamps` warnings | **0** | **0** |
+| `stars.vsh` / `stars.psh` compiles | **3** | **3** |
+
+Zero `loadColorRamps` warnings is the expected result, and it means two things
+at once: no real ramp fault occurs (`LOAD_FAILED` / `BAD_FORMAT` would now be
+release-visible), and the benign `EMPTY_NAME` case is correctly debug-only so it
+no longer dirties the release log.
+
+The `stars.*` compiles in **both** confirm the sky/celestial path now engages in
+AnimationEditor too — i.e. the shared-section behaviour works as read.
+
+### STILL OUTSTANDING: these cfgs are NOT in the repo
+
+`.gitignore:118` ignores `**/build/win32/x64/`, so every tool cfg under
+`src\build\win32\x64\Release\` is untracked — including both files just edited.
+**A clean checkout loses all of them**, and with them this fix, the NpcEditor
+config work, and the six ported SOE tool sections.
+
+`git ls-files src/build/win32/` returns only 15 entries: the vcxproj/sln files
+and the tracked `exe/win32/` payload. Nothing from `x64/Release/`.
+
+This was flagged in the earlier commit section and is still open. It is a
+decision, not an oversight — the options are to un-ignore the cfgs, to keep a
+tracked snapshot directory, or to accept the loss and rely on this handoff. The
+key itself is reproduced verbatim above so it is at least reconstructible.
