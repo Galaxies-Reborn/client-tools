@@ -1625,3 +1625,141 @@ from the D3D11 clear-alpha fix is visible in the first 9.
 ShipComponentEditor, SwgConversationEditor, SwgDraftSchematicEditor,
 SwgSpaceQuestEditor, SwgSpaceZoneEditor. Re-run the smoke to close those out; it
 is the first task next session either way.
+
+
+# ===== SESSION 2026-08-24 (resume after power loss) =====
+
+## TerrainEditor's "Tip of the Day" — the tips file was NEVER SHIPPED. Closed.
+
+Asked whether the tips exist in the official editor config area. They do not,
+anywhere. This is not a port defect and there is nothing to port.
+
+The dialog wants a file called `terrainEditor.tip`, opened with a plain `fopen`
+relative to the CWD (`TipDialog.cpp:39`) — **not** through TreeFile, so no
+searchPath, TRE or cfg key can ever supply it. It has to sit literally beside
+the exe.
+
+Searched, all negative:
+
+| Location | `*.tip` |
+|---|---|
+| `D:\SWG All Tools Working` — the whole SOE reference tree | none |
+| `D:\SWG All Tools Working\swg\current\exe\win32` | ships only `TerrainEditor.exe` + `TerrainEditor.ini` |
+| this repo + `D:\Code\Galaxies-Reborn` stage dirs | none |
+
+So SOE's own build showed the same dialog we do. What is displayed is the
+failure branch: string resource `CG_IDS_FILE_ABSENT` = *"Tips file does not
+exist in the prescribed directory"* (`TerrainEditor.rc:2520`).
+
+Two traps worth remembering:
+
+* **`TerrainEditor.ini` is NOT the MFC profile.** It is the shader/family list
+  data (`SF/dirt/dirt_bigcracks=...`, ~229 KB). Do not go looking for a `[Tip]`
+  section in it.
+* The real profile is the **registry**:
+  `HKCU\Software\Sony Online Entertainment\TerrainEditor`, section `[Tip]`,
+  keys `StartUp` / `FilePos` / `TimeStamp` (`TerrainEditor.cpp:331` sets the
+  registry key). Checked this session: the `Tip` subkey **does not exist**, so
+  `GetProfileInt(...,"StartUp",0)` returns 0, `m_bStartup` stays TRUE, and the
+  dialog fires on every launch. Ticking off "Show tips on startup" once writes
+  `StartUp=1` and it never comes back. That is the entire fix if it is wanted —
+  no code change, no file to author.
+
+Also note `ShowTipAtStartup()` only runs when `cmdInfo.m_bShowSplash` is set,
+i.e. when the editor is launched with no file argument — which is exactly what
+the smoke does.
+
+## `ui_root_npceditor.ui` is now TRACKED — clean-checkout hole closed
+
+Handoff next-step #1, done. Two changes:
+
+1. The file is copied (byte-identical, 11,349 bytes) to
+   `src/build/win32/exe/win32/ui/ui_root_npceditor.ui`, beside the other
+   preserved SOE originals (`NpcEditor.tab`, `QuestEditorConfig.xml`). No
+   `.gitignore` change was needed — verified with `git check-ignore`, that
+   directory is not excluded.
+2. `NpcEditor.cfg` gained `searchPath11="../../exe/win32"`, **relative**, which
+   resolves from the Release dir back to that preservation store.
+
+Why relative works, and it is worth knowing generally:
+`TreeFile::SearchPath`'s constructor runs `Os::getAbsolutePath()` on whatever
+the cfg gives it (`TreeFile_SearchNode.cpp:114`), resolving against the CWD —
+the exe's own directory. So relative searchPaths are legal and are the way to
+avoid the machine-specific-absolute-path problem flagged earlier in this doc.
+
+**VERIFIED, not assumed** — by negative control, which is the only way this is
+worth anything:
+
+| run | out-of-repo copy | result |
+|---|---|---|
+| control | present | ALIVE at 45s, no FATAL |
+| test, first attempt (`searchPath13`) | hidden | **EXITED 0x80000003**, `FATAL ExceptionHandler invoked` |
+| test, after fix (`searchPath11`) | hidden | ALIVE at 45s, no FATAL |
+
+**THREE searchPath traps, and the middle one cost real time:**
+
+* A searchPath that does **not exist** is a hard `FATAL`, not a warning —
+  `FATAL(!result, ("Could not convert to absolute path. Does it exist? %s"))`
+  at `TreeFile_SearchNode.cpp:117`. That is why the missing-directory case bites
+  so hard on a clean checkout.
+* **`maxSearchPriority` CAPS WHICH KEYS ARE EVEN READ, and this cfg sets it to
+  12** (`NpcEditor.cfg:5`). The registration loop is
+  `for (priority = 0; priority <= maxPriority; ++priority)` (`TreeFile.cpp:133`),
+  so `searchPath13` was **silently never read** — no warning, no error, the key
+  simply does nothing. The library default is 20 (`TreeFile.cpp:117`), which is
+  what misled me; the cfg overrides it. **If a searchPath appears to do nothing,
+  check `maxSearchPriority` FIRST.** Priorities in use here: TOC 0-3, Tree
+  0,2-8, Path 12. Free below the cap: 1, 9, 10, 11.
+* Higher number = **higher** precedence: nodes are sorted with
+  `a->getPriority() > b->getPriority()` (`TreeFile.cpp:336`), descending. So 11
+  deliberately sits *below* stage-B-override's 12 — the override corpus keeps
+  precedence and the in-repo copy is purely the safety net.
+
+`stage-B-override` is deliberately LEFT IN PLACE at priority 12 — it is the
+asm2hlsl corpus and carries `appearance/`, `datatables/`, `pixel_program/`,
+`snapshot/`, `texture/`, `vertex_program/` besides this one `ui/` file.
+
+## The 16-tool smoke is RE-RUN and GREEN against today's binaries
+
+The run lost to the power cut is redone in full. `_smoke-auto.ps1 -WaitSeconds 30`,
+results in `src/build/win32/x64/Release/_smoke-results.csv`.
+
+**16/16 alive. No FATAL in any per-tool log, no crash artifacts.** This closes the
+"UNVERIFIED against today's binaries" warning: the clear-alpha `gl11_r.dll` and the
+rebuilt `clientTerrain` sit under every 3D-viewport editor and nothing regressed.
+
+Tools 10-16, the ones the interrupted run never reached, all came up:
+
+| # | tool | verdict | window title |
+|---|------|---------|--------------|
+| 10 | ClientEffectEditor_r | w | `ClientEffectEditor_r` |
+| 11 | QuestEditor_r | w | `QuestEditor Version 2.11 (Built Aug 20 2026 - 18:17:05)` |
+| 12 | ShipComponentEditor_r | w | `ShipComponentEditor_r` |
+| 13 | SwgConversationEditor_r | w | `SwgConversationEditor` (MFC frame) |
+| 14 | SwgDraftSchematicEditor | w | `SwgDraftSchematicEditor` (MFC frame) |
+| 15 | SwgSpaceQuestEditor_r | w | `SwgSpaceQuestEditor - [naboo_imperial_4.tab]` |
+| 16 | SwgSpaceZoneEditor_r | w | `SwgSpaceZoneEditor` (MFC frame) |
+
+### Two deltas from the documented baseline — neither is a regression
+
+* **SwgConversationEditor and SwgSpaceZoneEditor now score `w`, not `c`.** The
+  `<branch>\exe\win32` complaint dialog did not appear in the 30s window this
+  run. **Cause NOT established** — do not record this as fixed. Note those two
+  (and QuestEditor, SwgDraftSchematicEditor, SwgSpaceQuestEditor, UIBuilder)
+  wrote **no `warning.log` at all** this run, so there is no log evidence either
+  way; only 11 of 16 tools produced one. Worth one look if it matters.
+* **UIBuilder still scores `?`** — unchanged known false negative. Its `#32770`
+  IS its main window (MFC dialog-based app). Ignore.
+
+Per-tool logs kept in `src/build/win32/x64/Release/logs/_smoke/`. Note
+`UIBuilder.warning.log` there is STALE (16:39, an earlier run) — the script only
+copies a log if the tool wrote one, so a stale file is not evidence.
+
+### CRLF fidelity checked too — no `.gitattributes` needed
+
+The repo has no `.gitattributes` and `core.autocrlf=true`, so a clean checkout
+writes this file with **CRLF**, not the LF bytes that were tested. Rather than
+assume, the CRLF form was generated (11,349 -> 11,380 bytes) and run with the
+out-of-repo copy hidden: **ALIVE at 45s**. The UI parser does not care, so the
+file is left as an ordinary tracked text file, consistent with the other
+preserved SOE originals. Both copies were restored and verified byte-identical.
