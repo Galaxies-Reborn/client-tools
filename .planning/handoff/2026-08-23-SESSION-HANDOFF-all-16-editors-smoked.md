@@ -1830,3 +1830,81 @@ SoundEditor's first-file-open path is outstanding.
 
 This also makes SoundEditor the **second** tool ever driven past launch, after
 ParticleEditor.
+
+## AnimationEditor driven past launch — works, and `groundScene` is confirmed visually
+
+Handoff next-step #3. It is up and rendering. PID left running for the user.
+
+### The handoff's own lead was WRONG — correct it
+
+This doc said "7,765 `.ans` files available. Drive it the same way ParticleEditor
+was driven." **AnimationEditor does not open `.ans` files.** Its document types
+are `.ash` (animation state hierarchy) and `.lat` (logical animation table) —
+`MainWindow.cpp:351`, filter `Editor Files (*.ash *.lat *.xml)`. The `.ans` files
+are the compiled animations a LAT *points at*, exactly as `.mp3` samples are what
+a `.snd` points at. There are **203** loose `.ash`/`.lat` in the SOE tree under
+`.../compiled/game/appearance/{ash,lat}/`.
+
+### The file dialog is a dead end here — do not waste time on it
+
+`openFile()` refuses anything not already under a TreeFile **search path**:
+
+    if (!TreeFile::stripTreeFileSearchPathFromFile(...)) {
+        WARNING(true, ("User: the specified file [%s] is not mappable to your
+                       TreeFile path.  Fix path before opening."));
+        return;   // MainWindow.cpp:363
+    }
+
+and `stripTreeFileSearchPathFromFile` only matches `SearchPath` nodes — it
+`dynamic_cast`s to `SearchPath` and ignores every TRE (`TreeFile.cpp:1027`).
+AnimationEditor.cfg has exactly **one** searchPath, `stage-B-override` at 12. So
+pointing the dialog at the SOE tree is rejected by design; the file would first
+have to be copied under stage-B-override. The `Open Shared Creature Template`
+path (`MainWindow.cpp:108`) has the same constraint plus two more: the path must
+contain the substring `shared` and must contain `.iff`.
+
+### The route that needs none of that
+
+`File -> Open Target ASH(s)` / `Open target LAT(s)` act on
+`AnimationEditorGameWorld::getFocusObject()`, which falls back to
+`networkScene->getPlayer()` — no dialog, no path mapping. The File menu has **no
+accelerators at all**, so drive it by arrows: Alt+F then Down xN, where
+1=Open Shared Creature Template, 2=New Ash, 3=New Lat, 4=Open..., 5=Open Target
+ASH(s), 6=Open target LAT(s), 7=Close, 8=Save. Driver kept at
+`scripts/_drive-animationeditor.ps1`.
+
+### Result
+
+**It loads the player's animation data BY ITSELF at boot** — no menu action
+needed. At ~35s three tabs are already open:
+
+    ASH - all_b.ash  |  LAT - all_m.lat  |  LAT - hum_m_face.lat
+
+with the Logical Animation Mapping tree populated from
+`Template Name: appearance/ash/all_b.ash` — add_face_blink, add_pistol_fire_1,
+coup_de_grace, default, emt_accept_affection, emt_afk, emt_applause_excited,
+emt_beckon, emt_belly_laugh, emt_bow2..5, emt_celebrate, ... real data out of the
+TREs.
+
+**Be accurate about the menu picks: they appear to have been no-ops.** The tab set
+is byte-for-byte identical across the boot shot and both post-menu shots, which is
+expected — the targets were already open. What changed between the boot shot and
+the next one is the **3D viewport**: at 35s it was bare ground, and a few seconds
+later it renders the **human male player character standing on dirt terrain**.
+That is the skeletal mesh finishing its build, not the menu.
+
+So `groundScene` for AnimationEditor (`2a368d829`, written into the
+`[ParticleEditor]` section — see the section-name trap above) is now **visually
+confirmed**, not just assumed from a launch smoke.
+
+No FATAL, no `Failed to get the player or a target object from the NetworkScene`,
+no `Could not get the NetworkScene`, no `not mappable` — checked in
+`logs/warning.animationeditor-drive.log`.
+
+Screenshots: `logs/_shots/AnimationEditor_{a-boot,b-lat,c-ash}.png`.
+
+### Still not exercised
+
+No animation was actually *played*, and nothing was edited or saved. Loading and
+rendering are proven; driving a logical animation from the tree is the next step
+if anyone wants it.
