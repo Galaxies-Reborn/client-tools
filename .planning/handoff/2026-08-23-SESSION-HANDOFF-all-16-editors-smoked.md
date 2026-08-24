@@ -538,3 +538,39 @@ what is actually in the constant buffer (the one thing nothing currently checks)
 though it captured NpcEditor's fine. Screen-region capture works but needs the
 window foregrounded, and `SetForegroundWindow` loses the race often enough to
 grab unrelated windows. Easiest reliable path is a human screenshot.
+
+### RESOLVED 2026-08-23: symptom 3 (particles as rectangles) was NOT a defect
+
+Loading a real effect settles it. `pt_campfire_s01.prt` (from the SOE tree's
+2101 loose .prt files at
+`data/sku.0/sys.client/compiled/game/appearance/`) loads and renders correctly —
+the character stands in a working campfire, confirmed visually by the user.
+
+The tree for the loaded effect names a shader per emitter:
+
+```
+Particle Effect ( Default ) 86
+  Emitter -> Particle Quad ( fire )
+  Emitter -> Particle Quad ( trailing embers )
+  Emitter -> Particle Quad ( trailing smoke )
+```
+
+versus the freshly-opened DEFAULT effect, which reads `Particle Quad ( No Shader )`.
+An unshaded quad draws as a plain rectangle, so "a bunch of rectangles moving away
+from the character" was the unconfigured default behaving correctly.
+
+**The particle rendering path in the DX11 port is working.** Remaining unexplained:
+the magenta skybox and the terrain appearance, symptoms 1 and 2 only.
+
+How it was driven, for repeatability: ParticleEditor ignores argv
+(`main.cpp` passes it to QApplication only) and opens via `QFileDialog`
+(`MainWindow.cpp:292`), so it needs a loose file and UI automation —
+foreground the main window, `Ctrl+O` (accel from `ui/BaseMainWindow.ui`
+`fileOpenAction`), type the full path, Enter. Guard the keystrokes on
+`GetForegroundWindow()` actually being the target, or they land in whatever else
+has focus.
+
+Two false signals to ignore when checking whether a load worked: a SUCCESSFUL
+load writes nothing to `warning.log` (an unchanged log is not failure), and the
+window caption updates late — it read `ParticleEditor_r` for a while after the
+load before becoming `... : pt_campfire_s01.prt`.
