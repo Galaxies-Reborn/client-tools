@@ -690,3 +690,148 @@ No editor processes left running (all ParticleEditor instances stopped). The
 working tree is clean and everything is committed. `warning.log` in Release holds
 the last injected run; per-tool logs are in `logs/_smoke/`, screenshots in
 `logs/_shots/`.
+
+## SOLVED 2026-08-24: the magenta sky is a CLEAR COLOUR, not a failed skybox
+
+Capture `D:\Code\Galaxies-Reborn\stage-B-x64\Capture250.rdc` (D3D11, 26 events,
+21 draws, 1280x720) — a real scene frame, taken manually with F12 after the
+automated `capture -d N` route proved unworkable (see the capture-problem section
+above; the MCP's `capture_frame` is launch-and-delay only, it cannot attach, so
+that escape does not exist).
+
+### What the capture proves
+
+`pixel_history` at (640,60) — sky region — on the scene target `ResourceId::214`
+returns **exactly one modification for the whole frame**: event 10, a **Clear**,
+postMod `(1.0, 0.0, 1.0, 1.0)`.
+
+**There is no skybox draw at all.** Not a mis-sampled cubemap, not a broken
+shader, not a bad SRV binding — nothing is drawn there, and what shows through is
+the clear colour. Every theory in the "Dead theories" section above was aimed at
+the wrong thing, and so was the analysis plan's step 4 (look for a cubemap at the
+sky draw): that draw does not exist.
+
+Also established from the same capture, so nobody re-checks:
+
+* The frame is structurally sane: clear (10, 11), scene draws (48..340), one
+  3-index fullscreen composite (354) into backbuffer `ResourceId::840`, Present.
+* **The composite is innocent.** It faithfully copies 214 -> 840. Its shader
+  output at the sky pixel is already magenta because its input is.
+* **Non-sky pixels are fine.** (640,400) = `0.63, 0.53, 0.47` (tan),
+  (200,650) = `0.43, 0.47, 0.28` (green). Geometry and texturing work.
+* Draw bindings are ordinary mesh shaders (`samplerDiffuse0` / `samplerNormal0`);
+  the 6-index draws at 271..340 are the particle quads (single sampler `s0`).
+
+### Where the magenta comes from — exact source
+
+`GroundScene.cpp:2344,2371` clears to `terrainObject->getClearColor()`, which is
+`ClientProceduralTerrainAppearance::getClearColor` ->
+`GroundEnvironment::getClearColor` -> `m_clearColor`, interpolated
+(`GroundEnvironment.cpp:1096`) from the environment block's clear-colour ramp.
+
+`EnvironmentBlock::loadColorRamps` (`EnvironmentBlock.cpp:715`) begins
+
+```cpp
+Image* const image = fileName ? ImageFormatList::loadImage (fileName) : 0;
+if (image && isValid (image))
+    ... load the real ramps ...
+else
+    ... default ramps, including:
+    m_clearColorRamp [i] = PackedRgb (255, 0, 255);   // line 811 — MAGENTA
+```
+
+`PackedRgb(255,0,255)` is `(1.0, 0.0, 1.0)` — **bit-for-bit the captured pixel**.
+It is a deliberate "these ramps did not load" sentinel.
+
+### Why nothing was ever logged — and why the log hunt kept failing
+
+The only diagnostic on that path is
+
+```cpp
+DEBUG_WARNING (fileName && *fileName, ("...not in the appropriate format (256w x 8h x 32b tga)"));
+```
+
+Two independent reasons it is silent here:
+
+1. `DEBUG_WARNING` **compiles out in release** (`Fatal.h:50` — the same trap the
+   NpcEditor `strlen(NULL)` fix hit; use `WARNING` for anything release-visible).
+2. The `fileName && *fileName` guard suppresses it **entirely** when the name is
+   empty — which is exactly the default-environment-block case.
+
+So the engine takes a documented failure path and says nothing at all. That is
+why sessions of log archaeology produced wrong answers: the evidence was never in
+the log to begin with.
+
+### Ruled OUT this session, with evidence — do not re-run these
+
+* **TGA loader not installed.** It is. `GameWidget.cpp:271-273` calls
+  `SetupSharedImage::setupDefaultData` then `install`, and
+  `setupDefaultData` sets `m_supportTarga = true` (`SetupSharedImage.cpp:67`),
+  which registers `TargaFormat`. Same in NpcEditor / TerrainEditor /
+  ShipComponentEditor.
+* **Ramp files missing from the mounted TREs.** They are present:
+  `trelist.py "D:/Code/SWGSource Client v3.0" colorramp` finds them in
+  `data_other_00.tre`, `patch_00.tre`, `patch_01.tre`, `patch_06.tre`
+  (`terrain/colorramp/*.tga` plus loose `terrain/*_colorramp_*.tga`).
+* **Ramp files invalid.** Extracted `terrain/colorramp/tatooine_global0.tga`
+  and parsed its header: **256w x 8h x 32bpp, uncompressed (imgtype 2)** — 8236
+  bytes = 18 header + 8192 pixels + 26 TGA-2.0 footer. That satisfies
+  `isValid()` (`EnvironmentBlock.cpp:61`: width 256, height 8 or 10, 32-bit
+  format). The data is good.
+
+### What is NOT yet established
+
+Which of the **two** entry conditions into that else-branch actually fires:
+
+* **(a) `fileName` is null/empty** — the block is
+  `EnvironmentBlockManager::m_defaultEnvironmentBlock`, which has no
+  `colorRampFileName`. This is the likelier one: it also explains the silence
+  (the guard suppresses the warning) and it means the serverless tools simply
+  never resolve a real environment family, because no planet/terrain environment
+  is loaded. Under this reading it is a **scene-setup/content gap in the tools,
+  not a DX11 port defect**, and the DX11 renderer is exonerated.
+* **(b) the image genuinely fails to load** at runtime despite being valid on
+  disk — a TreeFile/streaming problem specific to the tools' mount.
+
+These are cheap to separate and the next session should do exactly that before
+anything else.
+
+### Next step — one decisive test, ~15 minutes
+
+Temporarily promote the diagnostic and rebuild ParticleEditor:
+
+```cpp
+// EnvironmentBlock.cpp, else-branch of loadColorRamps
+WARNING (true, ("EnvironmentBlock::loadColorRamps FALLBACK - fileName=[%s] image=%p",
+                fileName ? fileName : "(null)", image));
+```
+
+`WARNING` (not `DEBUG_WARNING`) survives release. One run then says which case it
+is, and names the file if there is one. Branch (a) -> fix where the tools pick
+their environment family; branch (b) -> chase the TreeFile mount.
+
+Worth confirming in the same run: **does the god client show a correct sky?** If
+yes, the D3D11 sky path is provably fine and the fault is entirely in how the
+serverless tools set up their scene. That single observation splits the problem
+in half and costs one launch.
+
+### This also likely explains symptom 2 (terrain looks wrong) — same root cause
+
+The magenta clear is only the most visible of the defaults. The **same**
+else-branch replaces every lighting ramp at once
+(`EnvironmentBlock.cpp:798-818`): ambient -> `solidGray`, main diffuse and
+specular -> `solidWhite` at scale 1, fill and bounce -> `solidBlack`, fog ->
+`solidGray`, shadow -> `solidGray`, back/tangent -> `solidBlack`.
+
+That is precisely a flat, wrongly-lit, unfogged world. **Symptoms 1 and 2 are one
+bug, not two** — which fits the observation that both appear together in exactly
+the serverless-start tools. Fixing the ramp load should be expected to fix both;
+if it fixes the sky but not the terrain, then and only then treat terrain as
+separate.
+
+### Regression check once fixed
+
+The capture makes this mechanical — `assert-pixel` on the sky region:
+`renderdoc-cli <capture.rdc> assert-pixel 354 640 60 --expect <r> <g> <b> 1`.
+Any future regression to `1 0 1 1` is caught without a human eyeballing a
+screenshot.
