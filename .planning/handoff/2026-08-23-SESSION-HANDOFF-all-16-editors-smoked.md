@@ -460,3 +460,81 @@ Remaining, in the order I would do them:
    beside the older exe, and `stage-x64/gl05,06,07_r.dll` show as modified in git
    (rebuilt 08-20 18:25, byte-identical sizes to the 08-18 copies in Release).
    No ABI change, harmless — but unresolved.
+
+## OPEN: renderer correctness — outside this session's mandate, unresolved
+
+Reported by the user 2026-08-23 after the 16/16 launch verification, from visual
+inspection of the tools that do a **serverless start** (ParticleEditor,
+AnimationEditor and friends — engine boots standalone, no sign-in, a naked
+character in the viewport). NOT the god client, which goes through the game
+sign-in path and renders differently.
+
+Two symptoms, both unexplained:
+
+1. **The skybox renders magenta.**
+2. **Terrain looks wrong** in the tools that display it.
+3. **Particle effects render as plain rectangles** moving away from the
+   character — i.e. unshaded/untextured quads.
+
+**This does not contradict the 16/16 result.** That result means every tool
+starts and presents a working UI. It was never a claim that the D3D11 output is
+correct. These are different properties and only the first was tested.
+
+### Ruled OUT (checked, with evidence — do not re-run these)
+
+* Missing textures. Exactly one texture failure across every tool log
+  (`texture/jedi.dds`, introduced by this session's NpcEditor backdrop config).
+  `texture/defaulttexture.dds` is present.
+* Missing shaders. `shader/skybox.sht` (data_other_00.tre) and
+  `shader/skybox_6sided.sht` (patch_08.tre) both exist. The fallback in
+  `ShaderTemplateList.cpp:225` WARNs on failure and never fires.
+* Shader linkage. Zero "canonical interpolant signature" warnings — that path
+  explicitly warns when a draw "will not render".
+* Shader compile failures. Only benign X3206 truncation noise.
+
+### Dead theories — three, all mine, all wrong. Don't repeat them.
+
+1. *Cubemap sampling via the phantom-element path.* Wrong: the phantom layout
+   decodes (VertexBufferFormat.h) as `0x1109` = position | color0 |
+   texCoordCount1 | texCoordSet0_**2d**. The skybox uses a **3d** set
+   (`SkyBoxAppearance.cpp:97-98`), so it is a different format entirely.
+2. *The phantom element is the particle quads.* Also wrong. The comment at
+   `Direct3d11_InputLayoutCache.cpp:~540` states the case explicitly: "the space
+   nebula quads (position/color/texcoord) feed a_vertexlit.vsh, which also
+   declares a normal, and retail drew them". `0x1109` matches that exactly, and
+   the same log carries `could not open table [datatables/space/nebula/simple.iff]`.
+   It is deliberate D3D9-behaviour emulation, fires once per unique layout
+   (cached, not per draw), and is benign.
+3. *The vacuous ABI guard is the cause.* Unproven and probably not. See below.
+
+### The one real find, stated at its actual weight
+
+`Direct3d11_ShaderReflection.cpp:449` warns that its own constant name table does
+not match the shipped `.inc` files, so **the constant ABI guard checked nothing**
+— shader constants are not being verified at all. That is a genuine hole in the
+port's safety net and the code says it "must be corrected". It is a *diagnostic*
+gap, NOT evidence of a render fault. Do not promote it to a cause without a
+frame capture showing bad constant data.
+
+### Cheapest next test (do this before anything expensive)
+
+The ParticleEditor tree for a freshly-opened DEFAULT effect literally reads
+`Particle Quad ( No Shader )`. An unshaded quad renders as a plain rectangle, so
+the particle symptom may simply be an unconfigured default rather than a defect.
+Falsify by loading a real effect — there are **1769 `.prt` files** in the
+readable TREs, e.g. `appearance/pt_bolt_ion_cannon_proton.prt`. If a real effect
+renders correctly, symptom 3 is a non-issue and the search narrows to sky+terrain.
+
+### After that: RenderDoc, not more log archaeology
+
+Logs have now produced three wrong answers. A frame capture answers directly what
+they cannot: which draw emits the sky, what SRV/sampler is bound at that draw, and
+what is actually in the constant buffer (the one thing nothing currently checks).
+`D:\Code\renderdoc-mcp` exists but was NOT connected to this session's MCP servers.
+
+### Capture caveat for whoever looks next
+
+`PrintWindow` did NOT capture ParticleEditor's D3D viewport (came back blank),
+though it captured NpcEditor's fine. Screen-region capture works but needs the
+window foregrounded, and `SetForegroundWindow` loses the race often enough to
+grab unrelated windows. Easiest reliable path is a human screenshot.
