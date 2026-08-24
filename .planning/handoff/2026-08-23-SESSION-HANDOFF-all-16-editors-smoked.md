@@ -1066,3 +1066,82 @@ This was flagged in the earlier commit section and is still open. It is a
 decision, not an oversight — the options are to un-ignore the cfgs, to keep a
 tracked snapshot directory, or to accept the loss and rely on this handoff. The
 key itself is reproduced verbatim above so it is at least reconstructible.
+
+## 2026-08-24 (final+1): the tool cfgs are now TRACKED — the clean-checkout hole is closed
+
+The open item recorded above ("these cfgs are NOT in the repo") is resolved.
+**21 config files** — 16 `.cfg` and 5 `.ini` under
+`src\build\win32\x64\Release\` — are now tracked.
+
+### Why the .gitignore change looks the way it does
+
+Three rules covered that path and **all three excluded directories**:
+
+```
+src/build/win32/x64/
+**/build/win32/x64/
+**/x64/Release/
+```
+
+Git **never descends into an excluded directory**, so no `!` negation inside
+them can ever work. Simply appending `!.../Release/*.cfg` would have done
+nothing at all — silently. The rules therefore had to be rewritten to exclude
+directory *contents* instead:
+
+```
+src/build/win32/x64/**
+**/build/win32/x64/**
+**/x64/Release/**
+
+!src/build/win32/x64/
+!src/build/win32/x64/Release/
+!src/build/win32/x64/Release/*.cfg
+!src/build/win32/x64/Release/*.ini
+```
+
+The two intermediate-directory negations are load-bearing: without them git
+stops at `x64/` and never sees the files, no matter what the file patterns say.
+
+**If anyone "tidies" these back into bare directory rules, the tool configs
+silently stop being tracked again.** A comment in `.gitignore` says so.
+
+### Verified, not assumed
+
+* `git status --untracked-files=all` on that directory: **exactly 21 files**,
+  all `.cfg` / `.ini`.
+* Spot-checked `git check-ignore`: `ParticleEditor.cfg`, `AnimationEditor.cfg`,
+  `SwgSpaceQuestEditor.ini` -> tracked; `ParticleEditor_r.exe`,
+  `_cfg.sku-form.bak` -> still ignored.
+* Build output still ignored: `.pdb`, `logs/warning.log`, `_smoke-results.csv`.
+* Repo-wide untracked count afterwards: 22 = the 21 configs + `.gitignore`
+  itself. Nothing else was loosened.
+
+### What this preserves
+
+Everything a clean checkout used to destroy: the legacy no-sku TreeFile keys
+across all tool cfgs, the six ported SOE tool sections, the NpcEditor config
+work, and the `[ParticleEditor] groundScene` key that keeps the sky from
+rendering magenta.
+
+### CAVEAT — these files contain machine-specific absolute paths
+
+This is the real cost of tracking them, and it should be understood rather than
+discovered later. The cfgs point at **this machine's** layout:
+
+* `D:/Code/SWGSource Client v3.0/...` (the TRE set)
+* `D:/SWG All Tools Working/swg/current/...` (the SOE reference tree)
+* `D:/Code/Galaxies-Reborn/stage-B-override/ui/` (the NpcEditor `/AvView` page)
+
+On any other machine these resolve to nothing, and the failure mode is mostly
+**silent** — zero TREs mounted, or counts quietly reading 0 — not an error
+dialog. So treat the tracked copies as *this machine's working set plus a
+recoverable record of the structure*, not as portable configuration.
+
+If these ever need to work on a second machine, the fix is to parameterise the
+roots rather than to hand-edit 21 files; note also the quoting trap recorded
+earlier in this document (`ConfigFile` splits unquoted values on whitespace, and
+`D:\SWG All Tools Working` contains spaces).
+
+`client.cfg` is among the tracked files. It is the CLIENT config and carries the
+`_00_` sku key form. **Never copy it onto a tool cfg** — see the memory note
+`tool-cfgs-need-legacy-no-sku-treefile-keys` and the landmine section above.
