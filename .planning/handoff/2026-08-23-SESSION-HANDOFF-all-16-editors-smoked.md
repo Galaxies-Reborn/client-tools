@@ -1903,8 +1903,45 @@ no `Could not get the NetworkScene`, no `not mappable` — checked in
 
 Screenshots: `logs/_shots/AnimationEditor_{a-boot,b-lat,c-ash}.png`.
 
+### ANIMATION PLAYBACK CONFIRMED (user, 2026-08-24) — and here is exactly how
+
+**Double-click an Action in the `ASH - all_b.ash` tab, under the Actions
+sub-folder.** Kenny did it and the character animated.
+
+That is precisely the code path:
+
+    void ActionListItem::doDoubleClick()   // ashFormat/ActionListItem.cpp:122
+    {
+        // GOAL: tell the focus Object in the game to do the current action.
+        ...
+        appearance->getAnimationResolver().playAction(m_action.getName(), ...);
+    }
+
+`MovementActionListItem::doDoubleClick()` (MovementActionListItem.cpp:123) is
+identical. Both are **ashFormat** types.
+
+**The LAT tabs cannot play anything — do not try.** `LogicalAnimationTableWidget`
+forwards a double-click to `ListItem::doDoubleClick()`, whose base implementation
+is literally `// Default: do nothing.` (`core/ListItem.cpp:213`). Nothing in
+latFormat overrides it except `AnimationPriorityListItem::PathListItem`, which is
+a path edit, not playback. So the `Logical Animation Mapping` tree — the one that
+is open by default and looks like the obvious place to click — is a dead end for
+playback.
+
+Layout for whoever comes next: tab `ASH - all_b.ash` -> sub-tabs
+`State Hierarchy` | `Action Groups`. The Action items carry a blue **A** icon
+(dance_lyrical, dive, door_knock, duck, face_blow_kiss, ...).
+
+**Honest note on the automated attempt:** a scripted double-click was fired at a
+blue-A row in the `State Hierarchy` sub-tab and frame differencing over the
+viewport could NOT distinguish it from idle (0.02-0.15% changed pixels vs a
+0.06-0.07% idle baseline — the idle breathing animation sets that floor). Either
+the click missed a real Action item or it landed in the wrong list. The scripted
+route is unproven; the human route above is confirmed. If anyone wants this
+automated, target the **Actions sub-folder** specifically and expect the idle
+animation to make naive frame-diffing weak — compare limb silhouettes, or pick a
+large-amplitude action, rather than counting changed pixels.
+
 ### Still not exercised
 
-No animation was actually *played*, and nothing was edited or saved. Loading and
-rendering are proven; driving a logical animation from the tree is the next step
-if anyone wants it.
+Nothing has been edited or saved in AnimationEditor.
