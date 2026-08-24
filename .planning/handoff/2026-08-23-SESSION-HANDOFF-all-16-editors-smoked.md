@@ -835,3 +835,162 @@ The capture makes this mechanical — `assert-pixel` on the sky region:
 `renderdoc-cli <capture.rdc> assert-pixel 354 640 60 --expect <r> <g> <b> 1`.
 Any future regression to `1 0 1 1` is caught without a human eyeballing a
 screenshot.
+
+## 2026-08-24 (later): the WARNING test ran — answer is EMPTY_NAME, and the cause is `terrain/simple.trn`
+
+The test proposed above was carried out. Result: **case (a)**, and it leads to a
+one-line config cause with no DX11 involvement at all.
+
+### What was done
+
+`EnvironmentBlock.cpp`, else-branch of `loadColorRamps`, gained a release-visible
+`WARNING` splitting the three possible entry conditions (EMPTY_NAME /
+LOAD_FAILED / BAD_FORMAT). Rebuilt `clientTerrain.vcxproj` then
+`ParticleEditor.vcxproj`:
+
+```
+MSBuild: D:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe
+  -p:Configuration=Release -p:Platform=x64 -m
+```
+
+Both succeeded (clientTerrain 92 warnings / 0 errors, ParticleEditor 3 / 0).
+
+### Result — unambiguous
+
+```
+WARNING b160e5df: EnvironmentBlock::loadColorRamps FALLBACK case=EMPTY_NAME
+(default environment block; no colour ramp configured) -> magenta clear
+```
+
+Counts over the whole run: **EMPTY_NAME 1, LOAD_FAILED 0, BAD_FORMAT 0.**
+
+So the ramp files were never even *asked* for. Nothing failed to load and
+nothing was malformed — which retroactively confirms the three "ruled out"
+findings above were correct, and rules the TreeFile/streaming branch (b) out
+entirely.
+
+The same log shows terrain shaders compiling and running normally
+(`dot3_terrain_imp1`, `terrain_dot3_vs20_blend0`), so terrain *geometry* was
+always fine; only its lighting environment was defaulted.
+
+### The actual cause — ParticleEditor loads a bare test terrain
+
+`Game.cpp:859-874`: for `A_particleEditor` / `A_animationEditor`, the scene comes
+from `ConfigClientGame::getParticleEditorGroundScene()`, and
+`ConfigClientGame.cpp:1088` defines it as
+
+```cpp
+ms_particleEditorGroundScene = ConfigFile::getKeyString("ParticleEditor", "groundScene", "terrain/simple.trn");
+```
+
+Our `ParticleEditor.cfg` has **no `[ParticleEditor]` section at all**, so the
+compiled default applies: **`terrain/simple.trn`** — a bare test terrain with no
+environment family. No environment family means no environment block, so
+`EnvironmentBlockManager` hands back `m_defaultEnvironmentBlock`, which has an
+empty `colorRampFileName`, which takes the fallback, which paints the sky
+magenta. Every step is now accounted for.
+
+`terrain/simple.trn` is real and present (`data_other_00.tre`); so is
+`terrain/tatooine.trn` (`patch_01.tre`).
+
+### Confirming test — pointing it at a real planet
+
+Appended to `src\build\win32\x64\Release\ParticleEditor.cfg` (backup:
+`_ParticleEditor.cfg.pre-groundscene.bak`):
+
+```
+[ParticleEditor]
+	groundScene=terrain/tatooine.trn
+```
+
+The run changes character completely: **912 -> 1991 log lines**, and it now
+compiles **`vertex_program/stars.vsh` + `pixel_program/stars.psh`** and the
+`water_pass2_ps20` pair — celestial and water programs that the `simple.trn` run
+never touched. The sky/celestial machinery only engages when a terrain actually
+carries an environment.
+
+**Do not misread the remaining EMPTY_NAME line in that run.** It still appears,
+and that is correct and harmless: `EnvironmentBlockManager` *always* constructs a
+default block with no ramp, independently of how many real blocks load. The
+warning proves the default block exists; it does not prove real ones are absent.
+The `stars.*` compiles are the evidence that real ones loaded.
+
+### THIS IS PROBABLY NOT A PORT DEFECT — and probably not a defect at all
+
+SOE's own `ParticleEditor.cfg` (reference tree, `exe/win32/`) sets no
+`groundScene` either — it is 25 lines and only sets `windowed`, `uiRootName`,
+`loadHud=false`, `preloadWorldSnapshot=0`, and includes `tools.cfg` (which also
+sets none). So **SOE's ParticleEditor also ran on `terrain/simple.trn` and would
+also have shown the magenta clear.** The magenta sky looks like original
+behaviour for a bare tool scene, not a DX11 regression.
+
+Which means the DX11 port is **exonerated for symptom 1**, and "fixing" it is a
+matter of choosing a nicer default scene for the tools rather than repairing any
+rendering code.
+
+### VISUALLY CONFIRMED by the user, 2026-08-24
+
+> "The magenta is gone and I see the tatooine surface, sky box looks a bit
+> oversaturated, but could be lighting issue."
+
+That closes the investigation:
+
+* **Symptom 1 (magenta skybox) — RESOLVED.** Cause was the default
+  `groundScene=terrain/simple.trn`, a bare test terrain with no environment
+  family. Not a DX11 port defect; almost certainly original SOE behaviour.
+* **Symptom 2 (terrain looks wrong) — RESOLVED, same root cause**, as predicted.
+  The tatooine surface renders. Both symptoms were one bug, and that bug was a
+  missing config key rather than any rendering code.
+
+The DX11 port is **exonerated for both**. Every renderer theory from the earlier
+sessions (cubemap sampling, the phantom vertex element, the vacuous constant ABI
+guard) was chasing a fault that did not exist.
+
+### NEW, SMALL open item: the sky looks oversaturated
+
+Reported in the same observation. This is a **fresh, much narrower** item — the
+sky now draws, it just may not be graded right. Candidate causes, none yet
+tested: gamma / sRGB handling in the DX11 port, time-of-day position in the
+colour ramp (`GroundEnvironment.cpp:1096` interpolates by `m_currentColorIndex`),
+or simply how tatooine's ramp looks at that hour.
+
+**Do not theorise this one from source** — that is the mistake that cost this
+investigation several sessions. Two cheap measurements first:
+
+1. Re-capture with F12 and read the sky pixel numerically (`pick_pixel`), then
+   compare against the corresponding entry in tatooine's colour-ramp TGA. If the
+   drawn value matches the ramp, the renderer is right and it is content/hour.
+2. Compare against the god client on the same planet — it goes through the same
+   `GroundEnvironment` path but a different startup. A matching look there means
+   nothing is tool-specific.
+
+Note the tools still run without a compiled shader manifest, so this is also the
+moment to check whether anything colour-related differs with a warm cache.
+
+### Code left in place (deliberate, not scaffolding)
+
+The diagnostic was **kept**, but reshaped so it does not become log noise:
+
+* `LOAD_FAILED` and `BAD_FORMAT` -> release-visible `WARNING`. These indicate a
+  genuine fault and were previously silent in release; that silence is exactly
+  what cost this investigation several sessions.
+* `EMPTY_NAME` -> `DEBUG_WARNING` only, because it fires once in every run of
+  every tool and the client by design. Keeping it at `WARNING` would have made
+  every release log dirty.
+
+`clientTerrain` was rebuilt after the reshape. **ParticleEditor still needs a
+relink** to pick it up — it was left running for a visual check and the exe was
+locked.
+
+### Loose ends for the next session
+
+1. Relink ParticleEditor (`ParticleEditor.vcxproj`, Release|x64).
+2. Decide whether `groundScene=terrain/tatooine.trn` should be kept. It is
+   currently in the Release cfg as a TEST with a backup beside it. Note that cfg
+   lives OUTSIDE the tracked tree — see the warning about that in the commit
+   section above.
+3. Confirm visually whether terrain now looks right; that closes or re-opens
+   symptom 2.
+4. `AnimationEditor` shares the identical code path (`A_particleEditor ||
+   A_animationEditor`) and so has the same default and the same magenta sky. Any
+   decision here should be applied to both.
