@@ -2095,3 +2095,52 @@ the first thing to question, not the tool.
 
 Driver added: `scripts/_drive-mfc.ps1` - launches, dismisses the modal startup
 warnings (they swallow keys sent before dismissal), then File>Open with polling.
+
+## 2026-08-24: exhaustive `.cnv` hunt - still zero, with ONE archive left unread
+
+Kenny thought he had loaded a `.cnv` last night, possibly from a TRE. My earlier
+"zero .cnv" claim was scoped to **one directory** (`D:/Code/SWGSource Client v3.0`),
+which was not good enough. Redone properly:
+
+| scope | result |
+|---|---|
+| `*.cnv` on **C: and D:**, all fixed drives | only MS Office + ICU converters, nothing SWG |
+| every `*.tre`/`*.sot` on both drives - 1,680 files, 407 unique | **1,110,194 entries, 0 `.cnv`** |
+| the `.sot` archives (Misc/Server/Shared), which `trelist.py` had SKIPPED | 197,341 entries, 0 |
+| `D:\SWG Beyond\Win64` - a whole separate client I had never searched, 207 archives | 179,994 entries, 0 |
+| archive entries with "conversation" in the path (212 archives) | 5,981 - **all `.stf` strings** (5,951), plus a few `.ans`/`.snd`/`.inc`/`.wav`/`.cef`. No documents. |
+
+**`trelist.py` globs `*.tre` only.** The three `.sot` files are full TRE archives
+(`EERT5000`; Misc.sot alone has 120,601 entries) and were silently missed by every
+earlier scan. Worth fixing in the script if TRE inventory matters again.
+
+### The one place a `.cnv` could still hide
+
+`D:\SWG Beyond\Win64eyond_patch_01.tre` - v0006, **9,122 files**, 192 MB - is
+the only archive on either drive that will not open. Its header parses cleanly,
+but the TOC and name blocks are **not zlib**: they start `cf98c515` and
+`22c9ae60` rather than a `78 xx` zlib header, and every wbits variant (15, -15,
+31, 47) fails. That looks like obfuscation/encryption in the Beyond distribution,
+not a format variant. **I did not attempt to break it** - the standing rule is to
+use SWG-Toolkit's tre-lint as the format reference rather than reverse-engineer,
+and this is past what that reference covers.
+
+### Also checked: the MRU says the tool has never opened anything
+
+MFC put these under `HKCU\Software\Local AppWizard-Generated Applications\<app>\Recent File List`
+(NOT the SOE key - another registry-path trap like TerrainEditor's doubled
+`Software`). `SwgConversationEditor`'s list is **empty**. `SwgSpaceZoneEditor`'s
+is empty too. `SwgSpaceQuestEditor` has entries, but both are from this session.
+
+### Conclusion, stated carefully
+
+There is no `.cnv` on this machine outside `beyond_patch_01.tre`, and
+`SwgConversationEditor` has no record of ever opening one. It also cannot import
+`.java`: that dialog is **"Add Script Library"** and only inserts a library NAME
+into the LibrarySet (`ScriptTreeView.cpp:1107-1135`) - it does not read a
+conversation. `Conversation::load` requires an IFF whose FORM tag is `CNV`
+(`Conversation.cpp:1431`), extension irrelevant.
+
+So either the file came from somewhere off these two drives, or what was loaded
+was something else. Do not spend more time scanning - the search is exhaustive
+except for that one protected archive.
