@@ -220,7 +220,7 @@ Status key: **driven** = opened a real asset and confirmed the result;
 | 9 | ShipComponentEditor | driven | works |
 | 10 | TerrainEditor | driven | works |
 | 11 | UIBuilder | driven | works |
-| 12 | SwgGodClient | booted | needs a game server; blocked at login |
+| 12 | SwgGodClient | driven as a client | connects and plays; editor features untested |
 | 13 | SwgConversationEditor | driven (New) | tool works; no `.cnv` data exists |
 | 14 | SwgDraftSchematicEditor | driven (boot data) | works |
 | 15 | SwgSpaceQuestEditor | driven | works |
@@ -707,10 +707,36 @@ Used to place and edit objects in a live world.
 
 **Config:** `SwgGodClient.cfg`. No tool-specific section.
 
-**Setup — it needs a running game server, and that is the whole story.** It boots
-into the client's **LOG IN screen** (username/password) and stops there. Every
-editing feature operates on a connected world, so with no server there is nothing
-to drive. The console pane does print `Welcome to the SwgGodClient`.
+**Setup — it needs a running game server, and it needs the INDEXED login keys.**
+
+`SwgGodClient.cfg` shipped with no `[ClientGame]` section at all, so it fell back
+to `localhost`. Point it at your server with:
+
+```ini
+[ClientGame]
+	loginServerAddress0=192.168.1.200
+	loginServerPort0=44453
+```
+
+**The index is mandatory.** `SwgCuiLoginScreen.cpp:284-303` walks
+`loginServerAddress0`, `loginServerPort0`, `loginServerAddress1`, … and stops at
+the first missing address; an entry is accepted only if its port is also present
+and non-zero. The unindexed `loginServerAddress` in `ConfigClientGame.cpp:991`
+(default `localhost`, port 44453) is a **different key that the login page never
+reads** — setting only that one looks correct and does nothing. This is the single
+most likely hour to lose on this tool.
+
+`autoConnectToLoginServer` defaults false, so credentials are typed at the LOG IN
+box. Setting `loginClientID` / `loginClientPassword` / `autoConnectToLoginServer=true`
+would skip it, at the cost of putting credentials in a tracked file.
+
+Confirm it worked from `warning.log`:
+
+```
+Login: assembled 1 address(es) from ClientGame/loginServerAddress<N>.
+Login: connecting to 192.168.1.200:44453
+Login: OUTCOME -- connection to the login server OPENED.
+```
 
 **Points of interest** (all visible, none exercised)
 
@@ -724,11 +750,27 @@ to drive. The console pane does print `Welcome to the SwgGodClient`.
   layers), `.mif` (client data) and `.ilf` (interior layouts) —
   `ActionsEdit.cpp`, `ActionsGame.cpp`.
 
-**Assessment: launches correctly, functionally untestable here.** The UI is fully
-intact and the renderer draws the login scene properly, which is real evidence the
-client-side port is sound. But **nothing beyond login can be assessed without a
-server**, so treat any claim about its editing features as unverified.
+**Assessment: works as a client. The editor half is still untested.**
 
+Verified against a live server (2026-08-24): authenticated as `swg`, connected to
+`192.168.1.200:44453`, reached character selection, and entered the world.
+`WorldSnapshot` streamed cleanly while moving — `loaded` climbed 68 -> 170 with
+**`refused=0` on every tick** and no FATAL, no assert, no disconnect. So the whole
+client-side path works: authentication, cluster and character selection, world
+entry, proximity streaming, and the DX11 renderer drawing a live scene.
+
+**Be precise about what that does NOT cover.** Everything that makes this a *god*
+client is still unexercised:
+
+* object selection and the *Objects* / *ServerTemplates* panels against live objects
+* the **ObjectTemplate** and **Script** menus
+* *Brushes* / *Palettes*, and the *Bookmark* tree
+* the file dialogs — `.tpf` server object templates, `poi*.lay` terrain layers,
+  `.mif` client data, `.ilf` interior layouts
+* creating, moving, editing or saving anything in the world
+
+Treat "SwgGodClient works" as meaning *it connects and plays*. Its editing
+features remain the largest untested surface of any tool here.
 ---
 
 ### 13. SwgConversationEditor (`SwgConversationEditor_r.exe`)
