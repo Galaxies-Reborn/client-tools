@@ -650,6 +650,58 @@ out with `//-- don't open a file by default!` (`TerrainEditor.cpp:467`).
   Feather Clamp.
 * Menus include a **Debug** menu; toolbar has 3D View, Console, Warnings, Profile.
 
+#### Baking — Tools > Bake Terrain / Bake Rivers-Roads / Bake Flora
+
+This is the payload of the tool, and **Bake Flora is not in-process**: it shells
+out to **`Turf_r.exe`** (`TerrainEditorDoc.cpp:1761` -> `_bakeFlora`), swapping the
+`.trn` extension for `.tcf`, and pops *"Could not find Turf_r.exe!"* if the exe is
+missing. It was missing — Turf was in the solution but had never been ported to
+x64 (no `OutDir`/`TargetName`, and a link line still pointing at x86 libs), and it
+read `client.cfg`, whose sku-keyed form mounts zero TREs. Both fixed; see the
+`Turf` commit. **`Turf_r.exe` must be present in the Release directory.**
+
+How the flora bake actually works, which is not obvious from the UI:
+
+* the `.tcf` is the **output**, not an input — none ship with the game
+* the planet is loaded as `terrain\<planet>.trn` **through TreeFile**, i.e. from
+  the mounted TREs, *not* from the `.trn` you have open on disk
+* the planet name is taken from the **`.tcf` filename**, so it must be named for
+  the planet
+* the default clip is the whole world (±16384); `/R x0,z0,x1,z1` bounds it
+
+Driving Turf directly is far quicker than going through the UI, and does not
+write into your data tree:
+
+```
+Turf_r.exe <out>	atooine.tcf /R3200,-5100,3700,-4600 /f
+```
+
+**Verified 2026-08-24.** A 500m box near Mos Eisley sampled 59 flora and wrote a
+6,248-byte `.tcf` whose header parses correctly: type 8, version 1, terrainName
+`terrain	atooine.trn`, tile width 16m, bounds X 712..744 / Z 193..225,
+`numberOfFloraSampled` = 59 matching the log, height range 0.000..51.844, and a
+payload of exactly 32x32x6 = 6144 bytes. `numberOfFloraSampled` is only patched
+back at the end of the writer, so the file is complete.
+
+**Residual defect — Turf crashes AFTER writing.** `"Finished sampling"` never
+prints; the log stops after the sampling loop and the process dies with
+`FATAL: ExceptionHandler invoked`, exit `0x80000003`. The output is already on
+disk and correct by then, so the crash is in the teardown that follows the write:
+
+```cpp
+samplerAppearanceTemplate->writeStaticCollidableFloraFile(o_flora_file, tileBounds);
+delete appearance;
+delete appearanceTemplate;   // log ends here
+```
+
+(`HeightSampler.cpp:1236-1240`.) Practical impact: the baked file is good, but the
+non-zero exit means TerrainEditor's `ProcessSpawner` sees a failed child and may
+report the bake as failed. Not yet diagnosed — a double-free between the
+appearance and its template is the obvious suspect, but that is untested.
+
+**Bake Terrain and Bake Rivers/Roads are in-process** (`mapFrame->bakeTerrain()`,
+`mapFrame->updateRiversAndRoads()`) and were **not** exercised.
+
 **Assessment: works, and is impressive.** It opens real planet data with the full
 rule tree intact and needs no config beyond stock. Only loading was exercised —
 no editing, no 3D View, no save, and the generation/preview paths are untouched.
