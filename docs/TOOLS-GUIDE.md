@@ -683,21 +683,31 @@ Turf_r.exe <out>	atooine.tcf /R3200,-5100,3700,-4600 /f
 payload of exactly 32x32x6 = 6144 bytes. `numberOfFloraSampled` is only patched
 back at the end of the writer, so the file is complete.
 
-**Residual defect — Turf crashes AFTER writing.** `"Finished sampling"` never
-prints; the log stops after the sampling loop and the process dies with
-`FATAL: ExceptionHandler invoked`, exit `0x80000003`. The output is already on
-disk and correct by then, so the crash is in the teardown that follows the write:
+**The teardown crash is FIXED (2026-08-25).** It was a double-free, not an x64
+arithmetic bug. `Appearance::~Appearance` releases its own template —
+`AppearanceTemplateList::release(m_appearanceTemplate)` (`Appearance.cpp:105-109`)
+— and `release()` decrements to zero and **deletes** it
+(`AppearanceTemplateList.cpp:361-379`). `createAppearance()` had handed the
+Appearance that very template, so `delete appearance` already destroyed it and the
+following `delete appearanceTemplate` freed it a second time.
 
-```cpp
-samplerAppearanceTemplate->writeStaticCollidableFloraFile(o_flora_file, tileBounds);
-delete appearance;
-delete appearanceTemplate;   // log ends here
+Diagnosed by instrumenting the three teardown steps:
+
+```
+DIAG: about to write flora file
+DIAG: wrote flora file OK
+DIAG: deleted appearance OK
+<crash>                       <- "deleted appearanceTemplate OK" never reached
 ```
 
-(`HeightSampler.cpp:1236-1240`.) Practical impact: the baked file is good, but the
-non-zero exit means TerrainEditor's `ProcessSpawner` sees a failed child and may
-report the bake as failed. Not yet diagnosed — a double-free between the
-appearance and its template is the obvious suspect, but that is untested.
+The other `createAppearance` site in the same file (line ~122, freed at ~416)
+already deletes only the appearance, which is SOE's correct pattern and confirmed
+the fix rather than merely suppressing a symptom.
+
+After the fix: **exit 0**, `***Finished sampling.` prints, no FATAL, and the
+produced `.tcf` is **byte-identical** to the one the crashing build wrote — the
+change affects teardown only. TerrainEditor now sees a clean child exit, so an
+in-app Bake Flora reports success instead of looking like a failure.
 
 **Bake Terrain and Bake Rivers/Roads are in-process** (`mapFrame->bakeTerrain()`,
 `mapFrame->updateRiversAndRoads()`) and were **not** exercised.
