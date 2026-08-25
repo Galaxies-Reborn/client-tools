@@ -1945,3 +1945,82 @@ large-amplitude action, rather than counting changed pixels.
 ### Still not exercised
 
 Nothing has been edited or saved in AnimationEditor.
+
+## 2026-08-24: FULL PASS over every tool -> docs/TOOLS-GUIDE.md
+
+Drove every editor that had never been opened past its launch screen, then wrote
+`docs/TOOLS-GUIDE.md` (commit `537e5e4ce`): required setup, config keys, basic
+instructions, in-app points of interest, and an honest assessment per tool.
+
+**13 of 16 are now driven past launch, up from 3.** Read the guide rather than
+duplicating it here; only the things that change how you work are repeated below.
+
+### Config fixes made, each verified by a before/after run
+
+| file | change | symptom it fixed |
+|---|---|---|
+| `LightningEditor.cfg` | `[ParticleEditor] groundScene` | magenta sky |
+| `ClientEffectEditor.cfg` | `[ParticleEditor] groundScene` | magenta sky |
+| `ClientEffectEditor.cfg` | `searchPath11` = SOE client root | **could not open any file at all** |
+| `QuestEditor.cfg` | `searchPath10` = SOE **server** root, `11` = client root | **FATAL on every quest open** |
+| `uibuilder_searchpaths.cfg` | created | UIBuilder had no search paths |
+
+### The four findings worth carrying forward
+
+1. **All five Qt GameWidget tools call `Game::install(Game::A_particleEditor)`**
+   (`GameWidget.cpp:384`). ParticleEditor, AnimationEditor, SwooshEditor,
+   LightningEditor and ClientEffectEditor are all "the particle editor", all take
+   the `setScene()` branch, and all read `[ParticleEditor] groundScene` from
+   whatever cfg they loaded. The magenta sky was never particle-editor-specific.
+   SwooshEditor was accidentally fine only because it loads `AnimationEditor.cfg`.
+
+2. **QuestEditor needs SERVER data.** It FATALed on
+   `datatables/item/master_item/master_item.iff`, which is in **none** of the 209
+   client TREs. A client-only mount list can never satisfy it. This is the
+   clearest example of why the launch smoke was worth so little: it booted
+   perfectly every single time and died on the first file opened.
+
+3. **`stripTreeFileSearchPathFromFile` ignores TREs** (`TreeFile.cpp:1027`) — it
+   only matches `searchPath` entries. So AnimationEditor and ClientEffectEditor
+   refuse files that are mounted and perfectly readable, and the only trace is one
+   line in `warning.log`. In the UI the dialog just closes and nothing happens.
+
+4. **The SOE loose data roots are the master key.**
+   `.../data/sku.0/sys.{client,server}/compiled/game` are valid TreeFile roots,
+   named exactly as the TREs name their entries. Mounting one makes everything
+   under it both loadable and mappable. **Cost: startup goes from ~20s to 60s+.**
+
+### TerrainEditor: two things that will waste your time
+
+* Its MFC profile is at the **doubled-Software** registry path —
+  `HKCU\Software\Software\Sony Online Entertainment\TerrainEditor	errainEditor\`
+  — because `SetRegistryKey` was passed a full path where MFC wants a company name.
+* **Tip of the Day is modal and blocks all scripted input.** Set
+  `...	errainEditor\Tip\StartUp` (DWORD) `= 1` to stop it. Verified. Also note
+  `Ctrl+O` proved unreliable to script; the `Alt+F`, `O` menu route works, and
+  there is **no command-line file open** (`ProcessShellCommand` is commented out).
+
+### Still unproven, and stated plainly
+
+* **Nothing has been saved or edited by any tool.** Every result is a read path.
+* **SwgConversationEditor has no data here at all** — its document type is `.cnv`
+  and there is not one `.cnv` file on this machine. Only the compiled output
+  (1,363 `.java` conversation scripts) shipped. Not a port defect.
+* **SwgSpaceQuestEditor and SwgSpaceZoneEditor were not driven** past their
+  startup warnings.
+* **SwgGodClient stops at the client LOG IN screen** — it is a full game client
+  and needs a running server. Its UI and renderer are intact, which is real
+  evidence the port is sound, but no editing feature can be assessed here.
+
+### The two startup dialogs on the MFC Swg* tools are STRUCTURAL - do not "fix"
+
+1. "not running from `<branch>\exe\win32`" — checks the CWD for the substring
+   `exewin32` after stripping slashes. From `x64/Release` it can never match.
+2. "running out of the 'qt-tools-worktree' branch which does not match ..." —
+   compares the branch extracted from the CWD against the branch in the cfg paths
+   (`current`). Cosmetic. `SwgSpaceZoneEditor.cpp:127,133,140`.
+
+This also settles the earlier `c` -> `w` scoring question: the dialogs are still
+there. The smoke scores on window TITLES and the dialog's title is just
+`SwgConversationEditor`, which its error regex does not match. **Scoring
+artifact, not a behaviour change.**
