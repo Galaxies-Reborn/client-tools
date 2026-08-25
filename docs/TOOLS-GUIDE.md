@@ -218,7 +218,13 @@ Status key: **driven** = opened a real asset and confirmed the result;
 | 7 | NpcEditor | driven | works, best of the set |
 | 8 | QuestEditor | driven | works after a cfg fix |
 | 9 | ShipComponentEditor | driven | works |
-| 10–16 | TerrainEditor, UIBuilder, SwgGodClient, SwgConversationEditor, SwgDraftSchematicEditor, SwgSpaceQuestEditor, SwgSpaceZoneEditor | booted | see each |
+| 10 | TerrainEditor | driven | works |
+| 11 | UIBuilder | driven | works |
+| 12 | SwgGodClient | booted | needs a game server; blocked at login |
+| 13 | SwgConversationEditor | driven (New) | tool works; no `.cnv` data exists |
+| 14 | SwgDraftSchematicEditor | driven (boot data) | works |
+| 15 | SwgSpaceQuestEditor | driven | works |
+| 16 | SwgSpaceZoneEditor | driven | works |
 
 ---
 
@@ -757,10 +763,27 @@ plausible ways to get data in. **Neither was tested.**
    directories specified by …cfg"* — compares the branch extracted from the CWD
    against the branch in the configured paths (`current`). Structural.
 
-**Assessment: launches to a full MFC frame, and is effectively unusable on this
-dataset.** Not a port defect — the source data simply is not here. Do not "fix"
-the two startup dialogs; they are structural and harmless.
+**Assessment: the TOOL works. Only the documents are missing.** `File > New`
+(`Ctrl+N`) creates `swgcon1` and gives the complete editor:
 
+* **Conversation Editor** pane — tree seeded with `Root` -> `Npc Branch`, and a
+  toolbar of Move Up/Down, **Add Branch**, **Add Response**, **Find Text**,
+  **Test Branch**.
+* **Script Editor** pane — Conditions, Actions, **%TO / %DI / %DF Tokens**,
+  **Libraries** (`ai_lib`, `chat`, `conversation`, `utils`), Labels, Triggers,
+  with Add Condition/Action/Label/Library and Condition/Action **Wizards**.
+* Main toolbar adds **Spell Check**, **Scan**, **Compile Debug**, **Compile
+  Release**.
+
+The four library names correspond to real files under
+`dsrc/.../script/library/{ai_lib,chat,conversation,utils}.java`. Be precise about
+what that proves: the tree is populated from the new conversation's own default
+`LibrarySet` (`ScriptTreeView.cpp:464`), so it is *consistent with* a correct
+`scriptPath` rather than proof that it resolved.
+
+So this is not a broken tool — it is a working authoring environment with nothing
+authored to open. Creating and compiling a conversation from scratch is possible;
+neither was carried through, and nothing was saved.
 ---
 
 ### 14. SwgDraftSchematicEditor (`SwgDraftSchematicEditor.exe`)
@@ -828,11 +851,27 @@ configuration state, not a failure.
 its data path works. In this pass the modal warnings were dismissed but **no
 document was opened.**
 
-**Assessment: launches and parses its configuration; not driven.** The document
-type declares no file extension at all (`IDR_SWGDRATYPE` has empty filter
-fields), so the intended open route is not obvious from the resources and was not
-determined. Honest status: **booted, config verified, functionality unproven.**
+**Assessment: works.** The document-type resource declares no file extension,
+which is why the open route is not obvious — **but you do not use File > Open.**
+The tool boots with the whole `spacequest` tree already loaded (20 categories:
+_debug, assassinate, convoy, delivery, delivery_no_pickup, destroy, destroy_duty,
+destroy_surpriseattack, escort, escort_duty, inspect, patrol, recovery,
+recovery_duty, rescue, rescue_duty, salvage, space_battle, space_mining_destroy,
+survival) and the *Configuration* tab already parsed.
 
+**Expand a category and double-click a `.tab` leaf.** Title becomes
+`SwgSpaceQuestEditor - [<name>.tab]` and you get a full property editor:
+
+* *Property/Value* grid — Mission Template, `PT_cargo`, `PT_navPoint` /
+  `PT_navPointList`, `PT_questName`, `PT_spaceFaction`, `PT_spaceMobile` /
+  `PT_spaceMobileList`, `PT_spaceZone`, `PT_spawner` / `PT_spawnerList`.
+* *StringId/Text* grid and a *Quest Log Data* grid
+  (`CATEGORY = @spacequest\quests:neutral_category`).
+* Bottom tabs: **Configuration**, Output, Warning, **Shell**.
+
+Verified on `_debug.tab`. Note that file legitimately contains
+`PT_notImplemented = ERROR(2): see asommers` — that is SOE test content, not a
+tool failure. Nothing was edited or saved.
 ---
 
 ### 16. SwgSpaceZoneEditor (`SwgSpaceZoneEditor_r.exe`)
@@ -862,11 +901,22 @@ cosmetic.
 * Status bar carries a live `<0, 0, 0>` coordinate readout.
 * Menus: File, View, Help.
 
-**Assessment: launches to a working frame; not driven.** The buildout data the
-cfg points at is `.iff` (`e3_space_corellia.iff`, `e3_space_tatooine.iff`, …)
-while the document type wants `.tab`, and that mismatch was not resolved. **No
-zone was opened.** Honest status: booted, config verified, functionality unproven.
+**Assessment: works.** The `.tab` / `.iff` confusion is resolved: **open the
+`.tab` SOURCE under `dsrc/`, not the compiled `.iff` the cfg points at.**
+`OnOpenDocument` calls `loadFromSpreadsheet()` on the `.tab` and swaps the
+extension to `.iff` itself when it needs the compiled form
+(`SwgSpaceZoneEditorDoc.cpp:392,859`).
 
+There are **31** of them under
+`dsrc/sku.0/sys.server/compiled/game/datatables/space_zones/buildout/`
+(`space_tatooine.tab`, `space_corellia.tab`, `e3_space_*.tab`, ...).
+
+Verified with `space_tatooine.tab`: title becomes
+`SwgSpaceZoneEditor - [space_tatooine.tab]`, the tree fills with **Nav Points**,
+**Spawners** and **Miscellaneous**, and the zone view plots the objects across a
+ruled XZ grid (roughly 100-1300 by 100-800) with +X/-X/+Z/-Z axis labels. The
+XZ/XY/ZY buttons switch projection and the Hide Nav/Spawn/Misc/Paths/Grid
+toggles filter the view. Nothing was edited or saved.
 ---
 
 ## Part 3 — what is still not known
@@ -877,8 +927,11 @@ risk in this tree lives.
 * **Nothing has ever been saved by any tool.** Every result above is a read path.
   Save/export is completely untested across all 16.
 * **Nothing has been edited.** No parameter changed, no object created.
-* **Three tools were never driven past boot**: SwgConversationEditor (no `.cnv`
-  data exists), SwgSpaceQuestEditor and SwgSpaceZoneEditor.
+* **15 of 16 are now driven past launch.** The three that looked broken were not:
+  SwgSpaceZoneEditor needed the `.tab` source under `dsrc/` rather than the
+  compiled `.iff`; SwgSpaceQuestEditor is a tree-browser, not a File>Open tool;
+  and SwgConversationEditor works via `File > New` — only its `.cnv` documents
+  are absent from this machine.
 * **SwgGodClient cannot be assessed without a game server.**
 * **LightningEditor's 3D preview** may not re-render the loaded effect; the
   viewport looked identical for two different `.ltn` files.

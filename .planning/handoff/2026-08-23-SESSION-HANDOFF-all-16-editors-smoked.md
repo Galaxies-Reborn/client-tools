@@ -2024,3 +2024,74 @@ This also settles the earlier `c` -> `w` scoring question: the dialogs are still
 there. The smoke scores on window TITLES and the dialog's title is just
 `SwgConversationEditor`, which its error regex does not match. **Scoring
 artifact, not a behaviour change.**
+
+## 2026-08-24: the three "broken" MFC tools ALL WORK - I was wrong
+
+Kenny pushed back ("I think they work more than you realize") and he was right.
+None of the three was broken. Each just needed the correct way in, and I had
+guessed wrong on all three. `docs/TOOLS-GUIDE.md` is corrected; **15 of 16 tools
+are now driven past launch.**
+
+### SwgSpaceZoneEditor - open the `.tab` SOURCE, not the compiled `.iff`
+
+I had it backwards. `OnOpenDocument` calls `loadFromSpreadsheet()` on a `.tab`
+and swaps the extension to `.iff` itself when it wants the compiled form
+(`SwgSpaceZoneEditorDoc.cpp:392,859`). The cfg's `spaceZoneDataTablePath` points
+at the compiled `.iff` directory, which is what misled me.
+
+The sources are the **31** files under
+`dsrc/sku.0/sys.server/compiled/game/datatables/space_zones/buildout/`.
+
+`space_tatooine.tab` opens fine: tree of **Nav Points / Spawners /
+Miscellaneous**, and the zone view plots real objects on a ruled XZ grid.
+
+### SwgSpaceQuestEditor - it is a TREE BROWSER, not a File>Open tool
+
+File>Open produces no dialog, which is why my driver failed. It does not need
+one: the whole `spacequest` tree is **already loaded at boot** (20 categories)
+with the Configuration tab parsed.
+
+**Expand a category, double-click a `.tab` leaf.** Title becomes
+`SwgSpaceQuestEditor - [<name>.tab]` and a full property editor appears -
+`PT_navPointList`, `PT_spaceMobileList`, `PT_spawnerList`, a StringId/Text grid
+and Quest Log Data. Verified on `_debug.tab`. (That file contains
+`PT_notImplemented = ERROR(2): see asommers` - SOE test content, not a defect.)
+
+### SwgConversationEditor - the TOOL works; only the documents are missing
+
+`File > New` (`Ctrl+N`) creates `swgcon1` and gives the whole authoring
+environment: Conversation Editor tree seeded `Root` -> `Npc Branch` with Add
+Branch / Add Response / Test Branch, and a Script Editor with Conditions,
+Actions, %TO/%DI/%DF Tokens, **Libraries** (ai_lib, chat, conversation, utils),
+Labels, Triggers, Condition/Action Wizards, plus Spell Check, Scan and Compile
+Debug/Release on the main toolbar.
+
+The `.cnv` finding stands and is not a defect: `.cnv` is an IFF with FORM tag
+`CNV` (versions 0000/0001/0002, `Conversation.cpp:1431`) and there is **not one
+`.cnv` anywhere** - not under `D:\SWG All Tools Working`, not under `D:\Code`,
+not in any of the 209 TREs. Only the compiled output shipped (1,363 `.java`
+conversation scripts). So: working authoring tool, nothing authored to open.
+
+**Precision note:** the four Libraries come from the new conversation's own
+default `LibrarySet` (`ScriptTreeView.cpp:464`), not from a directory scan. Those
+four names DO correspond to real files under `dsrc/.../script/library/`, so it is
+*consistent with* a correct `scriptPath` - but it does not by itself prove
+`scriptPath` resolved. Do not overstate it.
+
+### The lesson worth keeping
+
+Three tools, three different entry conventions, none of them File>Open with the
+path the cfg advertises:
+
+| tool | way in |
+|---|---|
+| SwgSpaceZoneEditor | File>Open a `.tab` under **dsrc**, not the cfg's `.iff` path |
+| SwgSpaceQuestEditor | **double-click a leaf** in the tree it loads at boot |
+| SwgConversationEditor | **File>New** - there is no data to open |
+
+"Booted but not driven" was the right label at the time, but I let it read as
+closer to broken than it was. When a tool looks inert, the entry convention is
+the first thing to question, not the tool.
+
+Driver added: `scripts/_drive-mfc.ps1` - launches, dismisses the modal startup
+warnings (they swallow keys sent before dismissal), then File>Open with polling.
