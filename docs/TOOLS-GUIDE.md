@@ -673,12 +673,12 @@ Driving Turf directly is far quicker than going through the UI, and does not
 write into your data tree:
 
 ```
-Turf_r.exe <out>	atooine.tcf /R3200,-5100,3700,-4600 /f
+Turf_r.exe <out>\tatooine.tcf /R3200,-5100,3700,-4600 /f
 ```
 
 **Verified 2026-08-24.** A 500m box near Mos Eisley sampled 59 flora and wrote a
 6,248-byte `.tcf` whose header parses correctly: type 8, version 1, terrainName
-`terrain	atooine.trn`, tile width 16m, bounds X 712..744 / Z 193..225,
+`terrain\tatooine.trn`, tile width 16m, bounds X 712..744 / Z 193..225,
 `numberOfFloraSampled` = 59 matching the log, height range 0.000..51.844, and a
 payload of exactly 32x32x6 = 6144 bytes. `numberOfFloraSampled` is only patched
 back at the end of the writer, so the file is complete.
@@ -706,8 +706,59 @@ the fix rather than merely suppressing a symptom.
 
 After the fix: **exit 0**, `***Finished sampling.` prints, no FATAL, and the
 produced `.tcf` is **byte-identical** to the one the crashing build wrote — the
-change affects teardown only. TerrainEditor now sees a clean child exit, so an
-in-app Bake Flora reports success instead of looking like a failure.
+change affects teardown only.
+
+**CORRECTION (2026-08-27).** An earlier version of this section claimed the crash
+made TerrainEditor report a good bake as failed, because it "sees the child exit
+code through `ProcessSpawner`". **That is wrong — `_bakeFlora` never reads the
+exit code.** `ProcessSpawner::getExitCode` exists (`ProcessSpawner.cpp:189`) but
+is never called; the wait loop uses `isFinished(200)`, a bare
+`WaitForSingleObject` (`TerrainEditorDoc.cpp:1822`), under which a crashed child
+is indistinguishable from a clean one. Success is decided **solely** by
+`_importFloraSampleFile` reading the `.tcf` back. Since the double-free fired
+*after* the file was written and correct, the in-app path would likely have
+reported success even on the crashing build. The fix is still right — the
+double-free was real — but its user-visible impact was overstated.
+
+#### The unquoted-path bug — found by driving the UI, fixed 2026-08-27
+
+The first real in-app Bake Flora failed with `Could not open sample file`, and the
+reason had nothing to do with Turf. `_bakeFlora` built its command line by raw
+`strcat`, and `ProcessSpawner` calls `CreateProcess` with `lpApplicationName = 0`
+(`ProcessSpawner.cpp:138-140`), so the child's CRT splits the whole string on
+spaces. The data tree lives under `D:\SWG All Tools Working\...`, so Turf got
+**four** arguments instead of one path.
+
+Turf does `m_files.push_front(arg)` (`Turf.cpp:417`), so `front()` is the *last*
+fragment. Consequences, in the order they mislead you:
+
+* `_extractPlanetName` takes the basename, so the planet still resolved to
+  `tatooine` and **the bake ran perfectly** — 2048 rows, 207,114 flora, 75s
+* the output path became the **relative** `Working\swg\current\...\tatooine.tcf`,
+  resolved against the editor's own directory, where those folders do not exist
+* the write silently went nowhere, and 75 seconds of correct work was discarded
+* the log line to look for is the giveaway — the `D:\SWG All Tools ` prefix is
+  simply missing from the path Turf echoes:
+  `*** Sampling terrain\tatooine.trn flora to Working\swg\current\...`
+
+**Fixed** by quoting both paths (the `_access` existence checks still run against
+the unquoted exe path). Any data tree with a space anywhere in its path hit this.
+
+**VERIFIED IN-APP, 2026-08-27** — the whole point of the exercise. Kenny drove
+`File > Open` on `tatooine.trn`, then `Tools > Bake Flora`, on the rebuilt binary:
+
+| | result |
+|---|---|
+| child command line | `"...\Turf_r.exe" "D:\SWG All Tools Working\...\tatooine.tcf" /f` — quoted |
+| runtime | 72s for the **entire planet** |
+| output | `tatooine.tcf`, 6,291,560 bytes, at the correct path |
+| header | type 8, v1, `terrain\tatooine.trn`, 16m tiles, 1024x1024 = the full 16,384m world |
+| flora | 207,114; heights -4.237..537.302; payload exactly 6 bytes/tile |
+| vs. a direct quoted CLI run | **byte-identical** |
+| TerrainEditor | no `Could not open sample file`, no FATAL, process survived the import |
+
+Note the timing: a **full-world bake is ~75 seconds**, not the hours you might
+expect. The UI passes no `/R`, so it always bakes the whole planet.
 
 **Bake Terrain and Bake Rivers/Roads are in-process** (`mapFrame->bakeTerrain()`,
 `mapFrame->updateRiversAndRoads()`) and were **not** exercised.
