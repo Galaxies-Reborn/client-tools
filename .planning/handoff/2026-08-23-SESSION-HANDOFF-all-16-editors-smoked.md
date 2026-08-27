@@ -2252,3 +2252,211 @@ Objects / ServerTemplates panels against live objects, the **ObjectTemplate** an
 **Do not let "SwgGodClient works" drift into meaning more than "it connects and
 plays".** Its editing surface is now the single largest untested area in the tree,
 ahead of even the save paths.
+
+
+# ===== SESSION 2026-08-27 - TerrainEditor driven to the end - START HERE =====
+
+Resumed after a reboot. The previous session died mid-sentence right after
+committing the Turf double-free fix (2a7d6ec68), so nothing was in flight.
+
+**Six commits, tree clean.** Two real bugs fixed, two of my own earlier claims
+corrected, and TerrainEditor taken from "launches and loads" to provably usable.
+
+| commit | what |
+|---|---|
+| `cbb7f8c2a` | quote the Turf command line - in-app Bake Flora now lands its file |
+| `28809f309` | Bake Terrain verified against SOE's shipped output |
+| `7960572f0` | null-boundary paint guard |
+| `13219df40` | all three bakes exercised; terrain bake proven deterministic |
+| `7acb8a80a` | five `remove*()` paths corrupting their list count in release |
+| `3f5bb2877` | editing round-trip verified |
+
+Everything below is also in `docs/TOOLS-GUIDE.md` section 10, which is the durable
+copy. This section is the narrative and the traps.
+
+## Bug 1 - the unquoted command line (`cbb7f8c2a`)
+
+Driving `Tools > Bake Flora` through the UI for the first time failed with
+`Could not open sample file`. **Turf was innocent.** `_bakeFlora` built its command
+line with raw `strcat`, and `ProcessSpawner` calls `CreateProcess` with
+`lpApplicationName = 0` (`ProcessSpawner.cpp:138-140`), so the child CRT splits on
+spaces. The data tree is `D:\SWG All Tools Working\...` - four arguments, not one.
+
+Turf `push_front()`s each non-switch argument (`Turf.cpp:417`), so `front()` is the
+LAST fragment. `_extractPlanetName` takes the basename, so the planet still resolved
+to tatooine and **the bake ran perfectly** - 2048 rows, 207,114 flora, 75s - then
+wrote to the relative `Working\swg\...\tatooine.tcf` under the editor's own
+directory, where those folders do not exist. 75 seconds of correct work, discarded
+silently.
+
+**The giveaway is in the log** - the `D:\SWG All Tools ` prefix is simply missing:
+
+```
+*** Sampling terrain\tatooine.trn flora to Working\swg\current\...
+```
+
+## Bug 2 - five copies of the same release-only corruption (`7acb8a80a`)
+
+`TerrainGenerator` has this in **five** functions - `removeBoundary`, `removeFilter`,
+`removeAffector`, `Layer::removeLayer`, `TerrainGenerator::removeLayer`:
+
+```cpp
+for (i = 0; i < list.getNumberOfElements (); i++)
+    if (list [i] == item) { ...; break; }
+DEBUG_FATAL (i == list.getNumberOfElements (), ("not found"));   // compiles out
+list.removeIndexAndCompactList (i);                              // runs anyway
+```
+
+Item not in the list -> `i == count` -> the `DEBUG_FATAL` vanishes in release, and so
+does the bounds check inside `removeIndexAndCompactList` (`ArrayList.h:334`). What
+survives is `m_numberOfElements--`. On an empty list that reaches **-1**, and the
+next `add()` does `m_data [m_numberOfElements++] = newElement` (`ArrayList.h:232`),
+writing eight bytes BEFORE the allocation. `ArrayList::add` has no lower bound check.
+
+All five are reachable from the layer tree UI (`LayerView.cpp:668`, `1974-1981`).
+Fixed by bailing out instead of compacting an index never found, with a
+release-visible `WARNING`.
+
+## The recurring trap - now three instances
+
+**`DEBUG_` diagnostics do not exist in the builds anyone runs.** The NpcEditor
+`strlen(NULL)` (hidden by `DEBUG_WARNING`), today's null-boundary crash, and all
+five `remove*()` paths were invisible for exactly this reason. When you add a
+diagnostic in this tree use `WARNING` (`Fatal.h:50`), never `DEBUG_WARNING` or
+`DEBUG_FATAL`, unless you genuinely only want it in a debug build.
+
+## The headline result - the port computes SOE's own answers
+
+The shipped `tatooine.trn` **already contains SOE's baked terrain**, so their
+reference output for exactly this computation is sitting in the file to diff
+against. Bake Terrain, then `File > Save As`, then compare `WMAP`/`SMAP`:
+
+| chunk | SOE shipped | regenerated | verdict |
+|---|---|---|---|
+| `WMAP` (water) | 440 bits of 4,194,304 | 440 | **bit-for-bit identical** |
+| `SMAP` (slope >4m) | 2,171,057 (51.76%) | 2,171,035 | 1,066 differ - **99.9746%** |
+
+The 1,066 bits are floating-point jitter at the `chunkHeight > 4.f` threshold, not a
+port defect: the drift is **bidirectional and near-symmetric** (544 one way, 522 the
+other - a logic error drifts hard in one direction), it clusters in 12 contiguous
+runs over 124 of 2048 rows, and the water map, which uses a boolean test rather than
+a float threshold, is exactly right.
+
+**It is also deterministic.** A second bake in a separate process produced
+bit-identical maps and the same 1,066-bit delta. That is what a compiler/FP-model
+difference looks like; uninitialised state would have varied.
+
+Before today every result in this tree was "it launches and does not crash". This is
+the first evidence the ported code produces the same *numbers*.
+
+## Editing round-trips (`3f5bb2877`)
+
+First real editing by any of the 16 tools. Boundary deleted, circles added, boundary
+dragged between layers, Properties value changed -> Save As -> **File > Open on the
+saved file**. IFF-tag census, pre-edit vs after:
+
+```
+                layers  boundaries  filters  affectors  BCIR         size
+  pre-edit         274         394       98        409   267    3,687,203
+  after editing    274         396      103        423   269    3,689,387
+```
+
+On reload the deleted boundary was still gone, the added ones present, the changed
+value intact. `BCIR` net +2 with one confirmed deletion = one removed, three added.
+
+The reload direction mattered on its own: the editor had been shown to WRITE a file
+but never to read back what it wrote.
+
+## Two of my own claims, corrected - do not re-inherit them
+
+1. **"The double-free made TerrainEditor report good bakes as failed."** Wrong.
+   `_bakeFlora` **never reads the child exit code**. `getExitCode` exists
+   (`ProcessSpawner.cpp:189`) but is never called; the loop uses `isFinished(200)`,
+   a bare `WaitForSingleObject`, so a crashed child is indistinguishable from a
+   clean one. Success is decided solely by `_importFloraSampleFile` reading the
+   `.tcf` back. The double-free was real; its user-visible impact was overstated.
+2. **"Budget several minutes to half an hour for Bake Terrain."** Wrong by ~40x.
+   2048 x 2048 = 4,194,304 chunks takes **50 seconds** - the generator bails cheaply
+   on chunks no affector covers.
+
+## Traps worth the ink
+
+* **Bake Terrain has no completion dialog in release.** The `MessageBox` is inside
+  `#ifdef _DEBUG` (`EditorTerrain.cpp:1883-1888`). Success = the progress bar simply
+  vanishing. It also writes **no file**; the data only reaches disk on save.
+* **`Debug > View Baked Terrain` is a trap, not a verification.**
+  `addConsoleMessage` (`TerrainEditorDoc.cpp:1522-1529`) appends to a `CString` then
+  `SetWindowText`s the ENTIRE buffer, and the dump makes 1024 such calls. O(n^2),
+  ~270 MB of text copying for a 525 KB result. It will look like a hang. Diff the
+  saved `.trn` instead.
+* **The UI bake passes no `/R`** - it always bakes the whole planet.
+* **Rebuilding TerrainEditor needs the running instance closed** or the link fails
+  with `LNK1104: cannot open file ... TerrainEditor_r.exe`.
+* Building TerrainEditor incidentally relinks `stage-x64/gl05_r.dll`, `gl06_r.dll`,
+  `gl07_r.dll`. Same size, no source change - `git restore` them, keep them out of
+  commits.
+
+## OPEN - the null-boundary crash after Bake Rivers/Roads
+
+**One occurrence in four runs. Mechanism characterised, trigger unidentified.**
+
+```
+MapView::drawBoundary+0x4:  cmp byte ptr [r9+0Ch],0   ds:000000000000000c=??
+r9 = 0000000000000000
+```
+
+`r9` carries the `boundary` argument, so `layer->getBoundary(i)` returned **NULL**
+and `boundary->isActive()` dereferenced it. Stack: `drawBoundary <- drawLayer <-
+drawLayer <- drawBoundaries <- MapView::OnDraw <- CView::OnPaint` - the repaint
+`updateRiversAndRoads` triggers via `setZoom(oldZoom)` (`MapView.cpp:2559`).
+
+**Ruled out, with evidence - do not re-run these:**
+
+* **SOE's `preallocate(4096) // causes corruption`** (`MapView.cpp:2468`). The bug it
+  warns about is real (`ArrayList::resizeUp` memcpy's then `delete[]`s, so growing an
+  array of `MetaData` bitwise-copies each inner `ArrayList<Plane>` pointer and frees
+  the buffers out from under the copies), but tatooine has **12** boundary-poly
+  affectors - `AROA` 12, `ARIV` 0, `ARIB` 0, counted by IFF tag. The list never grows.
+* **Heap corruption.** `r9` was a clean NULL, not a freed or garbage pointer.
+* **Me killing the process.** WER logged a real `APPCRASH` (Application Error 1000,
+  exception `0xc000041d`, pid `0x6B78` = 27512) with a 36 MB minidump, and the app
+  ran its own `MyUnhandledExceptionFilter`. `TerminateProcess` produces neither.
+
+**Not reproduced in three subsequent attempts**: rivers/roads alone on a fresh load,
+after all three bakes, and after `File > Save As` - the exact original sequence.
+Each ran ~2s and clean.
+
+Guarded, not fixed: `MapView::drawLayer` now skips a null boundary and reports it
+once per session with `WARNING`, naming the layer and index. If it recurs, that line
+names the culprit.
+
+**Dump preserved**: `<scratchpad>/crash/TerrainEditor_r.exe.27512.dmp` plus
+`warning.at-crash.log`. Analyse with the Windows Kits `cdb.exe`; `.ecxr` lands on
+`InternalFatal`, so use `.frame /r 9` to get the real faulting frame.
+
+## Where TerrainEditor stands
+
+All three bake paths, the full edit/save/reload cycle, and the save path exercised on
+a real 3.7 MB planet, with output verified against reference data. **Still untouched:
+the 3D View.** That is the last surface on this tool.
+
+## State at handoff
+
+* Branch `qt-tools-verify`, clean, **41 ahead of `origin/x64-dx11-qt-tools`** - still
+  unpushed.
+* TerrainEditor running, PID 30236, with `C:\bake-test\tatooine3.trn` loaded.
+* `C:\bake-test\` holds three saves: `tatooine.trn` (post-bake), `tatooine2.trn`
+  (second bake, determinism check), `tatooine3.trn` (edited).
+* Original `tatooine.trn` in the SOE tree **untouched** (mtime 08/22). Backup at
+  `<scratchpad>/backup/tatooine.trn`.
+* Scratchpad:
+  `C:\Users\kenne\AppData\Local\Temp\claude\D--Code-swg-qt-tools-worktree\02b05a29-04a5-48a3-b42d-c2fdea431f16\scratchpad`
+
+## Next, in the order I would do it
+
+1. **The 3D View** - the last untouched surface on TerrainEditor.
+2. **Save and edit on the other 15.** Still completely untested there; TerrainEditor
+   is the only tool that has ever written a file.
+3. **SwgGodClient's editing surface** - still the single largest untested area in the
+   tree, per the earlier session's note. Nothing today changed that.
+4. Push the branch. 41 commits is a lot to be holding locally.
