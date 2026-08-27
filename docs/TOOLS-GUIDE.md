@@ -879,11 +879,38 @@ reference data — the flora bake byte-identical to a CLI run, and the terrain b
 matching SOE's own shipped `WMAP` exactly and `SMAP` to 99.97%. It has also
 round-tripped a full 3.7 MB planet through its own save path.
 
-**All three bake paths are now exercised** — flora, terrain, and rivers/roads.
-Still untouched: **editing** (no parameter changed, no affector added) and the
-**3D View**. Carry forward the one open defect: a single unreproduced null-boundary
-crash after Bake Rivers/Roads, now guarded and logged rather than fatal. The Tip
-dialog is the single biggest practical annoyance and is now solvable.
+#### Editing — the full round trip, VERIFIED 2026-08-27
+
+The first real editing done by any of the 16 tools, and it works end to end:
+**load -> edit -> save -> reload -> verify**.
+
+Driven through the **Construction Layers** tree and the 2D Map toolbar: a boundary
+deleted, boundary circles added, a boundary dragged between layers, and a value
+changed in the Properties panel. Then `File > Save As`, then `File > Open` on the
+saved file.
+
+Structural census of the saved `.trn`, by IFF tag, against the pre-edit save:
+
+| | layers | boundaries | filters | affectors | `BCIR` | size |
+|---|---|---|---|---|---|---|
+| pre-edit | 274 | 394 | 98 | 409 | 267 | 3,687,203 |
+| after editing | 274 | **396** | **103** | **423** | **269** | 3,689,387 |
+
+Every edit reached the file, and on reload Kenny confirmed in the layer tree that
+the **deleted boundary was still gone**, the **added boundaries were present**, and
+the **changed value had survived**. `BCIR` net +2 with one deletion reconciles to
+one circle removed and three added. The reload was clean — no FATAL, and none of
+the six new guards fired.
+
+That last direction matters on its own: the editor had been proven to *write* a
+file but never to *read back* what it wrote, and a file that saves but will not
+reload is the classic save-path failure. It reloads.
+
+**Assessment update.** All three bake paths and the full edit/save/reload cycle are
+now exercised on a real 3.7 MB planet. Still untouched: the **3D View**. Carry
+forward the one open defect — a single unreproduced null-boundary crash after Bake
+Rivers/Roads, now guarded and logged rather than fatal. The Tip dialog is the
+single biggest practical annoyance and is now solvable.
 
 ---
 
@@ -1200,7 +1227,11 @@ risk in this tree lives.
   `File > Save As` on 2026-08-27, and the result was verified against SOE's own
   shipped data (see Bake Terrain above). Save/export remains untested on the
   other 15.
-* **Nothing has been edited.** No parameter changed, no object created.
+* **One tool has now been edited with, and the edits round-trip.** TerrainEditor
+  had boundaries added and deleted, a boundary dragged between layers and a
+  Properties value changed; the saved `.trn` shows every change by IFF-tag census
+  and reloads with all of them intact (see Editing above). The other 15 remain
+  read-only exercises.
 * **15 of 16 are now driven past launch.** The three that looked broken were not:
   SwgSpaceZoneEditor needed the `.tab` source under `dsrc/` rather than the
   compiled `.iff`; SwgSpaceQuestEditor is a tree-browser, not a File>Open tool;
