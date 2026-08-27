@@ -796,6 +796,14 @@ Kenny ran the bake, then `File > Save As` to a scratch path. Result:
 | `WMAP` (water) | 440 bits set of 4,194,304 | 440 | **bit-for-bit identical** |
 | `SMAP` (slope >4m) | 2,171,057 bits set (51.76%) | 2,171,035 (51.76%) | 1,066 bits differ — **99.9746% identical** |
 
+**The bake is deterministic.** It was run again in a separate process session and
+saved to a second file: `WMAP` and `SMAP` both came out **bit-identical** to the
+first save, and the delta against SOE stayed at exactly the same 1,066 bits. That
+matters for the diagnosis — a stable, reproducible difference is what a
+compiler/FP-model change produces, whereas run-to-run noise would point at
+uninitialised state. (Both saves' file sizes are explained by the embedded path
+string alone: 25 vs 26 characters, so 3,687,202 vs 3,687,203 bytes.)
+
 The 1,066 differing slope bits are **floating-point boundary jitter at the
 `chunkHeight > 4.f` threshold**, not a port defect. The evidence:
 
@@ -818,11 +826,51 @@ The 2.49 MB trailing region (generator rules + flora maps) differs in 2,830 byte
 **This is also the first time any of the 16 tools has written a file through its
 own save path**, and it round-tripped a 3.7 MB planet correctly.
 
-**Bake Rivers/Roads** (`MapView::updateRiversAndRoads`, `MapView.cpp:2449`) is
-still **not** exercised. Two things to know before running it: it early-returns
-if the planet has no `AffectorBoundaryPoly`, and SOE's own comment at line 2468 —
-`metaDataList.preallocate(4096); // preallocate so it doesn't grow - causes
-corruption` — is a fixed cap with no bounds check on the affector count.
+#### Bake Rivers/Roads — exercised 2026-08-27, and one unexplained crash
+
+`MapView::updateRiversAndRoads` (`MapView.cpp:2449`) is in-process. On tatooine it
+runs in **about two seconds** — the planet has 12 road affectors and no rivers or
+ribbons (`AROA` 12, `ARIV` 0, `ARIB` 0, counted by IFF tag in the `.trn`). It
+early-returns outright if a planet has no active `AffectorBoundaryPoly`, so a
+progress dialog appearing at all is the proof it did real work.
+
+**Run three times, clean every time**: alone on a fresh load, after the other two
+bakes, and after `File > Save As`.
+
+**But it crashed the editor once, on the first attempt, and that is unexplained.**
+Recorded rather than glossed. The minidump pins the mechanism exactly:
+
+```
+MapView::drawBoundary+0x4:  cmp byte ptr [r9+0Ch],0   ds:000000000000000c=??
+r9 = 0000000000000000
+```
+
+`r9` carries the `boundary` argument, so `layer->getBoundary(i)` returned **NULL**
+and `boundary->isActive()` dereferenced it. The stack is `drawBoundary <-
+drawLayer <- drawLayer <- drawBoundaries <- MapView::OnDraw <- CView::OnPaint` —
+the repaint that `updateRiversAndRoads` triggers via `setZoom(oldZoom)` at
+`MapView.cpp:2559`. A null, not freed or corrupted memory.
+
+**It is not the corruption SOE warns about.** Their comment at `MapView.cpp:2468`
+— `preallocate(4096); // preallocate so it doesn't grow - causes corruption` —
+describes a real bug: `ArrayList::resizeUp` (`ArrayList.h:400-410`) `memcpy`s the
+old elements and then `delete[]`s them, so growing an array of `MetaData`
+bitwise-copies each inner `ArrayList<Plane>` pointer and then frees the buffers
+out from under the copies. It simply cannot be this crash: 12 affectors is nowhere
+near 4096, so the list never grows.
+
+**Why nothing reported it — the recurring trap in this tree.** Every diagnostic on
+the boundary-removal path is `DEBUG_`-only and compiles out in release:
+`TerrainGenerator.cpp:729` ("boundary not found in boundary list") and
+`ArrayList.h:334` ("index out of range"). Note `Layer::removeBoundary` calls
+`removeIndexAndCompactList(i)` **even when the boundary was not found**, with
+`i == getNumberOfElements()`, which silently decrements the count in release.
+
+`MapView::drawLayer` now skips a null boundary and reports it once per session
+with `WARNING` (release-visible), naming the layer and index. That converts the
+crash into a diagnostic and should identify the culprit if it recurs. **It is a
+guard, not a fix** — whatever writes the NULL is still unidentified, and three
+subsequent runs never fired it.
 
 **Assessment: works, and is the most thoroughly proven tool in the set.** It
 opens real planet data with the full rule tree intact, needs no config beyond
@@ -831,9 +879,11 @@ reference data — the flora bake byte-identical to a CLI run, and the terrain b
 matching SOE's own shipped `WMAP` exactly and `SMAP` to 99.97%. It has also
 round-tripped a full 3.7 MB planet through its own save path.
 
-Still untouched: **editing** (no parameter changed, no affector added), the **3D
-View**, and **Bake Rivers/Roads**. The Tip dialog is the single biggest practical
-annoyance and is now solvable.
+**All three bake paths are now exercised** — flora, terrain, and rivers/roads.
+Still untouched: **editing** (no parameter changed, no affector added) and the
+**3D View**. Carry forward the one open defect: a single unreproduced null-boundary
+crash after Bake Rivers/Roads, now guarded and logged rather than fatal. The Tip
+dialog is the single biggest practical annoyance and is now solvable.
 
 ---
 
