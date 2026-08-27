@@ -760,13 +760,80 @@ the unquoted exe path). Any data tree with a space anywhere in its path hit this
 Note the timing: a **full-world bake is ~75 seconds**, not the hours you might
 expect. The UI passes no `/R`, so it always bakes the whole planet.
 
-**Bake Terrain and Bake Rivers/Roads are in-process** (`mapFrame->bakeTerrain()`,
-`mapFrame->updateRiversAndRoads()`) and were **not** exercised.
+#### Bake Terrain — VERIFIED AGAINST SOE'S OWN OUTPUT, 2026-08-27
 
-**Assessment: works, and is impressive.** It opens real planet data with the full
-rule tree intact and needs no config beyond stock. Only loading was exercised —
-no editing, no 3D View, no save, and the generation/preview paths are untouched.
-The Tip dialog is the single biggest practical annoyance and is now solvable.
+`EditorTerrain::bakeTerrain` (`EditorTerrain.cpp:1817`) is in-process. For
+tatooine the `.trn` header gives `mapWidthInMeters=16384`, `chunkWidthInMeters=8`,
+so the loop is **2048 x 2048 = 4,194,304 chunks**. Measured: **50 seconds** at
+~100% CPU, flat 160 MB, process responsive throughout. Budget seconds, not hours
+— the generator bails cheaply on chunks no affector covers.
+
+**It writes no file.** It fills `BakedTerrain` in the in-memory document; the
+data only reaches disk on save. **There is no completion dialog in Release** —
+that `MessageBox` is inside `#ifdef _DEBUG` (`EditorTerrain.cpp:1883-1888`), so
+success looks like the progress bar simply vanishing. Cancel is polled once per
+row, not per chunk (line 1868).
+
+**Do not use Debug > View Baked Terrain to check the result.** It looks like the
+obvious verification and it is a trap: `addConsoleMessage`
+(`TerrainEditorDoc.cpp:1522-1529`) does `consoleMessage += newMessage` and then
+`SetWindowText` of the **entire** accumulated buffer, and the dump makes 1024
+such calls (512 water rows + 512 slope rows). That is O(n^2) — roughly 270 MB of
+text copying and 1024 full control reformats for a 525 KB result. It will look
+like a hang.
+
+**The right check: the baked data is serialised into the `.trn`.**
+`TerrainEditorDoc::save` passes `data.bakedTerrain = m_bakedTerrain` (line 548)
+and `BakedTerrain::save` writes two chunks — `WMAP` and `SMAP`, one **bit** per
+chunk, 2048x2048/8 = 524,288 bytes each. Crucially, **the shipped `tatooine.trn`
+already contains SOE's own baked terrain**, so their reference output for exactly
+this computation is sitting right there to diff against.
+
+Kenny ran the bake, then `File > Save As` to a scratch path. Result:
+
+| chunk | SOE shipped | regenerated here | verdict |
+|---|---|---|---|
+| `WMAP` (water) | 440 bits set of 4,194,304 | 440 | **bit-for-bit identical** |
+| `SMAP` (slope >4m) | 2,171,057 bits set (51.76%) | 2,171,035 (51.76%) | 1,066 bits differ — **99.9746% identical** |
+
+The 1,066 differing slope bits are **floating-point boundary jitter at the
+`chunkHeight > 4.f` threshold**, not a port defect. The evidence:
+
+* the drift is **bidirectional and near-symmetric** — 544 bits set in SOE's and
+  clear in ours, 522 the other way. A real logic error (off-by-one, sign flip,
+  wrong comparison) drifts hard in one direction
+* they cluster in 12 contiguous runs over 124 of 2048 rows, spanning rows
+  632..1988 — i.e. in particular *regions*, exactly where terrain happens to sit
+  near 4.0 m, and 19 rows differ by a single bit
+* the water map, which uses a boolean test rather than a float threshold, is
+  **exactly** right
+
+The whole file-size delta is likewise fully explained: the saved file is 40 bytes
+smaller, and the embedded source-path string shrank by exactly 40 (SOE's build
+path `C:\swg\test\data\sku.0\sys.shared\built\game\terrain\tatooine.trn`, 65 bytes, vs the
+25-byte scratch path). Every other structure is byte-for-byte the same length.
+The 2.49 MB trailing region (generator rules + flora maps) differs in 2,830 bytes
+— 0.11% — consistent with the same threshold effect.
+
+**This is also the first time any of the 16 tools has written a file through its
+own save path**, and it round-tripped a 3.7 MB planet correctly.
+
+**Bake Rivers/Roads** (`MapView::updateRiversAndRoads`, `MapView.cpp:2449`) is
+still **not** exercised. Two things to know before running it: it early-returns
+if the planet has no `AffectorBoundaryPoly`, and SOE's own comment at line 2468 —
+`metaDataList.preallocate(4096); // preallocate so it doesn't grow - causes
+corruption` — is a fixed cap with no bounds check on the affector count.
+
+**Assessment: works, and is the most thoroughly proven tool in the set.** It
+opens real planet data with the full rule tree intact, needs no config beyond
+stock, and both of its exercised bake paths produce output verified against
+reference data — the flora bake byte-identical to a CLI run, and the terrain bake
+matching SOE's own shipped `WMAP` exactly and `SMAP` to 99.97%. It has also
+round-tripped a full 3.7 MB planet through its own save path.
+
+Still untouched: **editing** (no parameter changed, no affector added), the **3D
+View**, and **Bake Rivers/Roads**. The Tip dialog is the single biggest practical
+annoyance and is now solvable.
 
 ---
 
@@ -1079,8 +1146,10 @@ toggles filter the view. Nothing was edited or saved.
 Being explicit, because the gap between "launches" and "works" is where all the
 risk in this tree lives.
 
-* **Nothing has ever been saved by any tool.** Every result above is a read path.
-  Save/export is completely untested across all 16.
+* **One tool has now saved.** TerrainEditor wrote a complete 3.7 MB `.trn` via
+  `File > Save As` on 2026-08-27, and the result was verified against SOE's own
+  shipped data (see Bake Terrain above). Save/export remains untested on the
+  other 15.
 * **Nothing has been edited.** No parameter changed, no object created.
 * **15 of 16 are now driven past launch.** The three that looked broken were not:
   SwgSpaceZoneEditor needed the `.tab` source under `dsrc/` rather than the
