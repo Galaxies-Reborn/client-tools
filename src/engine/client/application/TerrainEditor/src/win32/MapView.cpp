@@ -680,7 +680,29 @@ void MapView::drawLayer (CDC* pDC, const VectorArgb& color, const TerrainGenerat
 	int n = layer->getNumberOfBoundaries ();
 	int i;
 	for (i = 0; i < n; i++)
-		drawBoundary (pDC, color, layer->getBoundary (i), forceDraw);
+	{
+		const TerrainGenerator::Boundary* const boundary = layer->getBoundary (i);
+
+		//-- Tools > Bake Rivers-Roads left a null in a layer's boundary list and the
+		//   next repaint faulted on it (2026-08-27): drawBoundary+0x4 dereferencing a
+		//   null `boundary` for isActive(). Report and skip rather than fault in the
+		//   paint path. WARNING, not DEBUG_WARNING - the latter compiles out in
+		//   release, which is why every DEBUG_FATAL along that path stayed silent.
+		if (!boundary)
+		{
+			static bool reported = false;
+			if (!reported)
+			{
+				reported = true;
+				WARNING (true, ("MapView::drawLayer: null boundary %d of %d in layer '%s'",
+					i, n, layer->getName () ? layer->getName () : "<unnamed>"));
+			}
+
+			continue;
+		}
+
+		drawBoundary (pDC, color, boundary, forceDraw);
+	}
 
 	n = layer->getNumberOfLayers ();
 	for (i = 0; i < n; i++)
