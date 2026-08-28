@@ -2533,3 +2533,70 @@ posting.
 2. **Server evening**: walk on an edited .trn in SwgGodClient (closes
    edit->save->PLAY), then drive the god tools - still the largest untested area.
 3. Save-path sweep across the other 15 tools - only TerrainEditor has ever saved.
+
+# ===== SESSION 2026-08-28 - SAVE-PATH SWEEP across the other 15 tools =====
+
+Kenny is standing the server up in parallel; the god-client walk on an edited
+.trn happens when he is ready. Meanwhile: the save sweep. Only TerrainEditor had
+ever written a file before today.
+
+## Save-path map (agent-built, full detail in the agent output; keep these traps)
+
+* **SwgConversationEditor**: OnSaveDocument REJECTS paths with spaces; a failed
+  save can still return TRUE and clear the modified flag (catch block falls
+  through) - verify bytes on disk, never trust the title alone.
+* **ParticleEditor**: fileSaveAs has NO accelerator - drive via Alt+F, 'a'
+  (menuText "Save &As..."). Extension force-appended .prt.
+* **SoundEditor**: no save accel either (menu built in code); refuses to save an
+  empty sample list.
+* **AnimationEditor**: the ONLY tool that resolves save paths through TreeFile
+  (TreeFile::getPathName, dsrc->data rewrite); no Save As at all - dialog only
+  when m_pathName is empty. Boot-loaded all_b.ash would save to the raw relative
+  path under the CWD (Release dir) since TREs are not searchPaths.
+* **ClientEffectEditor**: save is a no-op unless m_effectTemplateModified; typed
+  extension .cef REQUIRED (not appended).
+* **DANGER GROUP - save writes to config-derived paths pointing into the SOE
+  reference tree, NOT the path you pick**: ShipComponentEditor (Save All, no
+  dialog at all), SwgSpaceQuestEditor (path run through extractRootName, real
+  dests from Configuration::getMissionTemplate), QuestEditor (exportDataTables +
+  .stf after the .qst), SwgDraftSchematicEditor (derived shared .tpf beside the
+  picked server .tpf). Do NOT drive their saves without first sandboxing or
+  auditing the destination paths.
+* SwgSpaceZoneEditor: writes the .tab you pick PLUS a compiled .iff derived via
+  Replace("dsrc","data") - a path with no "dsrc" gets the .iff beside the .tab.
+
+## Automation lessons (paid for in near-misses)
+
+* **The native file dialog's filename field must be VERIFIED after WM_SETTEXT.**
+  First attempt put the path in the wrong Edit (the search box); the dialog kept
+  its default name pointing at the ORIGINAL SOE file and the OK click raised an
+  overwrite prompt for it. Answered No; original verified untouched (mtime).
+  scripts/_drive-save.ps1 now sets every candidate edit, reads back, refuses to
+  click without an exact match, and treats any 'Confirm Save As' as failure
+  (targets are pre-deleted, so a confirm ALWAYS means wrong file) - answers NO.
+* **BM_CLICK via SendMessage deadlocks** when the click raises a modal dialog -
+  use PostMessage(dlg, WM_COMMAND, IDOK, btn) instead.
+* MFC tools are drivable with zero foreground: WM_COMMAND 0xE100/0xE101/0xE104
+  (New/Open/SaveAs), WM_CLOSE dismisses the startup boxes. Qt tools still need
+  guarded SendKeys for menu accels, and the guard DID trip while Kenny used the
+  machine - the guard aborts rather than spraying keys into his windows.
+
+## Results so far
+
+| tool | result |
+|---|---|
+| SwgConversationEditor | **SAVE + RELOAD PASS.** File>New -> Save As -> 2,164-byte FORM/CNV /0002 IFF (the FIRST .cnv on this machine) -> File>Open on it, title takes the name, no crash. C:\save-test\swgcon-new.cnv |
+| ParticleEditor | open PASS (campfire tree: fire/trailing embers/trailing smoke). Save As pending - foreground guard tripped (Kenny active). Retry. |
+| SwgSpaceZoneEditor | in flight |
+
+## Also fixed: SwgConversationEditor's three startup dialogs -> one
+
+Kenny reported three boxes. Identified all three (enum + Static text):
+1. structural exe\win32 check - stays;
+2. missing mochaCommand key (SwgConversationEditor.cpp:216-218 requires
+   scriptPath+stringPath+mochaCommand KEYS to exist);
+3. missing dictionary keys.
+Fix: appended mochaCommand (rebased; the mocha script does NOT exist locally -
+no utils/ dir in the reference tree - so Compile will fail if ever invoked) and
+both SOE .dct dictionary paths to SwgConversationEditor.cfg. Verified: one
+dialog remains. Spell checker now has SOE's 894KB medium dictionary.
