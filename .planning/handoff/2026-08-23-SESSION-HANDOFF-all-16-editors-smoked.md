@@ -2908,3 +2908,17 @@ WARNING, sharper than before now that saves SUCCEED: NpcEditor's SaveDialog
 Browse defaults and QuestEditor's plain Ctrl+S both point at / write back to
 the reference tree. The failures that used to protect it are fixed. Save As
 to a scratch path first, always.
+
+## NEXT PHASE ROADMAP -> .planning/TODO-tools-productization.md (2026-08-28)
+
+Kenny's direction, captured in the TODO file: (1) port
+buildQuestCrcStringTables (the .pl exists NOWHERE on this machine - find in
+SWGSource history or reimplement from the output format); (2) strip Perforce
+from every tool (several P4 buttons AUTO-SAVE first - dangerous); (3) a
+usability pass per editor - "usable, not perfection" - seeded with the save
+sweep's trap list; (4) packaging: inventory what loose data is NOT in the
+SWGSource TREs (lmg/ui/ash/lat/dsrc/...), installer carries it and
+parameterizes the cfg roots; (5) survey the CLI layer (templatecompiler,
+miff, TreeFileBuilder/Extractor, mochac - DataTableTool already done) to
+restore the end-to-end toolkit; (6) endgame: migrate that CLI layer to
+SWG-Toolkit.
