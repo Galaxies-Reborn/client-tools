@@ -2760,3 +2760,15 @@ Save is only usable for files under a real searchPath. Test rerun with a
 sandbox searchPath11=C:/save-test/anim holding loose all_b.ash + both LATs
 (AnimationEditor.cfg backed up as .pre-savesweep.bak; maxSearchPriority=12 so
 11 is read; 11 beats the TREs at 0-8).
+
+## AnimationEditor - SAVE PASS via sandbox searchPath (2026-08-28) - 11/15
+
+With searchPath11=C:/save-test/anim (loose all_b.ash + both LATs), Ctrl+S on
+each tab rewrote all three files BYTE-IDENTICAL (hash unchanged, mtime moved) -
+perfect round trip through both writers. Each save also emits an XML sibling
+(all_b.ash.xml ~1MB etc.) - the writers produce IFF + XML export together.
+Success is SILENT (no dialog) - by design. cfg restored after the test.
+Incidental: with the loose SOE-tree copies loaded instead of the TRE vintage,
+the avatar WALKED OFF SCREEN at boot - the loose tree's default logical
+animation apparently carries root motion. Cosmetic, but expect it if anyone
+mounts the loose tree for this tool.
