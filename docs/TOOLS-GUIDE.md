@@ -906,11 +906,51 @@ That last direction matters on its own: the editor had been proven to *write* a
 file but never to *read back* what it wrote, and a file that saves but will not
 reload is the classic save-path failure. It reloads.
 
-**Assessment update.** All three bake paths and the full edit/save/reload cycle are
-now exercised on a real 3.7 MB planet. Still untouched: the **3D View**. Carry
-forward the one open defect — a single unreproduced null-boundary crash after Bake
-Rivers/Roads, now guarded and logged rather than fatal. The Tip dialog is the
-single biggest practical annoyance and is now solvable.
+#### The 3D View — FIXED end to end, 2026-08-27
+
+It showed nothing but a grey screen — the `0xffa1a1a1` clear colour from
+`View3dView.cpp` — because **four separate pieces of scene glue were missing**,
+each one hidden behind the previous. All live in `clientGame`, which no tool runs:
+
+1. **The terrain appearance was the server variant.** `SetupSharedTerrain` binds
+   `MPTA`/`PTAT` to `ServerProceduralTerrainAppearanceTemplate` — collision/height
+   only, no renderable chunks. Fixed by installing `SetupClientTerrain` (after
+   `SetupClientGraphics` — it needs `ShaderPrimitiveSorter::getPhase`).
+2. **`ms_referenceCamera` was null**, so `calculateLod()` bailed every frame and no
+   chunks were requested. Only `Panorama.cpp:82` and `GroundScene.cpp:1945` ever
+   set it. The view now points it at its own camera each frame.
+3. **Collision was never installed** — the first completed chunk's flora crashed
+   the editor in `MemoryBlockManager::allocate` via `CollisionWorld::addObject`.
+   Fixed with the same `SetupSharedCollision::Data` Turf uses.
+4. **Terrain primitives were queued but never drawn, and there were no lights.**
+   `ClientChunk::render` only QUEUES into `ClientTerrainSorter`; the flush is a
+   world-cell pre-draw hook registered solely by `ClientWorld::
+   addRenderHookFunctions` (`ClientWorld.cpp:634`). A RenderDoc capture showed 5
+   draws (4 flora + composite) while `getNumberOfChunksRendered()` climbed
+   ~267/frame — rendered, queued, dropped. The view now registers the same
+   `draw`/`clear` hooks. That produced solid-black terrain: the game's lights
+   belong to `GroundEnvironment`, created **black** and driven by per-planet
+   environment data the tool never loads. The lint comment on `OnInitialUpdate`
+   still named `ambientLight/parallelLight` — the creation code had been removed;
+   restored with `FloraMeshView`'s lights as world environment lights.
+
+**Result: fully textured, lit Tatooine terrain**, confirmed visually and by
+screenshot (`logs/_shots/TerrainEditor_3dview_working.png`). Usage: open a planet,
+open the 3D View, **click Refresh on its toolbar** (the view starts empty by
+design), keep it focused (`OnSetFocus` gates rendering); arrow keys move, left-drag
+looks, the camera clamps to ground+2m. Diagnosis trail is in commits `02e7543ca`
+and `41ba57276`, including the RenderDoc workflow that actually works for MFC
+tools (drive via WM_COMMAND — MRU `0xE111`, 3D View `1258`, Refresh `1384` — and
+capture with F12 from the injected instance; the CLI's `-d` counting is eaten by
+~150 startup presents and its timeout kills larger values).
+
+**Assessment update.** All three bake paths, the full edit/save/reload cycle, and
+now the 3D View are exercised and working on a real planet. TerrainEditor is the
+most thoroughly verified tool in the set, and the only one with every major
+surface driven. Carry forward the one open defect — a single unreproduced
+null-boundary crash after Bake Rivers/Roads, now guarded and logged rather than
+fatal. The Tip dialog is the single biggest practical annoyance and is now
+solvable.
 
 ---
 
