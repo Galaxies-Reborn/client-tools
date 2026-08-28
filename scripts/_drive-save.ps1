@@ -176,7 +176,7 @@ function WaitDlg([int]$thePid,[int]$tries=25,[IntPtr]$excl=[IntPtr]::Zero) {
 function GuardedKeys([IntPtr]$target,[string]$keys) {
     # $keys may be comma-separated chunks sent with a pause between them
     # (menu mnemonics need the popup to appear first, e.g. '%f,a').
-    for ($i=0; $i -lt 30; $i++) {
+    for ($i=0; $i -lt 60; $i++) {
         [void][Sv]::BringWindowToTop($target); [void][Sv]::SetForegroundWindow($target)
         Start-Sleep -Milliseconds 500
         if ([Sv]::GetForegroundWindow() -eq $target) {
@@ -192,7 +192,7 @@ function GuardedKeys([IntPtr]$target,[string]$keys) {
 }
 
 Write-Host ("=== SAVE SWEEP: {0}" -f $Exe) -ForegroundColor Cyan
-if (Test-Path $SavePath) { Remove-Item $SavePath -Force }
+if ((Test-Path $SavePath) -and ($SavePath -ne $OpenPath)) { Remove-Item $SavePath -Force }
 Get-Process $name -ErrorAction SilentlyContinue | Stop-Process -Force
 $warn = Join-Path $dir 'logs\warning.log'
 $before = if (Test-Path $warn) { (Get-Item $warn).LastWriteTime } else { [datetime]::MinValue }
@@ -237,6 +237,15 @@ if ($OpenPath -ne '') {
 }
 
 $saveTarget = if ($NoDismiss) { $main } else { MainWin $p.Id }
+# snapshot existing #32770s so a pre-existing dialog-class window (UIBuilder's
+# workspace) is never mistaken for the Save dialog
+$preDlgs = @([Sv]::ForPid([uint32]$p.Id) | Where-Object { [Sv]::C($_) -eq '#32770' })
+function WaitNewDlg([int]$thePid,[object[]]$known,[int]$tries=15) {
+    for ($i=0; $i -lt $tries; $i++) { Start-Sleep -Milliseconds 600
+        foreach ($h in ([Sv]::ForPid([uint32]$thePid) | Where-Object { [Sv]::C($_) -eq '#32770' })) {
+            if ($known -notcontains $h) { return $h } } }
+    return $null
+}
 if ($QtSaveAccel -ne '') { if (-not (GuardedKeys $saveTarget $QtSaveAccel)) { exit 3 } }
 else { Write-Host ("posting save command 0x{0:X}" -f $SaveAsCmd)
        [void][Sv]::PostMessage($saveTarget, 0x0111, [IntPtr]$SaveAsCmd, [IntPtr]::Zero) }
@@ -256,7 +265,14 @@ if ($NoSaveDialog) {
     else { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; Write-Host 'stopped' }
     exit 0
 }
-$d = WaitDlg $p.Id 25 $main
+$d = WaitNewDlg $p.Id $preDlgs
+if (-not $d -and $QtSaveAccel -eq '') {
+    # some frames route the command through a child window - try the others
+    foreach ($w in $preDlgs) { if ($w -ne $saveTarget) {
+        Write-Host ("retrying save command on {0} '{1}'" -f $w, [Sv]::T($w)) -ForegroundColor Yellow
+        [void][Sv]::PostMessage($w, 0x0111, [IntPtr]$SaveAsCmd, [IntPtr]::Zero) } }
+    $d = WaitNewDlg $p.Id $preDlgs
+}
 if (-not $d) { Write-Host 'no Save dialog' -ForegroundColor Red; Shot $saveTarget 's4-nosave' | Out-Null; if(-not $Keep){Stop-Process -Id $p.Id -Force}; exit 2 }
 Write-Host ("  save dialog: '{0}'" -f [Sv]::T($d))
 Shot $d 's5-savedlg' | Out-Null

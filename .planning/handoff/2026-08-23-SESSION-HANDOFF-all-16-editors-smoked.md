@@ -2660,3 +2660,22 @@ against shipped data should expect that column to appear.
 * -NoSaveDialog for tools whose save writes straight to config paths
   (SpaceQuest); -NoDismiss for UIBuilder whose MAIN window is a #32770 (the
   dismiss loop would WM_CLOSE the app).
+
+## UIBuilder - SAVE + RELOAD + IDEMPOTENCY PASS (2026-08-28)
+
+Open a sandbox COPY of SOE's loose `ui_root_npceditor.ui` -> post ID_FILE_SAVE
+(0xE103) -> in-place rewrite, 11,349 -> 6,543 bytes. The shrink is UISaver
+dropping default-valued attributes, NOT data loss: every load-bearing node
+survives (/AvView, viewerWidget, sampleWearableBox, wearableVolumePage,
+currentVolumePage, pageWearables, hiddenAvatarList x2, CodeData). Reload of the
+normalized file -> second save leaves mtime UNTOUCHED, which is by design:
+`MainFrm.cpp:903-905` compares regenerated content against disk and skips
+unmodified files - i.e. the regeneration was byte-identical. Strongest possible
+idempotency result.
+
+Driving notes: UIBuilder's MAIN window is a #32770 (use -NoDismiss or the
+dismiss loop closes the app); opening a workspace spawns a SECOND #32770
+titled '[<file>]', so the save-dialog finder must look for NEW #32770s only.
+UNEXPLAINED: ID_FILE_SAVEAS (32774, custom id) posted via WM_COMMAND produced
+no dialog on two attempts - in-place ID_FILE_SAVE was used instead. If Save As
+matters later, investigate whether CFileDialog there needs an active window.
