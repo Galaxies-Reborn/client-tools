@@ -2679,3 +2679,23 @@ titled '[<file>]', so the save-dialog finder must look for NEW #32770s only.
 UNEXPLAINED: ID_FILE_SAVEAS (32774, custom id) posted via WM_COMMAND produced
 no dialog on two attempts - in-place ID_FILE_SAVE was used instead. If Save As
 matters later, investigate whether CFileDialog there needs an active window.
+
+## ParticleEditor - SAVE + RELOAD PASS (2026-08-28, human-driven)
+
+Kenny drove it; automation only verified. Open `pt_campfire_s01.prt` -> Save As
+`C:\save-test\campfire-resave.prt` (8,040 B vs 6,899 B original) -> File>Open
+the saved file -> tree repopulates AND the fire renders. Census: all semantic
+structure 1:1 (PEFT/EMGP/3x EMTR/3x PTQD + ramps/textures/timing); differences
+are FORMAT-VERSION UPGRADES - emitters 0012 -> 0014, version chunks 0001 ->
+0002, WVFM 63 -> 72 (later-SOE emitter parameters serialized with defaults).
+Third instance of the pattern: these tools UPGRADE old data to their current
+schema on save (SpaceQuest navRadius column, UIBuilder attribute
+normalization, ParticleEditor emitter version).
+
+Incidental findings while driving:
+* "Campfire not visible" = the effect TRANSLATION was non-zero (off-camera).
+  Reset + the Snap-to-player button brought it back. Not a render bug.
+* The UI stopped accepting clicks once after menu use; process Responding=TRUE,
+  no dialog present; Esc / Alt+Esc released it. Looks like a stuck Qt menu/
+  mouse grab, one occurrence, not reproduced.
+* File > New works but takes ~20s to visibly reset - not a hang, don't kill it.
