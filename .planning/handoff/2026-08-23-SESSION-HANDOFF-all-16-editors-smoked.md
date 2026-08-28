@@ -2729,3 +2729,11 @@ handleCombatAction every ~2s; combat_manager.iff + 52 playback .pst ARE in
 the mounted TREs; no warnings logged - whatever fails is silent in release).
 Both podracer_energy_binders*.swh files in the SOE tree are 0 bytes -
 placeholders, not valid opens.
+
+## SoundEditor - SAVE PASS (2026-08-28, human-driven)
+
+`music_combat_loop.snd` -> Save As -> 933 bytes, census identical, same 28
+samples - in EXACTLY REVERSED order (writer iterates its list back-to-front;
+cosmetic for a Random-No-Repeats playlist). First attempt saved a 163-byte
+1-sample template because the open hadn't landed - ALWAYS confirm "Sample List
+(28 samples)" before saving; the tool happily saves whatever it holds.
