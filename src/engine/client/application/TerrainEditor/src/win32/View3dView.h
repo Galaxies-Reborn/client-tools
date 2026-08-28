@@ -13,6 +13,7 @@
 //-------------------------------------------------------------------
 
 class GameCamera;
+class Light;
 class ObjectList;
 class TerrainObject;
 
@@ -24,6 +25,8 @@ private:
 
 	GameCamera*    camera;
 	TerrainObject* terrain;
+	Light*         ambientLight;
+	Light*         parallelLight;
 	
 	real           yaw;
 	real           pitch;

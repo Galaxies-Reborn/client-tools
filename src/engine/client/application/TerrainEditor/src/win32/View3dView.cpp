@@ -15,6 +15,8 @@
 #include "TerrainEditorDoc.h"
 #include "clientGraphics/Graphics.h"
 #include "clientTerrain/ClientProceduralTerrainAppearance.h"
+#include "clientTerrain/ClientTerrainSorter.h"
+#include "sharedObject/CellProperty.h"
 #include "clientGraphics/Light.h"
 #include "clientGraphics/RenderWorld.h"
 #include "clientObject/GameCamera.h"
@@ -44,6 +46,8 @@ View3dView::View3dView() :
 	CView (),
 	camera (0),
 	terrain (0),
+	ambientLight (0),
+	parallelLight (0),
 	yaw (0),
 	pitch (0),
 	timer (0),
@@ -181,6 +185,33 @@ void View3dView::OnInitialUpdate()
 	RenderWorld::addObjectNotifications (*terrain);
 	terrain->addToWorld ();
 
+	//-- Terrain chunks do not draw themselves: ClientChunk::render only QUEUES
+	//   primitives into ClientTerrainSorter, and the flush lives in a world-cell
+	//   pre-draw hook that only ClientWorld::addRenderHookFunctions installs
+	//   (ClientWorld.cpp:634) - clientGame code this tool never runs. Without the
+	//   hook the sorter fills up every frame and nothing is ever drawn: the 3D
+	//   View rendered ~267 chunks per frame to zero GPU draws. Mirror ClientWorld's
+	//   hook set here.
+	CellProperty::getWorldCellProperty ()->addPreDrawRenderHookFunction (&ClientTerrainSorter::draw);
+	CellProperty::getWorldCellProperty ()->addExitRenderHookFunction (&ClientTerrainSorter::clear);
+
+	//-- Lights. Without these the terrain renders solid black: the game's lights
+	//   belong to GroundEnvironment, which creates them BLACK and drives their
+	//   colours from per-planet environment data this tool never loads. The lint
+	//   comment on this function still names ambientLight/parallelLight - the
+	//   creation code had been removed at some point. Same lights the editor's own
+	//   FloraMeshView uses (FloraMeshView.cpp:189-195), but registered as world
+	//   environment lights because this view renders through RenderWorld.
+	ambientLight = new Light (Light::T_ambient, VectorArgb (1.f, 0.6f, 0.6f, 0.6f));
+	ambientLight->addToWorld ();
+	RenderWorld::addWorldEnvironmentLight (ambientLight);
+
+	parallelLight = new Light (Light::T_parallel, VectorArgb::solidWhite);
+	parallelLight->yaw_o (PI_OVER_4);
+	parallelLight->pitch_o (-PI_OVER_4);
+	parallelLight->addToWorld ();
+	RenderWorld::addWorldEnvironmentLight (parallelLight);
+
 	yaw   = 0;
 	pitch = 0;
 }  //lint !e429  //-- ambientLight/parallelLight has not been freed or returned
@@ -259,6 +290,26 @@ void View3dView::OnDestroy()
 	CView::OnDestroy();
 
 	IGNORE_RETURN (KillTimer (timer));
+
+	//-- mirror of the hooks added in OnInitialUpdate
+	CellProperty::getWorldCellProperty ()->removePreDrawRenderHookFunction (&ClientTerrainSorter::draw);
+	CellProperty::getWorldCellProperty ()->removeExitRenderHookFunction (&ClientTerrainSorter::clear);
+
+	if (ambientLight)
+	{
+		RenderWorld::removeWorldEnvironmentLight (ambientLight);
+		ambientLight->removeFromWorld ();
+		delete ambientLight;
+		ambientLight = 0;
+	}
+
+	if (parallelLight)
+	{
+		RenderWorld::removeWorldEnvironmentLight (parallelLight);
+		parallelLight->removeFromWorld ();
+		delete parallelLight;
+		parallelLight = 0;
+	}
 
 	//-- the static must not outlive the camera it points at
 	ClientProceduralTerrainAppearance::setReferenceCamera (0);
