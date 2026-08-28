@@ -14,6 +14,7 @@
 #include "Resource.h"
 #include "TerrainEditorDoc.h"
 #include "clientGraphics/Graphics.h"
+#include "clientTerrain/ClientProceduralTerrainAppearance.h"
 #include "clientGraphics/Light.h"
 #include "clientGraphics/RenderWorld.h"
 #include "clientObject/GameCamera.h"
@@ -56,6 +57,9 @@ View3dView::View3dView() :
 
 View3dView::~View3dView()
 {
+	//-- the static must not outlive the camera it points at
+	ClientProceduralTerrainAppearance::setReferenceCamera (0);
+
 	delete camera;
 	camera = 0;
 
@@ -90,6 +94,17 @@ void View3dView::OnDraw(CDC* pDC)
 		return;
 
 	NOT_NULL (camera);
+
+	//-- ClientProceduralTerrainAppearance::calculateLod() gives up immediately when
+	//   the static ms_referenceCamera is null, so no level of detail is selected and
+	//   no chunks are ever built - the 3D View then shows nothing but the 0xffa1a1a1
+	//   clear colour below. The only two callers of setReferenceCamera live in
+	//   clientGame (Panorama.cpp:82, GroundScene.cpp:1945), which this tool never
+	//   runs, so the editor has to point it at its own camera. The NOT_NULL that was
+	//   supposed to catch this is UNREF() in release (Fatal.h:97) and said nothing.
+	//   Set it every frame: it is a static shared by every view, and this one is
+	//   about to render.
+	ClientProceduralTerrainAppearance::setReferenceCamera (camera);
 
 	NOT_NULL (terrain);
 	IGNORE_RETURN (terrain->alter (elapsedTime));
@@ -245,7 +260,9 @@ void View3dView::OnDestroy()
 
 	IGNORE_RETURN (KillTimer (timer));
 
-	// TODO: Add your message handler code here
+	//-- the static must not outlive the camera it points at
+	ClientProceduralTerrainAppearance::setReferenceCamera (0);
+
 	delete camera;
 	camera = 0;
 }
