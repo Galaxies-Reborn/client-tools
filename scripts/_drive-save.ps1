@@ -20,6 +20,8 @@ param(
   [int]$SaveAsCmd = 0xE104,
   [string]$QtOpenAccel = '',
   [string]$QtSaveAccel = '',
+  [switch]$NoSaveDialog,      # save cmd writes directly (e.g. ID_FILE_SAVE to config paths)
+  [switch]$NoDismiss,         # main window IS a #32770 (UIBuilder) - never WM_CLOSE it
   [int]$Boot = 25,
   [int]$AfterOpen = 20,
   [int]$AfterSave = 12,
@@ -52,7 +54,14 @@ public class Sv {
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern IntPtr SendMessageW(IntPtr h, uint m, IntPtr w, StringBuilder l);
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
+    [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
     public static string GT(IntPtr h) { var s = new StringBuilder(2048); SendMessageW(h, 0x000D, (IntPtr)2048, s); return s.ToString(); }
+    public static string Chain(IntPtr h, IntPtr stop) {
+        var sb = new StringBuilder(); IntPtr cur = GetParent(h);
+        for (int i = 0; i < 12 && cur != IntPtr.Zero && cur != stop; i++) {
+            if (sb.Length > 0) sb.Append(" < ");
+            sb.Append(C(cur)); cur = GetParent(cur); }
+        return sb.ToString(); }
     public static List<IntPtr> ForPid(uint want) {
         var f = new List<IntPtr>();
         EnumWindows(delegate(IntPtr h, IntPtr l) { uint pid; GetWindowThreadProcessId(h, out pid);
@@ -79,7 +88,7 @@ function Shot([IntPtr]$h,[string]$tag) {
     $b.Save($p,[System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $b.Dispose(); return $p
 }
 function Wins([int]$thePid){ foreach($h in [Sv]::ForPid([uint32]$thePid)){ Write-Host ("    [{0}] '{1}'" -f [Sv]::C($h),[Sv]::T($h)) } }
-function Dlg([int]$thePid){ [Sv]::ForPid([uint32]$thePid) | Where-Object { [Sv]::C($_) -eq '#32770' } | Select-Object -First 1 }
+function Dlg([int]$thePid,[IntPtr]$excl=[IntPtr]::Zero){ [Sv]::ForPid([uint32]$thePid) | Where-Object { [Sv]::C($_) -eq '#32770' -and $_ -ne $excl } | Select-Object -First 1 }
 function MainWin([int]$thePid){
     $m=$null; $best=0
     foreach($h in [Sv]::ForPid([uint32]$thePid)){
@@ -96,21 +105,44 @@ function FillFileDialog([IntPtr]$dlg,[string]$path) {
     # deceptive search-box Edit). Set EVERY candidate, then read back and require
     # at least one to hold the exact path before clicking - a mis-filled dialog
     # with a default name would otherwise overwrite the ORIGINAL file.
-    $targets = @()
-    $e1 = [Sv]::GetDlgItem($dlg, 0x480)
-    if ($e1 -ne [IntPtr]::Zero) { $targets += $e1 }
-    foreach ($cmb in ([Sv]::Kids($dlg) | Where-Object { [Sv]::C($_) -like 'ComboBox*' })) {
-        foreach ($e in ([Sv]::Kids($cmb) | Where-Object { [Sv]::C($_) -eq 'Edit' })) { $targets += $e }
+    # ONLY the true filename edit: dlg item 0x480 (edt1), or the Edit inside the
+    # filename ComboBox. NEVER an edit under the rebar (search box, address bar) -
+    # touching those navigates the dialog or fools the verify.
+    $edit = [IntPtr]::Zero
+    for ($try = 0; $try -lt 8 -and $edit -eq [IntPtr]::Zero; $try++) {
+        if ($try -gt 0) { Start-Sleep -Seconds 1 }
+        $e1 = [Sv]::GetDlgItem($dlg, 0x480)
+        if ($e1 -ne [IntPtr]::Zero) { $edit = $e1; break }
+        $cmb = [Sv]::GetDlgItem($dlg, 0x47C)
+        if ($cmb -ne [IntPtr]::Zero) {
+            $e2 = [Sv]::Kids($cmb) | Where-Object { [Sv]::C($_) -eq 'Edit' } | Select-Object -First 1
+            if ($e2) { $edit = $e2; break } }
+        foreach ($k in [Sv]::Kids($dlg)) {
+            if ([Sv]::C($k) -ne 'Edit') { continue }
+            $chain = [Sv]::Chain($k, $dlg)
+            if ($chain -match 'ReBarWindow32|SearchEditBox|Address|Breadcrumb') { continue }
+            if ($chain -match 'ComboBox') { $edit = $k; break }
+        }
     }
-    if ($targets.Count -eq 0) { Write-Host 'no filename Edit control in dialog' -ForegroundColor Red; return $false }
-    foreach ($t in $targets) {
-        Write-Host ("  filling edit {0} (had '{1}')" -f $t, [Sv]::GT($t)) -ForegroundColor DarkGray
-        [void][Sv]::SendMessageW($t, 0x000C, [IntPtr]::Zero, $path)   # WM_SETTEXT
+    if ($edit -eq [IntPtr]::Zero) {
+        Write-Host 'no filename Edit found; all Edits with ancestor chains:' -ForegroundColor Red
+        foreach ($k in [Sv]::Kids($dlg)) {
+            if ([Sv]::C($k) -eq 'Edit') { Write-Host ("    {0} '{1}'  chain: {2}" -f $k, [Sv]::GT($k), [Sv]::Chain($k, $dlg)) } }
+        return $false }
+    Write-Host ("  filename edit {0} (had '{1}')" -f $edit, [Sv]::GT($edit)) -ForegroundColor DarkGray
+    # EM_SETSEL all + EM_REPLACESEL: behaves like typing (EN_CHANGE, internal sync)
+    [void][Sv]::SendMessage($edit, 0x00B1, [IntPtr]::Zero, [IntPtr](-1))   # EM_SETSEL 0,-1
+    [void][Sv]::SendMessageW($edit, 0x00C2, [IntPtr]1, $path)              # EM_REPLACESEL
+    Start-Sleep -Milliseconds 800
+    $got = [Sv]::GT($edit)
+    if ($got -ne $path) {
+        Write-Host ("  EM_REPLACESEL readback '{0}' - retrying WM_SETTEXT" -f $got) -ForegroundColor Yellow
+        [void][Sv]::SendMessageW($edit, 0x000C, [IntPtr]::Zero, $path)
+        Start-Sleep -Milliseconds 800
+        $got = [Sv]::GT($edit)
     }
-    Start-Sleep -Milliseconds 600
-    $verified = $false
-    foreach ($t in $targets) { if ([Sv]::GT($t) -eq $path) { $verified = $true; break } }
-    if (-not $verified) { Write-Host 'FILL VERIFY FAILED - not clicking OK' -ForegroundColor Red; return $false }
+    Write-Host ("  filename edit now: '{0}'" -f $got)
+    if ($got -ne $path) { Write-Host 'FILL VERIFY FAILED - not clicking OK' -ForegroundColor Red; return $false }
     $ok = [Sv]::GetDlgItem($dlg, 1)                                   # IDOK
     if ($ok -eq [IntPtr]::Zero) { Write-Host 'no IDOK button' -ForegroundColor Red; return $false }
     # async click: BM_CLICK via SendMessage blocks if the save pops a modal box
@@ -125,6 +157,8 @@ function GuardOverwrite([int]$thePid,[int]$secs) {
         $c = [Sv]::ForPid([uint32]$thePid) | Where-Object { [Sv]::T($_) -eq 'Confirm Save As' } | Select-Object -First 1
         if ($c) {
             Write-Host 'OVERWRITE PROMPT - fill went to the wrong file. Answering NO.' -ForegroundColor Red
+            foreach ($k in [Sv]::Kids($c)) {
+                if ([Sv]::C($k) -eq 'Static' -and [Sv]::T($k) -ne '') { Write-Host ("    confirm text: {0}" -f [Sv]::T($k)) } }
             [void][Sv]::PostMessage($c, 0x0111, [IntPtr]7, [IntPtr]::Zero)   # IDNO
             Start-Sleep -Seconds 1
             foreach ($h in [Sv]::ForPid([uint32]$thePid)) {
@@ -134,9 +168,9 @@ function GuardOverwrite([int]$thePid,[int]$secs) {
     }
     return $true
 }
-function WaitDlg([int]$thePid,[int]$tries=25) {
+function WaitDlg([int]$thePid,[int]$tries=25,[IntPtr]$excl=[IntPtr]::Zero) {
     for ($i=0; $i -lt $tries; $i++) { Start-Sleep -Milliseconds 600
-        $d = Dlg $thePid; if ($d) { return $d } }
+        $d = Dlg $thePid $excl; if ($d) { return $d } }
     return $null
 }
 function GuardedKeys([IntPtr]$target,[string]$keys) {
@@ -168,14 +202,18 @@ Start-Sleep -Seconds $Boot
 $p.Refresh(); if ($p.HasExited) { Write-Host ("EXITED during boot 0x{0:X8}" -f $p.ExitCode) -ForegroundColor Red; exit 1 }
 
 # dismiss modal startup warnings without foreground: WM_CLOSE works on these boxes
-for ($round=0; $round -lt 6; $round++) {
-    $d = Dlg $p.Id
-    if (-not $d) { break }
-    Write-Host ("  dismissing startup dialog: '{0}'" -f [Sv]::T($d)) -ForegroundColor DarkGray
-    [void][Sv]::PostMessage($d, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CLOSE
-    Start-Sleep -Milliseconds 1200
+if (-not $NoDismiss) {
+    for ($round=0; $round -lt 6; $round++) {
+        $d = Dlg $p.Id
+        if (-not $d) { break }
+        Write-Host ("  dismissing startup dialog: '{0}'" -f [Sv]::T($d)) -ForegroundColor DarkGray
+        [void][Sv]::PostMessage($d, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)  # WM_CLOSE
+        Start-Sleep -Milliseconds 1200
+    }
 }
 $main = MainWin $p.Id
+if ($NoDismiss -and (-not $main -or $main -eq [IntPtr]::Zero)) {
+    $main = [Sv]::ForPid([uint32]$p.Id) | Select-Object -First 1 }
 Write-Host "-- windows after boot --"; Wins $p.Id
 Write-Host ("boot shot: {0}" -f (Shot $main 's1-boot'))
 
@@ -188,7 +226,7 @@ if ($OpenPath -ne '') {
     if ($QtOpenAccel -ne '') { if (-not (GuardedKeys $main $QtOpenAccel)) { exit 3 } }
     else { Write-Host ("posting File>Open 0x{0:X}" -f $OpenCmd)
            [void][Sv]::PostMessage($main, 0x0111, [IntPtr]$OpenCmd, [IntPtr]::Zero) }
-    $d = WaitDlg $p.Id
+    $d = WaitDlg $p.Id 25 $main
     if (-not $d) { Write-Host 'no Open dialog' -ForegroundColor Red; Shot $main 's2-noopen' | Out-Null; if(-not $Keep){Stop-Process -Id $p.Id -Force}; exit 2 }
     Write-Host ("  open dialog: '{0}'" -f [Sv]::T($d))
     if (-not (FillFileDialog $d $OpenPath)) { if(-not $Keep){Stop-Process -Id $p.Id -Force}; exit 2 }
@@ -198,18 +236,35 @@ if ($OpenPath -ne '') {
     Write-Host ("after-open shot: {0}" -f (Shot (MainWin $p.Id) 's3-opened'))
 }
 
-if ($QtSaveAccel -ne '') { $m2 = MainWin $p.Id; if (-not (GuardedKeys $m2 $QtSaveAccel)) { exit 3 } }
-else { Write-Host ("posting File>Save As 0x{0:X}" -f $SaveAsCmd)
-       [void][Sv]::PostMessage((MainWin $p.Id), 0x0111, [IntPtr]$SaveAsCmd, [IntPtr]::Zero) }
-$d = WaitDlg $p.Id
-if (-not $d) { Write-Host 'no Save dialog' -ForegroundColor Red; Shot (MainWin $p.Id) 's4-nosave' | Out-Null; if(-not $Keep){Stop-Process -Id $p.Id -Force}; exit 2 }
+$saveTarget = if ($NoDismiss) { $main } else { MainWin $p.Id }
+if ($QtSaveAccel -ne '') { if (-not (GuardedKeys $saveTarget $QtSaveAccel)) { exit 3 } }
+else { Write-Host ("posting save command 0x{0:X}" -f $SaveAsCmd)
+       [void][Sv]::PostMessage($saveTarget, 0x0111, [IntPtr]$SaveAsCmd, [IntPtr]::Zero) }
+if ($NoSaveDialog) {
+    Start-Sleep -Seconds $AfterSave
+    $d2 = Dlg $p.Id $main
+    if ($d2) { Write-Host ("  post-save dialog: '{0}'" -f [Sv]::T($d2)) -ForegroundColor Yellow
+               foreach ($k in [Sv]::Kids($d2)) { if ([Sv]::C($k) -eq 'Static' -and [Sv]::T($k) -ne '') { Write-Host ("    {0}" -f [Sv]::T($k)) } }
+               Shot $d2 's6-postdlg' | Out-Null
+               [void][Sv]::PostMessage($d2, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero); Start-Sleep -Seconds 2 }
+    $p.Refresh(); if ($p.HasExited) { Write-Host ("EXITED after save 0x{0:X8}" -f $p.ExitCode) -ForegroundColor Red }
+    if (Test-Path $SavePath) {
+        $fi = Get-Item $SavePath
+        Write-Host ("SAVED: {0}  {1} bytes  {2}" -f $fi.FullName, $fi.Length, $fi.LastWriteTime) -ForegroundColor Green
+    } else { Write-Host ("NOT SAVED: {0} does not exist" -f $SavePath) -ForegroundColor Red }
+    if ($Keep) { Write-Host ("LEFT RUNNING pid {0}" -f $p.Id) -ForegroundColor Green }
+    else { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; Write-Host 'stopped' }
+    exit 0
+}
+$d = WaitDlg $p.Id 25 $main
+if (-not $d) { Write-Host 'no Save dialog' -ForegroundColor Red; Shot $saveTarget 's4-nosave' | Out-Null; if(-not $Keep){Stop-Process -Id $p.Id -Force}; exit 2 }
 Write-Host ("  save dialog: '{0}'" -f [Sv]::T($d))
 Shot $d 's5-savedlg' | Out-Null
 if (-not (FillFileDialog $d $SavePath)) { if(-not $Keep){Stop-Process -Id $p.Id -Force}; exit 2 }
 if (-not (GuardOverwrite $p.Id $AfterSave)) { if(-not $Keep){Stop-Process -Id $p.Id -Force}; exit 4 }
 
 # a second #32770 after save is usually an overwrite/format prompt - report, close it
-$d2 = Dlg $p.Id
+$d2 = Dlg $p.Id $main
 if ($d2) { Write-Host ("  post-save dialog: '{0}' - closing" -f [Sv]::T($d2)) -ForegroundColor Yellow
            Shot $d2 's6-postdlg' | Out-Null
            [void][Sv]::PostMessage($d2, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero); Start-Sleep -Seconds 2 }

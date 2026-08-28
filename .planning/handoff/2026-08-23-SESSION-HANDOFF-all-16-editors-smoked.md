@@ -2600,3 +2600,63 @@ Fix: appended mochaCommand (rebased; the mocha script does NOT exist locally -
 no utils/ dir in the reference tree - so Compile will fail if ever invoked) and
 both SOE .dct dictionary paths to SwgConversationEditor.cfg. Verified: one
 dialog remains. Spell checker now has SOE's 894KB medium dictionary.
+
+## SwgSpaceZoneEditor - SAVE + RELOAD + DETERMINISM PASS (2026-08-28)
+
+Open SOE's `space_tatooine.tab` (dsrc buildout) -> Save As `C:\save-test\space_tatooine.tab`
+-> writes BOTH the .tab (184,697 B) and the compiled .iff (155,461 B; census
+IDENTICAL to SOE's shipped compile: FORM DTII/0001 + COLS/TYPE/ROWS, per
+`scripts/iffcensus.py`) -> File>Open the saved .tab (title takes it, no crash)
+-> Save As gen2 -> **gen1 == gen2 byte-identical for BOTH files.**
+
+Content fidelity vs the SOE original: 7 diff lines total - one row repositioned
+(writer reorders on load), float text normalized (`4300.0` -> `4300.00`), and a
+trailing field tab appended per line. Writer normalization, no data loss.
+
+The .iff landed beside the .tab because the path had no "dsrc" for the
+Replace("dsrc","data") rewrite to hit - as predicted from the source.
+
+## SwgDraftSchematicEditor - SAVE + RELOAD PASS (2026-08-28)
+
+Open SOE dsrc `armor_appearance_assault_trooper_bicep_l.tpf` -> Save As into
+`C:\save-test\schematic\server\` -> BOTH tpfs written: the server one at the
+picked path and the derived `shared_*.tpf`, which landed in `schematic\shared\`
+(the `server/`->`shared/` rewrite worked on the dialog path). Reload the saved
+tpf -> gen2 save -> identical modulo the filename banner. Diff vs the SOE
+original: only regeneration artifacts (editor banner replaces the armor-exporter
+one, `optional=false` -> `optional = false`, key reordering). No data loss.
+
+## SwgSpaceQuestEditor - SAVE PASS in a full sandbox (2026-08-28)
+
+Its save ignores the picked path and writes to config-derived destinations, so
+the run used a COPY sandbox: spacequest datatables (dsrc+data) and
+string/en/spacequest copied to C:\save-test\sq\, cfg keys
+serverMissionDataTablePath / sharedStringFilePath temporarily redirected
+(RESTORED afterwards - the .pre-savesweep.bak flow).
+
+Open `spacequest/patrol/corellia_imperial_1.tab` -> ID_FILE_SAVE (0xE103, no
+dialog) -> **all SEVEN artifacts written**: mission .tab+.iff, questlist
+.tab+.iff, questtask .tab+.iff (those directory trees created by the tool
+itself), and the .stf. SOE tree verified untouched (find -newer: 0 files).
+
+NOTE: the save UPGRADES old-schema tabs - the current build's patrol template
+has a `navRadius i[150]` column SOE's shipped .tab predates; the rewrite adds
+it (rows preserved, enum quoting normalized). Anyone diffing saved output
+against shipped data should expect that column to appear.
+
+## Driver hardening while getting here (scripts/_drive-save.ps1)
+
+* Filename edit = dlg item 0x480 ONLY (or the cmb13 combo's Edit), found with a
+  retry loop; the Vista dialog materializes the legacy ids lazily. NEVER write
+  to other Edits - the search box triggers navigation, the address bar fools
+  the readback verify.
+* EM_SETSEL + EM_REPLACESEL (typing-like) with WM_SETTEXT fallback, then a
+  readback gate before clicking OK.
+* OK via PostMessage WM_COMMAND(IDOK) - BM_CLICK over SendMessage deadlocks
+  when the save pops a modal.
+* Any 'Confirm Save As' after OK = the fill went to the WRONG file (targets are
+  pre-deleted) -> answer IDNO, abort. This guard caught two real near-misses
+  aimed at the SOE originals.
+* -NoSaveDialog for tools whose save writes straight to config paths
+  (SpaceQuest); -NoDismiss for UIBuilder whose MAIN window is a #32770 (the
+  dismiss loop would WM_CLOSE the app).
