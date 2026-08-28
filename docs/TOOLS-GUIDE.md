@@ -944,8 +944,45 @@ tools (drive via WM_COMMAND — MRU `0xE111`, 3D View `1258`, Refresh `1384` —
 capture with F12 from the injected instance; the CLI's `-d` counting is eaten by
 ~150 startup presents and its timeout kills larger values).
 
-**Assessment update.** All three bake paths, the full edit/save/reload cycle, and
-now the 3D View are exercised and working on a real planet. TerrainEditor is the
+#### The edit -> 3D preview loop — VERIFIED 2026-08-28, with the workflow spelled out
+
+The workflow the tool exists for — change a rule, see the planet change — works.
+Kenny added a new root layer, drew a boundary circle, gave it an
+`AffectorHeightConstant` of 150, hit **Refresh** in the 3D View, and the valley
+from the baseline shot became a plateau with a sheer cliff at the circle's edge.
+Before/after: `logs/_shots/TerrainEditor_edit3d_{before,after}.png`.
+
+**The non-obvious workflow mapping, learned the hard way:**
+
+* A boundary drawn on the 2D map lands in **whatever layer is selected in the
+  Construction Layers tree** at that moment (`LayerView::addBoundary` uses
+  `GetSelectedItem()`, walking up to the parent layer if a child is selected).
+  Nothing on the 2D map chooses the destination — the tree selection does.
+* Everything inserts from the **Insert** menu on the main menu bar (active when
+  the layers window has focus): New Layer > Root Layer, New Affector > Height >
+  Constant, etc.
+* Affector parameters are set in the **Properties** panel and do nothing until
+  **Apply Changes** (top-left of the layers toolbar).
+* `OnRefresh` in the 3D View serialises the **live document** to an in-memory Iff
+  and rebuilds the whole appearance, so no save is needed to preview.
+
+**OPEN DEFECT: the Construction Layers tree cannot scroll.** Not an input-routing
+problem — the control itself is paralysed. Probed from outside with the tree's
+HWND: `WM_VSCROLL`, `WM_MOUSEWHEEL`, keyboard End, and even `TVM_ENSUREVISIBLE`
+sent directly to the control are all no-ops, and no scrollbar is drawn despite
+`WS_VSCROLL` in the style, a valid scroll range (0..31), a normal 18px item
+height, and content that plainly overflows. Queries (`TVM_GETCOUNT` = 1176
+items) and selection (`TVM_SELECTITEM`) work fine. Cause unknown — possibly an
+old-comctl32-vs-modern-Windows interaction; `LayerView` sets `TVS_CHECKBOXES`
+post-creation (`LayerView.cpp:1301`), which is a known finicky path.
+**Workarounds that make the tool fully usable:** maximise the layers panel
+inside the MDI area, and use **Insert > Collapse All / Expand All** — collapsed,
+all 33 top-level layers of tatooine fit on screen. The other tree panels
+(Environments, Families) are shorter and rarely need scrolling; whether they
+share the defect is untested.
+
+**Assessment update.** All three bake paths, the full edit/save/reload cycle, the
+3D View, and the edit -> preview loop are exercised and working on a real planet. TerrainEditor is the
 most thoroughly verified tool in the set, and the only one with every major
 surface driven. Carry forward the one open defect — a single unreproduced
 null-boundary crash after Bake Rivers/Roads, now guarded and logged rather than
