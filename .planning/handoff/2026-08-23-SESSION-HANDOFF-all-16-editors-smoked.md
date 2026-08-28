@@ -2886,3 +2886,25 @@ END-TO-END VERIFIED: QuestEditor open resave.qst -> Ctrl+S -> .qst + both
 + .stf, all in the sandbox. DataTableTool standalone: "SUCCESS creating data
 table". QuestEditor.cfg sandbox redirect still ACTIVE pending Kenny's checker
 confirmation - restore from .pre-savesweep.bak when done.
+
+## SOE-tree write audit (Kenny's request) - TWO files were hit; both reconstructed
+
+Full-tree scan for files modified 2026-08-28: exactly TWO, both dsrc NpcEditor
+default-save targets, clobbered at 17:00 during the failed NpcEditor save
+attempts (each failed attempt APPENDED another stub cross-reference line):
+  dsrc/sku.0/sys.server/.../object/mobile/beginner_brawler_client_1.tpf
+  dsrc/sku.0/sys.shared/.../object/mobile/shared_beginner_brawler_client_1.tpf
+
+RECONSTRUCTED exactly from two untouched sources: the sibling _client_2/_3
+templates (identical modulo index + appearance) and the COMPILED data-side
+.iffs, which preserved _client_1's truth (appearance/bith_m.sat - the Bith
+Kenny was dressing; he had opened this NPC). Server rebuilt at the siblings'
+exact 283 B; shared at 407 B with bith_m. The checker output and QuestEditor
+pipeline work is in the previous section; the .qst checker ran CLEAN in-app
+(Kenny confirmed the banner + 0/0 summary). QuestEditor.cfg restored - NO
+sandbox redirects remain in any cfg.
+
+WARNING, sharper than before now that saves SUCCEED: NpcEditor's SaveDialog
+Browse defaults and QuestEditor's plain Ctrl+S both point at / write back to
+the reference tree. The failures that used to protect it are fixed. Save As
+to a scratch path first, always.
