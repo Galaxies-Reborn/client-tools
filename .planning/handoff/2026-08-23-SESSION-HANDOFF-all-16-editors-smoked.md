@@ -2787,3 +2787,29 @@ TRAPS confirmed live, in order encountered:
    value-editing matters.
 3. Both false alarms checked: the SOE original was never overwritten (mtime
    intact, 0 files newer in the clienteffect dir).
+
+## NpcEditor - CLIENT-DATA WRITER PASS; template writers blocked by missing sources (2026-08-28) - 13/15 (partial)
+
+Kenny dressed the boot avatar (3 wearables + customization sliders) -> Ctrl+A
+-> three C:\save-test outputs.
+
+* **npc-client.mif: PASS with real content** - 742 B of generated MIF source
+  holding exactly the UI state: UseMeshGenerator for shoes_s01_m / pants_s13_m
+  (color 41) / shirt_s32_m (colors 215/202) + CustomizationSetInt blend_fat 95,
+  index_color_skin 15. The dress->save loop works end to end.
+* **npc-server.tpf / npc-shared.tpf: 46-byte stubs** - only the cross-reference
+  lines, each CORRECTLY rewritten (sharedTemplate -> npc-shared.iff via the
+  .tpf->.iff map; clientDataFile -> npc-client.cdf via .mif->.cdf). The base
+  template content is missing because the patch SOURCE cannot be read:
+  - fresh mode needs text/templates/base_humanoid.txt +
+    shared_base_humanoid.txt (the NpcEditor.tab ServerFile/SharedFile columns)
+    - **absent everywhere**: 0 hits in all 209 TREs, nothing loose, nothing in
+    the SOE tree. Never shipped.
+  - open-existing mode reads the originals recorded at open; those resolved to
+    dsrc/sku.0/sys.client/.../object/creature/player/*.tpf which DOES NOT
+    EXIST (the real sources are under sys.server and sys.shared).
+  Errors are QMessageBoxes only - NOTHING reaches warning.log, and warning.log
+  is truncated by every tool launch, so post-hoc log forensics is useless here.
+
+Same category as QuestEditor's icons and the .cnv sources: SOE-internal dev
+data that never shipped. Code path exercised; content gap documented.
