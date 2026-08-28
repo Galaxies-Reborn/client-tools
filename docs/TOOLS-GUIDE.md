@@ -981,8 +981,43 @@ all 33 top-level layers of tatooine fit on screen. The other tree panels
 (Environments, Families) are shorter and rarely need scrolling; whether they
 share the defect is untested.
 
+#### File > New — a planet from scratch, VERIFIED 2026-08-28
+
+The community mapmaker's path works end to end: **File > New -> minimal rule set
+-> 3D preview -> Save As -> reload**, producing an 895-byte `.trn` (kennywood.trn)
+whose structure verifies: one layer, one `AHCN`, one `ASCN`, one shader family
+referencing `dirt_mudcrack`, `WMAP`/`SMAP` present.
+
+What a new document gives you, from `OnNewDocument`: **mapWidth 4096m** (a quarter
+of a shipped planet — change it in `Options > Map Parameters`), 8m chunks, 4
+tiles/chunk, an empty generator that **seeds one root layer**, and all default
+views opened.
+
+The minimal viable planet, in order (order matters — affectors depend on families):
+
+1. **Shader Families panel -> New Family** (leftmost toolbar button). You get a
+   family plus one auto-created child with a **made-up placeholder name**.
+2. **Double-click the child** (or the Find magnifier). It opens a *Select Shader
+   Template File* dialog — this is the non-obvious mechanic
+   (`ShaderTreeView::OnDblclk` -> `OnFindshader`, a `CFileDialog` whose chosen
+   **file title** becomes the child's shader template name). Pick a real terrain
+   shader from the SOE loose tree, e.g.
+   `.../sys.client/compiled/game/shader/dirt_mudcrack.sht` — the same names
+   tatooine's own families use. The folder holds ~23,000 files; type the name
+   rather than scrolling.
+3. Select the seeded layer: **Insert > New Affector > Height > Constant**, set a
+   height in Properties, **Apply Changes**.
+4. **Insert > New Affector > Shader > Constant** — auto-assigns the first family.
+5. **3D View > Refresh** — a flat textured plain is success.
+
+**Trap for later: Bake Flora cannot work on a from-scratch planet** until the
+`.trn` is reachable as `terrain/<name>.trn` through TreeFile — Turf loads the
+planet from the mounted TREs/search paths, not from the file on disk. In-process
+Bake Terrain is unaffected.
+
 **Assessment update.** All three bake paths, the full edit/save/reload cycle, the
-3D View, and the edit -> preview loop are exercised and working on a real planet. TerrainEditor is the
+3D View, the edit -> preview loop, and creation from scratch are exercised and
+working. TerrainEditor is the
 most thoroughly verified tool in the set, and the only one with every major
 surface driven. Carry forward the one open defect — a single unreproduced
 null-boundary crash after Bake Rivers/Roads, now guarded and logged rather than
