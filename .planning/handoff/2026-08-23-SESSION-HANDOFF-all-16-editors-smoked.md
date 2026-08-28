@@ -2699,3 +2699,33 @@ Incidental findings while driving:
   no dialog present; Esc / Alt+Esc released it. Looks like a stuck Qt menu/
   mouse grab, one occurrence, not reproduced.
 * File > New works but takes ~20s to visibly reset - not a hang, don't kill it.
+
+## SwooshEditor + LightningEditor - SAVE PASS (2026-08-28, human-driven)
+
+**SwooshEditor**: `pt_electric_sword.swh` -> save -> census 1:1, SWSH form
+version upgraded 0000 -> 0001 (+12 bytes of new-field defaults). Same
+upgrade-on-save pattern as ParticleEditor/SpaceQuest.
+
+**LightningEditor**: `force_lightning.ltn` -> save -> **BYTE-IDENTICAL to the
+SOE original**. Strongest fidelity result in the sweep - its .ltn version
+matches the original, so the round trip is exact.
+
+**The .swh probe bug has a visible symptom**: LightningEditor's Save As
+writability probe uses ".swh" (copy-paste from SwooshEditor,
+MainWindow.cpp:255) and the probe CREATES the file - every Save As leaves a
+0-byte `<name>.swh` beside the real .ltn. Confirmed live: saving
+`force_lightening-resave.ltn` produced `force_lightening-resave.swh` (0 B).
+
+**Release-build fact that will confuse anyone using these two tools**: the
+ENTIRE property panel is disabled BY DESIGN in release - MainWindow.cpp:513-519
+(#ifdef _DEBUG gates editing; the #else disables m_mainToolsFrame outright).
+SOE only allowed swoosh/lightning EDITING in debug builds; release builds are
+viewers with working File I/O. The ironically-named 'Debug' UI group (demo
+controls) stays enabled. Seventh instance of the _DEBUG-only behavior trap.
+
+**OPEN observation (not chased)**: SwooshEditor's animation demo is inert -
+the attacker/defender never play the combat action (alter() re-fires
+handleCombatAction every ~2s; combat_manager.iff + 52 playback .pst ARE in
+the mounted TREs; no warnings logged - whatever fails is silent in release).
+Both podracer_energy_binders*.swh files in the SOE tree are 0 bytes -
+placeholders, not valid opens.
