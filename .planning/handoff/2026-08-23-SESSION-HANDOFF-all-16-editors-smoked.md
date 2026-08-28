@@ -2460,3 +2460,76 @@ the 3D View.** That is the last surface on this tool.
 3. **SwgGodClient's editing surface** - still the single largest untested area in the
    tree, per the earlier session's note. Nothing today changed that.
 4. Push the branch. 41 commits is a lot to be holding locally.
+
+
+# ===== SESSION 2026-08-27 (evening) + 08-28 - the 3D View, and the edit loop =====
+
+Continuation of the same working day. Durable detail is in docs/TOOLS-GUIDE.md
+section 10 and in the commit messages; this is the index.
+
+## Commits (all pushed)
+
+| commit | what |
+|---|---|
+| `02e7543ca` | 3D View: SetupClientTerrain + reference camera + SetupSharedCollision |
+| `41ba57276` | 3D View: ClientTerrainSorter draw/clear hooks + restored lights - RENDERS |
+| `b31a1335d` | guide: the four missing pieces of clientGame scene glue |
+| `b66086156` | guide: edit->preview loop verified; layers-tree scroll defect |
+
+## The one-line summary
+
+The 3D View went from a grey rectangle to fully textured, lit terrain, and the
+edit -> Refresh -> preview loop is verified (boundary circle + AffectorHeightConstant
+150 -> visible cliff). TerrainEditor is done: every major surface driven.
+
+## The reusable part - client terrain rendering in ANY tool needs four things
+
+1. `SetupClientTerrain::install()` after SetupClientGraphics (else the MPTA/PTAT
+   tags bind to the SERVER appearance - collision only, no renderable chunks)
+2. `ClientProceduralTerrainAppearance::setReferenceCamera(camera)` every frame
+   (else calculateLod() silently returns; only clientGame ever sets it)
+3. `SetupSharedCollision::install()` (else the first flora addToWorld faults in
+   MemoryBlockManager::allocate) - copy Turf.cpp:194-205
+4. World-cell render hooks + lights: `addPreDrawRenderHookFunction(&ClientTerrainSorter::draw)`
+   + `addExitRenderHookFunction(&ClientTerrainSorter::clear)` (else chunks queue
+   primitives nobody flushes - ClientWorld.cpp:634 is the only game caller), and
+   ambient+parallel Lights via RenderWorld::addWorldEnvironmentLight (else black -
+   GroundEnvironment creates the game's lights BLACK and env data drives them)
+
+Every assert guarding all four compiles out in release. That trap is now at SIX
+instances across this effort.
+
+## OPEN defects
+
+* **Construction Layers tree cannot scroll** - control-level: WM_VSCROLL, wheel,
+  End, TVM_ENSUREVISIBLE all no-ops sent directly to the HWND; no scrollbar drawn
+  despite WS_VSCROLL + range 0..31 + overflowing content. Queries and selection
+  work. Workarounds (fully usable): maximise the panel, Insert > Collapse All.
+  Suspect: TVS_CHECKBOXES set post-creation (LayerView.cpp:1301)? Undiagnosed.
+* Null-boundary crash after Bake Rivers/Roads - one occurrence, guarded, see the
+  earlier section.
+
+## RenderDoc on MFC tools - what worked (also in the renderdoc memory)
+
+CLI `-d N` counting is useless here: ~150 presents burn during startup and the
+internal timeout kills 400+. Working recipe: launch under `renderdoc-cli capture`,
+drive the UI with WM_COMMAND posts (MRU open 0xE111, ID_3D_VIEW 1258, ID_REFRESH
+1384), let the CLI time out - the editor STAYS injected - then F12 writes a full
+capture to the CLI's -o path. `drive3d.ps1` in the session scratchpad does the
+posting.
+
+## Next steps (in order)
+
+1. **File > New** - planet from scratch. Started 08-28; see the section below if
+   one was added, else it is the open task. Facts already established from code:
+   new doc = mapWidth 4096 (not 16384), chunkWidth 8, 4 tiles/chunk, empty
+   generator; Options > Map Parameters dialog exists (DialogMapParameters);
+   new-shader-family flow is ShaderTreeView::OnNewshaderfamily which auto-creates
+   a placeholder CHILD whose shaderTemplateName is a made-up unique name - a real
+   shader template must be assigned or first fetch will presumably fail.
+   TRAP for later: Bake Flora on a new planet CANNOT work via Turf until the .trn
+   is reachable as terrain/<name>.trn through TreeFile - Turf loads from the
+   mounted TREs/search paths, not the file on disk.
+2. **Server evening**: walk on an edited .trn in SwgGodClient (closes
+   edit->save->PLAY), then drive the god tools - still the largest untested area.
+3. Save-path sweep across the other 15 tools - only TerrainEditor has ever saved.
