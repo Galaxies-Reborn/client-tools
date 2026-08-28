@@ -1330,20 +1330,67 @@ XZ/XY/ZY buttons switch projection and the Hide Nav/Spawn/Misc/Paths/Grid
 toggles filter the view. Nothing was edited or saved.
 ---
 
+## Part 2.5 — the save-path sweep (2026-08-28)
+
+Every tool except SwgGodClient was driven through its save path: open (or
+create) a document, save, verify the bytes, reload. **13 full passes, one
+partial** (NpcEditor). Verification tooling: `scripts/iffcensus.py` (IFF tag
+census diff) and `scripts/_drive-save.ps1` (WM_COMMAND/dialog automation with
+an overwrite guard). Full narrative in the session handoff; the durable facts:
+
+| tool | save verdict | fidelity vs source |
+|---|---|---|
+| TerrainEditor | PASS (08-27) | edit round-trip by census |
+| SwgConversationEditor | PASS | File>New -> valid FORM/CNV /0002; reloads |
+| SwgSpaceZoneEditor | PASS | gen1==gen2 **byte-identical** (.tab AND .iff); .iff census == SOE's compile |
+| SwgDraftSchematicEditor | PASS | server+derived shared .tpf; regeneration stable modulo banner |
+| SwgSpaceQuestEditor | PASS | all 7 artifacts; **upgrades schema** (adds navRadius) |
+| UIBuilder | PASS | normalize-on-save; regeneration **byte-identical** (tool skips unmodified writes, MainFrm.cpp:903) |
+| ParticleEditor | PASS | **upgrades emitters 0012->0014**; reload renders |
+| SwooshEditor | PASS | upgrades SWSH 0000->0001 |
+| LightningEditor | PASS | **byte-identical** to SOE original |
+| SoundEditor | PASS | same 28 samples, list order REVERSED (cosmetic) |
+| AnimationEditor | PASS | **byte-identical** rewrite + XML sibling export |
+| ClientEffectEditor | PASS | edit round-trip (added CAMS serialized, rest 1:1) |
+| ShipComponentEditor | PASS | Save All = 1,288 files; xwing attachment .iff **byte-identical** |
+| QuestEditor | PASS | .qst **byte-identical**; .tab/.stf real; .iff compile needs the unshipped external tool |
+| NpcEditor | PARTIAL | .mif writer PASS (wearables+sliders captured); .tpf writers blocked - text/templates sources never shipped |
+
+The one pattern to internalize: **these tools upgrade old data to their current
+schema on save.** Byte-fidelity happens exactly when the on-disk format version
+matches the build's. Diffing saved output against 2004-vintage shipped data
+will show version-upgrade deltas that are correct behavior, not corruption.
+
+Save-behavior traps confirmed live, by tool:
+* SwgConversationEditor: save REJECTS paths with spaces; a failed save can
+  still return TRUE and clear the modified flag - verify bytes on disk.
+* ClientEffectEditor: save is a SILENT no-op unless modified (edit AFTER
+  opening - open resets the flag); typed `.cef` extension REQUIRED.
+* AnimationEditor: TRE-resident files CANNOT save (loud error with the
+  `tre[...]` path); only searchPath-resident files can. Success is silent.
+* QuestEditor: after opening, plain Ctrl+S writes back to the OPENED path -
+  in-place. Use File>Save As.
+* LightningEditor: every Save As leaves a 0-byte `<name>.swh` beside the
+  `.ltn` (the copy-pasted writability probe creates it).
+* SoundEditor: saves whatever it currently holds - confirm the sample list
+  loaded before saving.
+* Swoosh/LightningEditor release builds: the ENTIRE property panel is
+  disabled BY DESIGN (`#ifdef _DEBUG`, MainWindow.cpp:513-519) - they are
+  viewers with working File I/O; editing needed a debug build even at SOE.
+* Config-path savers (ShipComponent, SpaceQuest, QuestEditor exports): the
+  destinations come from cfg keys, NOT the Save dialog - sandbox the keys
+  before testing saves, restore after.
+
 ## Part 3 — what is still not known
 
 Being explicit, because the gap between "launches" and "works" is where all the
 risk in this tree lives.
 
-* **One tool has now saved.** TerrainEditor wrote a complete 3.7 MB `.trn` via
-  `File > Save As` on 2026-08-27, and the result was verified against SOE's own
-  shipped data (see Bake Terrain above). Save/export remains untested on the
-  other 15.
-* **One tool has now been edited with, and the edits round-trip.** TerrainEditor
-  had boundaries added and deleted, a boundary dragged between layers and a
-  Properties value changed; the saved `.trn` shows every change by IFF-tag census
-  and reloads with all of them intact (see Editing above). The other 15 remain
-  read-only exercises.
+* **Save/export is now exercised on 15 of 16 tools** (see Part 2.5). Only
+  SwgGodClient's save surface remains untouched (needs the server).
+* **Editing round-trips are proven on three tools** (TerrainEditor's boundary
+  edits, ClientEffectEditor's added camera shake, NpcEditor's wearables into
+  the .mif). The rest saved unmodified or regenerated documents.
 * **15 of 16 are now driven past launch.** The three that looked broken were not:
   SwgSpaceZoneEditor needed the `.tab` source under `dsrc/` rather than the
   compiled `.iff`; SwgSpaceQuestEditor is a tree-browser, not a File>Open tool;
