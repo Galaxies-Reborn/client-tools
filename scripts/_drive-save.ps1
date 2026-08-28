@@ -55,6 +55,12 @@ public class Sv {
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h, int id);
     [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
+    [StructLayout(LayoutKind.Sequential)] public struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
+    [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+    public static uint IdleMs() {
+        var lii = new LASTINPUTINFO(); lii.cbSize = (uint)Marshal.SizeOf(typeof(LASTINPUTINFO));
+        if (!GetLastInputInfo(ref lii)) return 0;
+        return (uint)Environment.TickCount - lii.dwTime; }
     public static string GT(IntPtr h) { var s = new StringBuilder(2048); SendMessageW(h, 0x000D, (IntPtr)2048, s); return s.ToString(); }
     public static string Chain(IntPtr h, IntPtr stop) {
         var sb = new StringBuilder(); IntPtr cur = GetParent(h);
@@ -177,9 +183,11 @@ function GuardedKeys([IntPtr]$target,[string]$keys) {
     # $keys may be comma-separated chunks sent with a pause between them
     # (menu mnemonics need the popup to appear first, e.g. '%f,a').
     for ($i=0; $i -lt 60; $i++) {
+        # never type while the user is active: require 8s of system-wide input idle
+        if ([Sv]::IdleMs() -lt 8000) { Start-Sleep -Seconds 3; continue }
         [void][Sv]::BringWindowToTop($target); [void][Sv]::SetForegroundWindow($target)
         Start-Sleep -Milliseconds 500
-        if ([Sv]::GetForegroundWindow() -eq $target) {
+        if ([Sv]::GetForegroundWindow() -eq $target -and [Sv]::IdleMs() -ge 8000) {
             foreach ($chunk in $keys -split ',') {
                 [System.Windows.Forms.SendKeys]::SendWait($chunk)
                 Start-Sleep -Milliseconds 1000
