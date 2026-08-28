@@ -2813,3 +2813,40 @@ Kenny dressed the boot avatar (3 wearables + customization sliders) -> Ctrl+A
 
 Same category as QuestEditor's icons and the .cnv sources: SOE-internal dev
 data that never shipped. Code path exercised; content gap documented.
+
+## QuestEditor - SAVE PASS (2026-08-28, human-driven) - SWEEP COMPLETE
+
+Open u16_nym_meet_townspeople.qst -> File>Save As C:\save-test\resave.qst
+(cfg export dirs sandboxed, RESTORED after):
+* .qst BYTE-IDENTICAL to the SOE original (12,865 B, 0 diff) - third exact
+  round trip of the sweep.
+* Full fan-out landed: questlist + questtask .tab (real content, string ids
+  renamed to the new basename), resave.stf (1,531 B). The basename regexp
+  works despite looking wrong (greedy .* with empty capture concern - in
+  practice Qt3 QRegExp yields the right basename).
+* Both compiled .iff outputs are 0 BYTES - compile() shells out to an external
+  ToolProcess (compileDataTable) and the tools/ directory never shipped
+  (documented 08-23: toolPath absent). NOT a save defect; the editor's own
+  writers are all correct. SOE's DataTableTool.exe in the reference exe/win32
+  can compile .tab->.iff manually if ever needed.
+* TRAP: after opening a file, plain Ctrl+S saves back to the OPENED PATH -
+  in-place into the SOE tree. Use File>Save As only.
+
+# ===== SAVE SWEEP FINAL TALLY (2026-08-28) =====
+
+**14 of 15 tools driven through their save path** (SwgGodClient deferred to the
+server session by design). 13 full PASS + NpcEditor partial (client-data
+writer PASS; template writers blocked by unshipped text/templates sources).
+
+Byte-identical round trips: LightningEditor (.ltn), AnimationEditor (all
+three files), QuestEditor (.qst), ShipComponentEditor (xwing attachment .iff),
+SwgSpaceZoneEditor (gen1==gen2 across .tab AND .iff).
+
+The recurring pattern worth knowing: these tools UPGRADE old data to their
+current schema on save (ParticleEditor emitters 0012->0014, SwooshEditor SWSH
+0000->0001, SpaceQuest navRadius column, UIBuilder attribute normalization).
+Byte-fidelity happens exactly when the on-disk format version matches the
+build's.
+
+All originals audited untouched; every near-miss was caught by the driver's
+overwrite guard or turned out to be a false alarm.
