@@ -2737,3 +2737,26 @@ samples - in EXACTLY REVERSED order (writer iterates its list back-to-front;
 cosmetic for a Random-No-Repeats playlist). First attempt saved a 163-byte
 1-sample template because the open hadn't landed - ALWAYS confirm "Sample List
 (28 samples)" before saving; the tool happily saves whatever it holds.
+
+## ShipComponentEditor - SAVE ALL PASS in sandbox (2026-08-28) - 10/15
+
+cfg sharedPathDsrc/Data temporarily -> C:\save-test\shipcomp (restored after).
+Ctrl+S (Save All, no dialog) wrote **1,288 files**: master ship_chassis and
+ship_components .tab+.iff plus per-chassis attachment .tab+.iff for the whole
+fleet. Spot checks: ship_chassis_xwing.iff BYTE-IDENTICAL to the SOE copy;
+master .iffs census-identical DTII. Master .tab rows differ from the SOE loose
+tree - DATA VINTAGE, not corruption: the tool writes what it loaded from the
+mounted TREs (SWGSource 3.0), a different snapshot than the loose tree.
+
+## AnimationEditor - TRE-resident files CANNOT be saved (loud, honest failure)
+
+Ctrl+S on the boot-loaded ASH tab -> error dialog: "failed to write IFF-based
+ASH file to path [patch_57_client_00.tre[appearance/ash/all_b.ash]]". So
+TreeFile::getPathName on a TRE-resident file returns the tre[...] bracket
+notation, the writer fopens that string, and fails - RELEASE-VISIBLE dialog,
+unlike most failures in this tree. The earlier prediction (fallback writes to
+a relative path under CWD) was WRONG - the fallback never engages.
+Save is only usable for files under a real searchPath. Test rerun with a
+sandbox searchPath11=C:/save-test/anim holding loose all_b.ash + both LATs
+(AnimationEditor.cfg backed up as .pre-savesweep.bak; maxSearchPriority=12 so
+11 is read; 11 beats the TREs at 0-8).
