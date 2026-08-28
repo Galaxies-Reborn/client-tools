@@ -2772,3 +2772,18 @@ Incidental: with the loose SOE-tree copies loaded instead of the TRE vintage,
 the avatar WALKED OFF SCREEN at boot - the loose tree's default logical
 animation apparently carries root motion. Cosmetic, but expect it if anyone
 mounts the loose tree for this tool.
+
+## ClientEffectEditor - EDIT + SAVE PASS (2026-08-28, human-driven) - 12/15
+
+avatar_explosion_01.cef + added Camera Shake -> Save As -> census: CAMS 1->2,
+everything else 1:1 (CPAP/PSND/CLEF). A true edit round-trip.
+TRAPS confirmed live, in order encountered:
+1. Save is a SILENT no-op unless m_effectTemplateModified - no dialog, no
+   write, no feedback. The first attempt "did nothing" because the edit
+   preceded the file open (open resets the flag). Edit AFTER opening.
+2. Tree Value-column edits REVERT on commit (Kenny observed) - only the
+   context-menu add paths set the modified flag (MainWindow.cpp:596-599); the
+   value-edit path was not exercised further. Worth its own look if
+   value-editing matters.
+3. Both false alarms checked: the SOE original was never overwritten (mtime
+   intact, 0 files newer in the clienteffect dir).
