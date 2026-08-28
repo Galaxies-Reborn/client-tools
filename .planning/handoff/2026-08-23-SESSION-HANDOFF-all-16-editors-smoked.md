@@ -2850,3 +2850,39 @@ build's.
 
 All originals audited untouched; every near-miss was caught by the driver's
 overwrite guard or turned out to be a false alarm.
+
+## 2026-08-28 (evening): QuestEditor's ENTIRE save pipeline now works - three fixes
+
+Kenny asked for the compile step to work. Three separate defects stood in the way:
+
+1. **QuestChecker needed perl (absent).** Ported the 543-line QuestChecker.pl to
+   PowerShell - `src/build/win32/exe/win32/QuestChecker.ps1`, original .pl
+   preserved beside it. Rule-for-rule faithful including quirks (isTrue("") is
+   TRUE; perl numification; exit 0 even with findings). Verified: clean quest ->
+   0/0 SUCCESS; adversarial quest -> 19 errors + 1 warning across every rule
+   category. ToolProcess::checkQuest now invokes powershell -File
+   ../../exe/win32/QuestChecker.ps1 (also fixing the original's single-`..`
+   path which resolved to x64\exe\win32 - nowhere).
+
+2. **DataTableTool did not exist for x64** (SOE's 2016 exe rejects args - see 3).
+   Built from in-tree source. Two vcxproj-chain fixes: build with
+   -p:SolutionDir=<src\build\win32\> (the archive dependency's includes hang
+   off $(SolutionDir), undefined for direct vcxproj builds), and the
+   Release|x64 link needed libxml2.lib from deps\x64\lib + zlib.lib from the
+   solution output (the project referenced 32-bit prebuilts). Output lands as
+   Release\DataTableTool.exe - exactly the bare name QuestEditor spawns.
+
+3. **THE ROOT CAUSE of 'Invalid command line specified' - a 20-year-old parser
+   bug.** CommandLine.cpp gobbleString() terminated unquoted arguments at ANY
+   '-', so any dashed path (c:/save-test/...) split mid-argument and failed the
+   parse - in OUR build AND SOE's own 2016 binary identically. Fixed: '-' only
+   terminates at stringLength 0 (token start, where it introduces an option).
+   No grammar rule relied on mid-argument splitting (glued short options were
+   never lexed). NOTE: this is sharedFoundation - every tool and the client
+   pick up the (strictly more permissive) behavior on their next rebuild.
+
+END-TO-END VERIFIED: QuestEditor open resave.qst -> Ctrl+S -> .qst + both
+.tabs + BOTH COMPILED .IFFs (2,417 / 1,974 B real DTII; were 0-byte failures)
++ .stf, all in the sandbox. DataTableTool standalone: "SUCCESS creating data
+table". QuestEditor.cfg sandbox redirect still ACTIVE pending Kenny's checker
+confirmation - restore from .pre-savesweep.bak when done.

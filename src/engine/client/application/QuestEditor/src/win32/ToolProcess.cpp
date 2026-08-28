@@ -134,8 +134,16 @@ void ToolProcess::checkQuest(char const * const filename)
 {
 	StringVector v;
 
-	v.push_back("perl");
-	v.push_back("../exe/win32/QuestChecker.pl");
+	// QuestChecker was a perl script (../exe/win32/QuestChecker.pl); the tool
+	// machines carry no perl, so it was ported to PowerShell (2026-08-28).
+	// The port lives in the tracked preservation store, reached relative to
+	// the Release working directory like the other ../../exe/win32 payloads.
+	v.push_back("powershell");
+	v.push_back("-NoProfile");
+	v.push_back("-ExecutionPolicy");
+	v.push_back("Bypass");
+	v.push_back("-File");
+	v.push_back("../../exe/win32/QuestChecker.ps1");
 	v.push_back(filename);
 
 	m_procArgList.push_back(v);
