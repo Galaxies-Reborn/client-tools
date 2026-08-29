@@ -3241,3 +3241,48 @@ ConversationEditor dishonest save-failure, NpcEditor SaveDialog defaults,
 QuestEditor Ctrl+S no-prompt, TerrainEditor tree scroll, SwooshEditor demo)
 or item 4 (not-in-TREs inventory + installer). Item 5's CLI survey now has
 one more datum: the god client needed no CLI tools tonight.
+
+# ===== SESSION 2026-08-29 (night): CLI TOOLKIT BUILD-OUT - 8 new tools - START HERE =====
+
+TODO item 5 executed across all three tiers, Kenny-authorized ("work on all
+3 tiers"). Everything committed and pushed. Full status, recipes, and the
+deferred list live in .planning/TODO-tools-productization.md item 5 - read
+that first; this block is the summary.
+
+**10 CLI tools now live in Release**: TemplateCompiler, Miff, TreeFileBuilder,
+TreeFileExtractor, TemplateDefinitionCompiler, UpdateLocalizedStrings,
+LabelHashTool, ViewIff (new tonight) + DataTableTool, Turf (earlier).
+
+Verification highlights (each tool proven, not just built):
+* Miff reproduced the shipped quest_crc_string_table.iff BYTE-IDENTICAL from
+  perl-format MIF text - which also re-validates the CRC PS port a third way.
+* TreeFileBuilder/Extractor: build->list->extract round trip byte-identical,
+  and the built archive parses as v0005 in the independent trelist.py.
+* TemplateCompiler compiles SOE dsrc against SOE tdfs -> v0010 iffs, the
+  exact schema the in-tree engine expects (shipped data is v0009 - the known
+  upgrade-on-recompile delta, NOT a defect).
+* LabelHashTool agrees with the shipped CRC table.
+* TDC regenerates template C++ matching in-tree generated code modulo the
+  TFD custom-code sections (which preserve hand-written methods by design).
+
+Machine facts future sessions need:
+* Miff requires a C preprocessor: cpp.exe beside the exe, or MIFF_CPP env
+  var. MIFF_CPP is setx'd to VS clang on this machine. No GNU cpp exists
+  anywhere locally; SOE flex/bison DO exist at swg-main/tools (used for the
+  Miff grammar build; BISON_SIMPLE must point at Miff's bison.simple).
+* templateCompiler.cfg now sits in Release (TreeFile searchPath for @base
+  resolution). tdfs resolve by walking UP directories from the .tpf; base
+  .tpfs resolve the same way - sandboxes need the base chain (see
+  C:\save-test\tpl-sandbox for a working example).
+* TDC writes generated C++ into ../../../..-style paths from the tdf's own
+  sharedpath/compilerpath directives - NEVER run it inside the SOE tree
+  unless you intend to regenerate; sandbox layout at C:\save-test\tdf-sandbox.
+* Deferred with reasons (StringFileTool, ShaderBuilder, TextureBuilder,
+  CreateShaderTemplate, ClientCacheFileBuilder, exporter tools) - item 5 in
+  the TODO has the exact error shapes and the reusable build recipes.
+
+## Next session
+Item 3 (usability paper cuts) or item 4 (not-in-TREs inventory / installer).
+The DraftSchematicEditor Compile button can now actually work end to end
+(templatecompiler exists) - worth a quick in-app verification when next in
+that editor.

@@ -122,7 +122,51 @@ LOOSE data that is NOT in any TRE. Plan:
 - Ship legacy no-sku TreeFile keys in tool cfgs (never client.cfg's _00_
   form) — see the memory note; this stays the #1 config landmine.
 
-## 5. Survey the command-line tools — SURVEYED 2026-08-29, build-out in progress
+## 5. CLI tools — BUILD-OUT DONE 2026-08-29 (8 new tools built + verified)
+
+**Built x64 and verified this session** (all in src/build/win32/x64/Release):
+- TemplateCompiler (compiles SOE tpf+tdf sources; output = tdf schema v0010,
+  what the in-tree engine loads; p4 -edit/-submit stripped)
+- Miff (byte-identical vs shipped quest CRC iff; needs a preprocessor:
+  cpp.exe beside exe, or MIFF_CPP env var -> set to VS clang on this machine)
+- TreeFileBuilder + TreeFileExtractor (3-file TRE round trip byte-identical,
+  archive validates as v0005 in trelist.py; extractor reads real SOE TREs)
+- TemplateDefinitionCompiler (regenerated SharedTangibleObjectTemplate
+  matches in-tree generated code modulo TFD custom-code sections)
+- UpdateLocalizedStrings (stf v0->v1 CRC upgrade tool)
+- LabelHashTool (quest name -> 0x00707d5e, matches shipped CRC table)
+- ViewIff (MFC GUI IFF inspector - opens iffs, title bar confirms)
+Plus DataTableTool + Turf from earlier sessions: **10 CLI tools live**.
+
+**Deferred, with reasons**:
+- StringFileTool: MFC GUI stf diff/merge; 57 char16/MBCS errors after the
+  atlmfc-header fix; needs a real Unicode pass.
+- ShaderBuilder: MFC message-map casts + pre-C++11 idioms; ALSO investigate
+  whether its D3D9-era output matches the DX11 port's compiled_shader
+  manifest before spending time.
+- TextureBuilder: TextureFormat fwd-decl vs modern type_traits; real port.
+- CreateShaderTemplate / ClientCacheFileBuilder: sources only, no project
+  files at all (VC6 leftovers) - would need vcxprojs authored from scratch.
+- Armor/CoreWeapon/WeaponExporterTool: need serverGame headers - the server
+  library is not in this repo; build from swg-main if ever wanted.
+- mochac.pl: STILL UNFOUND.
+
+**Recipes that made this go** (reuse for any future CLI bring-up):
+- x64 groups keep win32-era lib lists: point AdditionalLibraryDirectories at
+  ..\..\..\..\..\..\..\deps\x64\lib + $(SolutionDir)x64\Release; replace
+  libpcre.a -> pcre.lib; add zlib.lib; drop libclient/librpc/libsupp.
+- pcre is a DLL: PCRE_STATIC sharedRegex objs want pcre_malloc/pcre_free
+  DATA symbols an import lib can't give - drop SetupSharedRegex::install
+  from CLI tools (allocator hook only).
+- Tools with empty x64 dep lists (rsp-era): add the engine lib set by hand.
+- Old atlmfc bundle: remove external/3rd/library/atlmfc include+lib, use
+  VS's MFC/ATL. 'byte' ambiguity: _HAS_STD_BYTE=0 (SwgConversationEditor
+  precedent).
+- Miff needs flex/bison: SOE's own exes at swg-main/tools work (BISON_SIMPLE
+  env var -> its bison.simple); custom-build output paths had to be pinned
+  to src/compile/win32/Miff (x64 IntDir broke $(IntDir)..\).
+
+## 5 (survey notes). Survey of exe/win32 — 2026-08-29
 
 Full survey of D:\SWG All Tools Working\swg\current\exe\win32 (50+ exes)
 cross-referenced against in-tree sources. Verdicts:
