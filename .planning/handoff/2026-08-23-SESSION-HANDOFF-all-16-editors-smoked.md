@@ -2991,3 +2991,67 @@ human-driven result in-session.
 * Native file dialogs: fill ONLY dlg item 0x480 (or cmb13's edit), verify by
   readback, click via posted WM_COMMAND - and treat any 'Confirm Save As' as
   a wrong-target signal (scripts/_drive-save.ps1 embodies all of it).
+
+# ===== SESSION 2026-08-29 - CRC PORT DONE - QuestEditor 100% =====
+
+Productization TODO item 1 is DONE and verified end to end. Everything
+committed. QuestEditor now has no broken buttons left except the deliberate
+p4 ones (item 2's business).
+
+## What was done
+
+* **`src/build/win32/exe/win32/BuildQuestCrcStringTables.ps1`** - one
+  PowerShell script replacing the perl pair (buildQuestCrcStringTables.pl p4
+  wrapper + buildCrcStringTable.pl) AND Miff: it walks
+  `<root>/data/sku.0/sys.shared/compiled/game/datatables/questlist`, CRCs the
+  names (SOE's table, transcribed mechanically from the perl), and writes the
+  binary CSTB IFF directly plus the CRLF .tab. Root is derived from
+  `defaultListDirectory` in QuestEditor.cfg (text before `/dsrc/`), so it
+  tracks the tool's own config; `-Root`, `-OutputIff`, `-OutputTab` override.
+  Generic mode `-InputFile names.txt -OutputIff out.iff` reproduces the inner
+  buildCrcStringTable.pl for OTHER crc tables (object templates etc, TODO
+  item 5).
+* **ToolProcess.cpp** buildQuestCrcStringTables() now spawns powershell with
+  `-Branch <branch>` - same shape as the QuestChecker port. Rebuilt
+  QuestEditor_r (vcxproj + `-p:SolutionDir=src\build\win32\`), links clean.
+
+## Verification (all three layers)
+
+1. Generic mode fed the 2736 names extracted from the SOE tree's shipped
+   `quest_crc_string_table.iff` -> regenerated it BYTE-IDENTICAL (125160
+   bytes, 0 differing).
+2. Walk mode from the Release dir (root out of QuestEditor.cfg) -> also
+   byte-identical. The SOE questlist dir holds exactly 2736 .iffs and the
+   walked names equal the shipped table's names exactly.
+3. In-app: drove Tool > BuildQuestCrcTables via Alt+T,T (guarded foreground,
+   PrintWindow evidence). Console printed both paths, "2736 entries written",
+   DONE. On-disk iff hash unchanged (0C7339C5FDCBC8FF...), .tab went from
+   the stale 2654-line SOE copy to a fresh 2736-line one.
+
+## Facts worth keeping
+
+* The shipped SOE `.iff` (2736 entries) and its sibling `.tab` (2654 lines)
+  were from DIFFERENT bakes - never byte-compare a regenerated tab against
+  the SOE tab. The iff is the truth; its STNG chunk carries the exact input
+  name list.
+* IFF numbers: chunk/form sizes big-endian, chunk payloads little-endian,
+  cstrings NUL-terminated; entries sorted by unsigned CRC ascending (perl
+  sorted "0x%08x" strings - same order). Tab lines are `0x%08x<TAB>name`
+  CRLF.
+* PS 5.1 parses 8-hex-digit literals as WRAPPED Int32 (0xFFFFFFFF is -1);
+  the table uses the `L` suffix. Do the CRC math in [long] with 0xFFFFFFFFL
+  masks.
+* The in-app run WRITES INTO the SOE reference tree (that is its job - those
+  are the pipeline's output slots). SOE originals of both files are backed
+  up with hashes at `C:\save-test\soe-crc-backup\`.
+* QuestEditor's title still says "Built Aug 28" after a relink - the banner
+  __DATE__ lives in a TU that only recompiles when ITS file changes. Check
+  the exe mtime, not the title, when verifying you run a fresh build.
+
+## Next session
+
+The handoff order stands: the god-client server evening when Kenny brings
+the server up (walk an edited .trn, drive the god tools), else continue the
+productization TODO - item 2 (strip Perforce; the auto-save-before-p4
+buttons are the dangerous ones) or item 3 (usability paper cuts, seed list
+in the TODO).

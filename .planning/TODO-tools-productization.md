@@ -3,7 +3,21 @@
 Started as QuestEditor notes; the scope is all 16 editors. Goal per Kenny:
 "basic cleanup and make them usable, not perfection" — then package.
 
-## 1. Port buildQuestCrcStringTables (QuestEditor)
+## 1. Port buildQuestCrcStringTables (QuestEditor) — DONE 2026-08-29
+
+Shipped as `src/build/win32/exe/win32/BuildQuestCrcStringTables.ps1` (one
+script, folds the walk + buildCrcStringTable.pl together, writes the binary
+IFF directly — no perl, no p4, no Miff). ToolProcess.cpp now spawns it the
+QuestChecker way. Verified byte-identical against the SOE tree's shipped
+quest_crc_string_table.iff (2736 entries) in both generic-input and
+directory-walk modes, then run in-app via the Tool menu: clean console, DONE,
+iff hash unchanged, stale 2654-line .tab refreshed to 2736 (SOE originals
+backed up at C:\save-test\soe-crc-backup\). The tree root is derived from
+defaultListDirectory in QuestEditor.cfg, so the installer's later cfg
+parameterization carries over for free. The script's `-InputFile` generic
+mode is reusable for the object-template/planet CRC tables in item 5.
+
+## 1 (original notes). Port buildQuestCrcStringTables (QuestEditor)
 
 The `Build Quest CRC Tables` button shells `perl buildQuestCrcStringTables.pl
 --local <branch>` (ToolProcess.cpp:148-160), same missing-perl problem the

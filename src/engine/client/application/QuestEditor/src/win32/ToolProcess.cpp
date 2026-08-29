@@ -157,9 +157,18 @@ void ToolProcess::buildQuestCrcStringTables(char const * const branch)
 {
 	StringVector v;
 
-	v.push_back("perl");
-	v.push_back("buildQuestCrcStringTables.pl");
-	v.push_back("--local");
+	// buildQuestCrcStringTables was a perl Perforce wrapper around
+	// buildCrcStringTable.pl; the tool machines carry no perl or p4, so both
+	// were ported into one PowerShell script (2026-08-29) that walks the
+	// questlist directory instead of asking p4. Same tracked store and spawn
+	// shape as QuestChecker above.
+	v.push_back("powershell");
+	v.push_back("-NoProfile");
+	v.push_back("-ExecutionPolicy");
+	v.push_back("Bypass");
+	v.push_back("-File");
+	v.push_back("../../exe/win32/BuildQuestCrcStringTables.ps1");
+	v.push_back("-Branch");
 	v.push_back(branch);
 
 	m_procArgList.push_back(v);
