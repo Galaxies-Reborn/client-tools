@@ -3549,3 +3549,39 @@ file) is the handy .cnv for future ConversationEditor testing - the SOE
 NpcEditor (SaveDialog defaults point INTO the SOE reference tree + silent
 template-writer stubs), QuestEditor (Ctrl+S writes opened path, no prompt),
 TerrainEditor (Construction Layers tree cannot scroll).
+
+# ===== SESSION 2026-08-29 (cont. 3): QuestEditor pass DONE =====
+
+Fifth item-3 editor complete. Kenny verified all three scenarios in-app,
+plus re-confirmed the CRC button (BuildQuestCrcStringTables.ps1) works on
+the fresh build.
+
+## QuestEditor fixes (QuestEditor.cpp/.h)
+
+* **Ctrl+S in-place overwrite now confirms - ONCE per file.** The seed:
+  plain Save wrote straight back to the opened path (usually inside the SOE
+  reference tree) AND fanned out exportDataTables/compile/check beside it.
+  First plain Save of an opened file now shows Save In Place / Save As... /
+  Cancel with SAVE AS as the Enter default, so habitual Ctrl+S+Enter routes
+  to a dialog instead of clobbering shared data. Confirming (or using Save
+  As) sets m_confirmedSaveToOpenedPath and later saves are silent. saveAs()
+  sets the flag BEFORE calling save() - do not remove that line or Save As
+  re-prompts.
+* **Close prompt can now save.** Was "Are you sure you want to close?"
+  Yes/No - discarding was the only affirmative. Now Save / Discard / Cancel
+  (default Save); a cancelled/failed save aborts the close (m_dirty
+  re-checked after save() - save() only clears it on a successful write).
+
+Checked and intentionally left: saveQuest failure already shows a critical
+box; Save As already appends .qst + confirms overwrite; writability
+pre-check already present; Export/Compile/Check gate on "save first"
+rather than auto-saving (so they never hit the new prompt).
+
+Reminder trap (still true): the title-bar build date is a stale __DATE__
+banner - check the exe mtime, not the title.
+
+## Remaining item-3 seeds
+
+NpcEditor (SaveDialog defaults point INTO the SOE reference tree + silent
+template-writer stubs), TerrainEditor (Construction Layers tree cannot
+scroll).

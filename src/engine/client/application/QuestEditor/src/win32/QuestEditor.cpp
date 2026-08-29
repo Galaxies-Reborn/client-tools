@@ -86,6 +86,7 @@ QuestEditor::QuestEditor(QWidget *questWidgetParent, char const * const questWid
 , m_taskIff()
 , m_stringFile()
 , m_dirty(false)
+, m_confirmedSaveToOpenedPath(false)
 , m_stringTable()
 {
 	IGNORE_RETURN(m_taskTree->addColumn(tr("Task Tree")));
@@ -248,6 +249,7 @@ void QuestEditor::saveAs()
 		}
 
 		setFilename(path.c_str());
+		m_confirmedSaveToOpenedPath = true; //the user explicitly chose this path
 		save();
 	}
 }
@@ -261,6 +263,28 @@ void QuestEditor::save()
 	{
 		saveAs();
 		return;
+	}
+
+	//-- first plain save of an opened file: confirm the in-place overwrite
+	//once. Save does not just write the .qst - it regenerates the exported
+	//datatables, compiled iffs and string table beside it, which for files
+	//opened from the reference tree overwrites shared data with no undo.
+	if (!m_confirmedSaveToOpenedPath)
+	{
+		int const result = QMessageBox::warning(this, "Save in place?",
+			QString("Save will overwrite the opened file and regenerate its exported files:\n\n%1").arg(m_filename),
+			"Save In Place", "Save As...", "Cancel", 1, 2);
+
+		if (result == 2)
+			return;
+
+		if (result == 1)
+		{
+			saveAs();
+			return;
+		}
+
+		m_confirmedSaveToOpenedPath = true;
 	}
 
 	//-- make sure all files are writable
@@ -914,13 +938,25 @@ void QuestEditor::closeEvent(QCloseEvent * eventClose)
 {
 	if (m_dirty)
 	{
-		int result = QMessageBox::warning(this, "Changes not saved!", "Are you sure you want to close?",
-			QMessageBox::Yes, QMessageBox::No);
+		int const result = QMessageBox::warning(this, "Changes not saved!", "Save changes before closing?",
+			"Save", "Discard", "Cancel", 0, 2);
 
-		if (result == QMessageBox::No)
+		if (result == 2)
 		{
 			eventClose->ignore();
 			return;
+		}
+
+		if (result == 0)
+		{
+			save();
+
+			//save was cancelled or failed - do not discard the work
+			if (m_dirty)
+			{
+				eventClose->ignore();
+				return;
+			}
 		}
 	}
 
