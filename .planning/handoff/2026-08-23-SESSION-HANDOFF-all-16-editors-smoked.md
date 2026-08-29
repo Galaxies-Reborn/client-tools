@@ -3585,3 +3585,75 @@ banner - check the exe mtime, not the title.
 NpcEditor (SaveDialog defaults point INTO the SOE reference tree + silent
 template-writer stubs), TerrainEditor (Construction Layers tree cannot
 scroll).
+
+# ===== SESSION 2026-08-29 (cont. 4): NpcEditor pass DONE - x64 npos bug was the REAL clobber mechanism =====
+
+Sixth item-3 editor complete. Kenny-verified: in-place confirm fires, Save As
+redirects cleanly, and the saved .tpf files are faithful (one rewritten
+cross-reference line, everything else preserved).
+
+## THE BIG FIND - copyUpdatedFile's x64 npos truncation
+
+MainWindow.cpp copyUpdatedFile compared
+  i->find(key) != static_cast<unsigned>(std::string::npos)
+Fine on win32. On x64, find() returns 64-bit npos but the cast truncates the
+right side to 0xFFFFFFFF - never equal - so EVERY line "matched" and every
+save through this path replaced the ENTIRE file with N copies of the
+cross-reference line (N = source line count). Kenny's saves produced 12/19,
+12/21-line repeat files from PRISTINE dsrc sources (dressed_mugger verified
+clean, dated 08-22).
+
+**This retro-corrects the 08-28 diagnosis**: the beginner_brawler dsrc
+clobber was blamed on "appended stub cross-reference lines" from unreadable
+patch sources. The real mechanism was this npos bug mangling every
+copyUpdatedFile save. The 08-28 reconstruction of the two files remains
+correct; the explanation in that section is superseded.
+
+Found by instrumentation, not theory (three wrong theories preceded it:
+corrupted sources, ObjectTemplateWriter, QFileInfo staleness). Temporary
+PROBE WARNINGs in the save path named the branch + source; the source being
+pristine while output repeated pinned it inside copyUpdatedFile in one
+glance. Probes stripped after. Swept every tool source for one-sided npos
+truncation compares - this was the only instance. (Two-sided casts like
+static_cast<int>(pos) == static_cast<int>(npos) truncate consistently and
+are safe.)
+
+## Other NpcEditor fixes (same commit)
+
+* One-time in-place-overwrite confirm on plain Save (lists all three target
+  files; Save In Place / Save As... / Cancel, Enter = Save As) - the
+  QuestEditor pattern; m_confirmedSaveToOpenedPath, set by Save As too.
+* All three savers return bool; m_dirty only clears when ALL succeed (both
+  save paths used to clear it unconditionally, even on total failure).
+* Every silent failure branch now shows a message box: missing template
+  source (the never-shipped text/templates/base_humanoid.txt),
+  ObjectTemplateWriter failures (was IGNORE_RETURN + DEBUG_WARNING printing
+  the FILE* instead of the name - now WARNING with the right args),
+  copyUpdatedFile failures.
+* copyUpdatedFile preserves the replaced line's leading whitespace and
+  trailing newline (it used to emit the bare line, gluing it to the next).
+
+## Environment trap that bit this session: setx vs running terminals
+
+MIFF_CPP is setx'd (registry has it) but this terminal session PREDATES the
+setx, so every process launched from it - including editors, and Miff
+spawned by NpcEditor's Compile - lacked it. Symptom: Compile button ->
+Console window "ERROR: Possible problems running the GNU C Preprocessor /
+'cpp' is not recognized". Fix per launch: read it from
+HKCU\Environment and set $env:MIFF_CPP before Start-Process. A fresh
+terminal (post-reboot or newly opened) inherits it globally.
+
+## Machine state
+
+C:\save-test\papercut-pass\ cleaned of the corrupt test outputs; the good
+verification set (client/shared/server-save-3.*) kept. SOE tree took ZERO
+writes from all NpcEditor testing (audited) - the confirm+redirect flow
+works. QuestEditor litter from earlier testing still in the SOE tree
+(quest-resave2.* - 5 files incl. two 0-byte compiled iffs; the 0-byte iffs
+suggest the in-app DataTableTool compile failed silently in that run -
+UNINVESTIGATED, worth a look when next in QuestEditor).
+
+## Remaining item-3 seeds
+
+TerrainEditor only: Construction Layers tree cannot scroll (3D View works
+since 08-27).
