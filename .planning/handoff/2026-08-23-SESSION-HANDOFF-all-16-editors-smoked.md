@@ -3340,3 +3340,88 @@ SwgConversationEditor (failed save returns TRUE + clears modified flag),
 NpcEditor (SaveDialog defaults point into the reference tree; silent
 template-writer stubs), QuestEditor (Ctrl+S writes opened path, no prompt),
 TerrainEditor (Construction Layers scroll; 3D View untested).
+
+# ===== SESSION END 2026-08-30 - CONTEXT CLEAR - START HERE =====
+
+Everything committed and PUSHED (origin/x64-dx11-qt-tools in sync at
+716b19091). Working tree clean. No editors running. This block is the
+complete resume point; the two session blocks above it (CLI toolkit
+build-out, usability pass) carry the deep detail.
+
+## What this mega-session delivered, in order
+
+1. **CRC port (TODO item 1) DONE** - BuildQuestCrcStringTables.ps1 in the
+   tracked exe/win32 store, byte-identical vs shipped, wired into
+   QuestEditor, run clean in-app. QuestEditor has NO broken buttons left.
+2. **Perforce stripped (TODO item 2) DONE for all shipped editors** - every
+   p4 button/menu/spawn removed from 8 tools + UIBuilder; toolbar bitmap
+   tiles cut so icons don't shift; SwgClient's inert p4 libs dropped. God
+   client intentionally untouched (already stubbed via SWG_DISABLE_PERFORCE).
+3. **God client evening COMPLETE** - edit->save->PLAY closed (walked the
+   edited .trn against the live server; screenshot in logs/_shots/), god
+   editing surface proven (spawn/move/apply-transform/delete/bookmarks).
+   Two permanent cfg gains: [ClientGame] 0fd345d9=true (unhides CSR slash
+   commands) and the full [GodClient] path section. Login recipe and focus
+   model (Ctrl+F8, backtick console is a no-op in this build) documented in
+   the evening blocks.
+4. **CLI toolkit (TODO item 5) BUILT** - 10 CLI tools live in Release:
+   TemplateCompiler, Miff (needs MIFF_CPP env var -> set to VS clang,
+   persisted via setx), TreeFileBuilder/Extractor, TemplateDefinitionCompiler,
+   UpdateLocalizedStrings, LabelHashTool, ViewIff + DataTableTool, Turf.
+   Each verified (byte-identical where a reference existed). Deferred list
+   + reusable build recipes in TODO item 5.
+5. **Usability pass (TODO item 3) IN PROGRESS** - 2 of ~7 editors done:
+   * LightningEditor: 4 fixes (probe litter, world-origin invisible bolts
+     found via RenderDoc, caption refresh) - all Kenny-verified.
+   * SwooshEditor: panel enabled in release + combat demo revived through
+     THREE root causes (missing combat stance via overrideAnimationTarget,
+     hand-slot leak killing weapon switching, polearm rows pointing at
+     trail-less combat entries) - Kenny-verified across all weapon types.
+
+## The interactive workflow being used for item 3 (KEEP USING IT)
+
+Kenny drives the UI and reports; the session fixes live and relaunches.
+Loop: pre-fix known paper cuts -> rebuild -> launch for Kenny -> he pokes,
+asks what controls do, runs save scenarios -> instrument silent failures
+with temporary WARNINGs when something is dead -> fix -> strip probes
+(git-restore library files that only carried probes; keep tool-side fixes)
+-> commit batch when Kenny confirms. Rebuilds need his editor CLOSED
+(LNK1104 otherwise). Save-safe workspace: C:\save-test\papercut-pass\.
+
+## NEXT: ClientEffectEditor (agreed with Kenny before the clear)
+
+Known seeds: tree value edits REVERT (the editing-hostile one) and save
+silently no-ops on unmodified docs. Pre-read the value-edit path in
+src/engine/client/application/ClientEffectEditor before launching. Loose
+.cef samples exist in the SOE tree appearance dir if needed.
+Then remaining: SwgConversationEditor (failed save returns TRUE + clears
+modified flag - Doc.cpp ~1118-1138), NpcEditor (SaveDialog defaults point
+INTO the SOE reference tree + silent template-writer stubs), QuestEditor
+(Ctrl+S writes opened path, no prompt), TerrainEditor (Construction Layers
+tree cannot scroll; 3D View still never exercised).
+
+## Machine state
+
+* Release dir: all 16 editors + 10 CLI tools, everything current.
+* C:\save-test\: papercut-pass\ (samples + Kenny's force-lightening-resave),
+  tpl-sandbox\ + tdf-sandbox\ + tre-sandbox\ + lat-check\ (CLI verification
+  sandboxes, disposable but handy), soe-crc-backup\ (SOE originals + hashes).
+* MIFF_CPP user env var -> VS clang (miff's preprocessor).
+* SOE reference tree pristine (write audit clean; my one warning.log litter
+  deleted). Terrain override REVERTED - stock tatooine.
+* Server VM (192.168.1.200) was up for the god evening; state now unknown.
+
+## Traps refreshed this session (beyond the standing list)
+
+* The combat/animation pipeline hides ~6 consecutive DEBUG-only failure
+  points - instrument, don't theorize (details in the Swoosh block above).
+* RenderDoc launch-capture works automated: renderdoc-cli capture -d 1500 +
+  drive the file-open during the delay + hold foreground; output lands as
+  <name>_frameN.rdc despite a 'timed out' message.
+* SwooshEditor reads AnimationEditor.cfg ([ParticleEditor] section feeds
+  ParticleEditor AND AnimationEditor - and Swoosh via its GameWidget quirk).
+* Serverless avatar has NO inventory container - CuiInventoryManager
+  unequip paths fail; anything doing container transfers on the tool
+  avatar needs a serverless fallback.
+* PS 5.1: 8-hex-digit literals wrap to negative Int32 (use L suffix);
+  [Text.Encoding]::Latin1 doesn't exist.
