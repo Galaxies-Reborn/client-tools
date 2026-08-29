@@ -2922,3 +2922,72 @@ parameterizes the cfg roots; (5) survey the CLI layer (templatecompiler,
 miff, TreeFileBuilder/Extractor, mochac - DataTableTool already done) to
 restore the end-to-end toolkit; (6) endgame: migrate that CLI layer to
 SWG-Toolkit.
+
+# ===== SESSION END 2026-08-28 - SAVE SWEEP DONE, PIPELINE FIXED - START HERE =====
+
+Everything below is committed and PUSHED (origin/x64-dx11-qt-tools, in sync at
+e10d37fb5). Working tree clean. No editors left running. Kenny confirmed every
+human-driven result in-session.
+
+## What this day delivered, shortest form
+
+1. **Save-path sweep COMPLETE: 14 of 15 tools driven through save** (SwgGodClient
+   deferred - needs the server). 13 full PASS + NpcEditor partial (client-data
+   .mif writer works with real content; .tpf writers blocked by never-shipped
+   text/templates sources). Five byte-identical round trips. Per-tool verdicts
+   + the confirmed trap list: docs/TOOLS-GUIDE.md Part 2.5. The tools UPGRADE
+   old data to their current schema on save - expect version deltas vs 2004
+   data; they are correct behavior.
+2. **QuestEditor's save pipeline fully works now** - three fixes: QuestChecker
+   ported perl->PowerShell (tracked at src/build/win32/exe/win32/, adversarially
+   tested, ran clean in-app); DataTableTool built for x64 from in-tree source
+   (needs -p:SolutionDir=src\build\win32\ - the archive dep's includes hang off
+   it; x64 link uses deps\x64\lib libxml2 + solution zlib); and THE ROOT CAUSE -
+   **CommandLine.cpp gobbleString terminated unquoted args at any '-'**, so
+   every dashed path failed "Invalid command line" in every engine CLI tool
+   since 2004. Fixed in sharedFoundation; all tools + client inherit on rebuild.
+3. **SwgConversationEditor startup dialogs 3 -> 1** (mochaCommand + dictionary
+   keys added; remaining dialog is the structural exe\win32 check).
+4. **SOE-tree write audit (Kenny asked): 2 dsrc templates were clobbered by
+   failed NpcEditor saves; both reconstructed EXACTLY** from untouched siblings
+   + the compiled .iffs (which preserved the truth, incl. the bith_m.sat). The
+   memory note now carries the audit one-liner - run it after any save session.
+5. **Roadmap captured: .planning/TODO-tools-productization.md** - 6 workstreams
+   (CRC port, P4 removal everywhere, per-tool usability pass, installer +
+   not-in-TREs inventory, CLI-layer survey, SWG-Toolkit endgame). The CRC port
+   collapsed to ONE script (buildCrcStringTable.pl, found in
+   D:\Code\Galaxies-Reborn\swg-main\tools\ along with the whole SOE pipeline;
+   the community's p4-free wrapper is swg-main\utils\
+   build_quest_crc_string_tables.py). mochac.pl remains UNFOUND anywhere.
+
+## Machine state
+
+* C:\save-test\ = the sweep's artifacts (resaves, sandboxes, broken.qst test
+  file, build logs). Disposable, but the sandboxes are handy for re-tests.
+* All tool cfgs restored - NO sandbox redirects remain (verified: zero
+  .pre-savesweep.bak files).
+* Release dir gained: DataTableTool.exe (x64, working), compiled_shader cache
+  (from 08-24), appearance/ash+lat dirs (AnimationEditor test, empty now).
+* SOE reference tree: fully intact after reconstruction; audit `find "D:/SWG
+  All Tools Working" -type f -newermt <date>` after future save sessions.
+
+## Next session, in order
+
+1. **The god-client server evening** (standing item, Kenny was bringing the
+   server up): walk on an edited .trn in SwgGodClient (closes
+   edit->save->PLAY), then drive the god tools - the largest untested area.
+   Login cfg facts are in the 08-24 section (loginServerAddress0 indexed keys).
+2. Then the productization TODO, roughly in its own order - item 1 (CRC port)
+   is small and unblocks the last QuestEditor button.
+
+## Traps refreshed this session (beyond the standing list)
+
+* QuestEditor Ctrl+S writes back to the OPENED path - and now SUCCEEDS. Save
+  As first, always. NpcEditor's SaveDialog defaults also point into the
+  reference tree.
+* warning.log is truncated by every tool launch and QMessageBox errors never
+  reach it - post-hoc log forensics on UI errors is useless; capture dialogs
+  live.
+* Native file dialogs: fill ONLY dlg item 0x480 (or cmb13's edit), verify by
+  readback, click via posted WM_COMMAND - and treat any 'Confirm Save As' as
+  a wrong-target signal (scripts/_drive-save.ps1 embodies all of it).
