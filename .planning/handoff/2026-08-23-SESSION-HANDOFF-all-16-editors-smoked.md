@@ -3111,3 +3111,57 @@ Conversation 11, SpaceZone 13. Screenshots confirm no icon shift anywhere.
 All 8 changed editors relinked 09:33-09:39 and smoked; screenshots in the
 session scratchpad (p4strip-shots/). No editors left running. SwgClient
 relinked but not re-run (link-only change, exit 0).
+
+# ===== SESSION 2026-08-29 (evening): EDIT->SAVE->PLAY CLOSED - god client walk on edited terrain =====
+
+Kenny stood the server up. **The edited .trn walk happened and PASSED.**
+
+## The result
+
+tatooine3.trn (the 08-27 TerrainEditor edit: height change + circle boundary
+at (-3616,-832) r=224) staged as terrain/tatooine.trn in
+D:/Code/Galaxies-Reborn/stage-B-override (priority 12). God client logged in
+(all three Login: lines clean), god mode granted by the server automatically
+(GameWidget.cpp:1578 sends setGodMode on world entry), /teleport to the site,
+and Kenny walked the edited terrain: carved depression rendered, textures/
+flora/lighting correct, and the server-placed rocks FLOATING at the old
+ground height - the exact predicted client/server terrain mismatch artifact,
+i.e. positive proof the client renders the EDITED file. Screenshot:
+logs/_shots/godclient-edited-terrain-walk.jpg (GOD MODE indicator visible).
+
+To revert the override: delete stage-B-override/terrain/tatooine.trn.
+To make the edit real server-side: copy it into the VM's server data (not done).
+
+## Two walls hit on the way, both solved - REUSABLE KNOWLEDGE
+
+1. **The god client has NO typed command console in this build.** The
+   backtick/Ctrl+F8 console toggle is a null-guarded no-op (the CUI Console
+   page is missing from the NGE-retail UI bundle - guarded by an earlier
+   session, comment at ActionsGame.cpp:211). The Qt ConsoleWindow is
+   OUTPUT-ONLY (ConsoleWindow.cpp - QTextView, no input line). The in-game
+   chat line is the only place to type. Also: /warpme and the whole
+   scene/remote/mount parser set are compiled out of release
+   (SwgCuiChatWindow.cpp:437 '#if PRODUCTION == 0'; Production.h derives
+   PRODUCTION from DEBUG_LEVEL=0).
+2. **Admin slash commands are hidden behind SOE's obfuscated cfg key.**
+   CuiCommandTableParser::resetCommands skips every command in the 'csr'
+   display group (teleport included) unless ConfigClientGame::getCSR() -
+   which is KEY_BOOL(0fd345d9) (ConfigClientGame.cpp:1169,886; deliberately
+   gibberish-named). Fix: [ClientGame] 0fd345d9=true - now set in
+   SwgGodClient.cfg with a comment. The working client always had it
+   (swg-client-v2/stage/client.cfg:80). Client-side visibility only; the
+   server still validates god mode per command. Symptom without it:
+   "No such command, mood, chat type: teleport" (CuiChatParser.cpp:348).
+
+## Focus-model facts for driving the god client
+
+Title bar shows input owner: [Game Focus] = game grabbed mouse+keyboard,
+[God Client Focus] = Qt panels have input. Toggle: Ctrl+F8 (or numpad Enter,
+or the Game button on the game window). Clicking in the viewport always
+grabs focus back to the game (GameWidget mousePressEvent). Entering god
+mode DISABLES the HUD (GameWidget.cpp:1573); Ctrl+H toggles it back.
+
+## Still open tonight: the god-tool surface (phase 3)
+
+Selection, Objects/ServerTemplates panels, spawn/move/delete, bookmarks,
+ObjectTemplate/Script menus. In progress as this block is written.
