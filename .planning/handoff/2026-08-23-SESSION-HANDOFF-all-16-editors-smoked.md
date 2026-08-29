@@ -3286,3 +3286,57 @@ Item 3 (usability paper cuts) or item 4 (not-in-TREs inventory / installer).
 The DraftSchematicEditor Compile button can now actually work end to end
 (templatecompiler exists) - worth a quick in-app verification when next in
 that editor.
+
+# ===== SESSION 2026-08-29/30 - USABILITY PASS: Lightning + Swoosh DONE =====
+
+Item-3 pass running interactively with Kenny (he drives the UI, fixes land
+live). Two editors completed and verified in his hands; all committed+pushed.
+
+## LightningEditor - 4 fixes, all verified
+* Save As .swh probe litter -> probes the real .ltn (SOE's own tree carries
+  a 0-byte podracer_energy_binders.swh from this bug, ~20 years old).
+* INVISIBLE BOLTS solved via RenderDoc (automated launch-capture + driving
+  Ctrl+O during the frame-delay window works; captures land as _frameN.rdc):
+  the endpoint demo pinned bolts at the WORLD ORIGIN - fine on simple.trn,
+  invisible after the 08-24 move to tatooine (avatar spawns far away; clip
+  y ~ -725). All demo modes now anchor to the player. Save round trip and
+  color edits verified.
+* Caption only refreshed in paintEvent (which never fires) - update() forced
+  on open/save.
+
+## SwooshEditor - property panel enabled + combat demo fully revived
+* Panel was force-disabled in release (viewer-only since SOE). Enabled; only
+  the debug-only 'final game swooshes' toggle stays greyed.
+* The 'animation demo inert' mystery ran FIVE silent layers deep (every
+  failure DEBUG-only): demo fires -> selector FOUND -> script accepted ->
+  PSAA initialize -> LAT lookup fails because the avatar never enters the
+  weapon 'ready' combat states. Root: requestSetCombatTarget was removed
+  upstream (SOE TODO comment in the tool). Fix: CreatureController::
+  overrideAnimationTarget re-applied per alter.
+* Weapon switching: unequip-to-inventory fails on the inventory-less avatar
+  and the deleted weapon left the hand slot occupied - first equip worked,
+  all later ones failed silently. Fix: transferItemToWorld before delete.
+* Polearm trails: tab rows pointed at lower_posture_* entries (no
+  StartTrailsAction in their scripts); repointed at knockdown_polearm_*.
+  Trail hardpoints (tr1s/tr1e) verified present on the weapon meshes.
+* Kenny-verified: punch/kick/sword/lightsaber/polearm/beams/flamethrower all
+  swing with trails; switching works. Defender + reference-swoosh orbit also
+  player-anchored (same origin disease as the bolts).
+
+## Reusable diagnosis knowledge
+* The combat/animation pipeline has ~6 consecutive silent failure points
+  (CCPM no-selector fallthrough, PSAA actor/variable/empty-name skips,
+  SHAC lookup miss) - ALL debug-only. Instrument with temporary WARNINGs,
+  then git-restore the library files (keep tool-side fixes only).
+* Trail system: weapon trails need tr1s/tr1e hardpoints on the WEAPON mesh
+  and a StartTrailsAction in the combat entry's playback script; body trails
+  ride lankle/rankle/hold_l/hold_r with thin camera-facing ribbons.
+* dlt20a Rifle row still references fire_5 which doesn't exist in all_b.ash
+  root.combat - datatable nit, untouched.
+
+## Remaining item-3 seeds
+ClientEffectEditor (tree value edits revert; silent no-op save),
+SwgConversationEditor (failed save returns TRUE + clears modified flag),
+NpcEditor (SaveDialog defaults point into the reference tree; silent
+template-writer stubs), QuestEditor (Ctrl+S writes opened path, no prompt),
+TerrainEditor (Construction Layers scroll; 3D View untested).
