@@ -3496,3 +3496,56 @@ Doc.cpp ~1118-1138), NpcEditor (SaveDialog defaults point INTO the SOE
 reference tree + silent template-writer stubs), QuestEditor (Ctrl+S writes
 opened path, no prompt), TerrainEditor (Construction Layers tree cannot
 scroll; 3D View now works but the scroll cut remains).
+
+# ===== SESSION 2026-08-29 (cont. 2): SwgConversationEditor pass DONE + exewin32 dialogs killed =====
+
+Fourth item-3 editor complete. Kenny verified load -> edit -> resave ->
+reload round trip in-app. Committed.
+
+## SwgConversationEditor fixes (SwgConversationEditorDoc.cpp)
+
+* **The dishonest save (the seed).** OnSaveDocument's catch fell through to
+  SetModifiedFlag(false) + return TRUE - a failed save told MFC it
+  succeeded: no dirty *, no prompt on close, work silently discarded. Both
+  failure branches now return FALSE and keep the flag.
+* **Both catch blocks were DEAD CODE since 2004.** OnOpenDocument AND
+  OnSaveDocument set FatalSetThrowExceptions(false) BEFORE their try blocks
+  (should be true; the trailing reset to false exists in both). A FATAL
+  during load/save never threw - it crashed the app; the "Error loading"/
+  "Error saving" boxes could never fire. Fixed: true before, false after,
+  including on every early return.
+* **save() returning false (read-only file, bad path) was silent** -
+  Conversation::save ends in iff.write(), and the FALSE return produced no
+  message at all. Now: "Could not write the file. Is it read-only?" box.
+* **A failed load presented as a good document** - the open catch fell
+  through to onOpenDefaultViews + return TRUE on a partially-loaded doc.
+  Now aborts the open.
+* **Pre-compile auto-save was fire-and-forget** - a failed save let the
+  compile run against stale on-disk state. Now aborts the compile.
+
+## exewin32 startup dialog REMOVED from all three MFC tools
+
+The "X is not running from <branch>\exe\win32. You may be running an older
+version." box was one copy-pasted block (strip slashes from cwd, look for
+substring "exewin32") in SwgConversationEditor, SwgSpaceQuestEditor and
+SwgSpaceZoneEditor. Our x64\Release cwd can never contain it -> guaranteed
+useless click every launch. Removed from all three; all three rebuilt and
+ConversationEditor now starts with ZERO dialogs.
+
+CAREFUL if this is ever revisited: in the two space editors the removed
+block DECLARED the `char buffer[1024]` cwd that the SECOND dialog (the
+branch-mismatch check right below it) still reads - the declaration was
+re-added inside that check's scope. That second "running out of the
+'qt-tools-worktree' branch" box still fires in both space editors; it is
+the structural cfg-path comparison documented 08-23. Kenny has been offered
+its removal too - not done yet.
+
+Test artifact: C:\save-test\swgcon-new.cnv (the 08-28 sweep's round-trip
+file) is the handy .cnv for future ConversationEditor testing - the SOE
+.cnv sources never shipped.
+
+## Remaining item-3 seeds
+
+NpcEditor (SaveDialog defaults point INTO the SOE reference tree + silent
+template-writer stubs), QuestEditor (Ctrl+S writes opened path, no prompt),
+TerrainEditor (Construction Layers tree cannot scroll).

@@ -1015,12 +1015,16 @@ BOOL SwgConversationEditorDoc::OnOpenDocument(LPCTSTR lpszPathName)
 		return FALSE;
 	
 	// TODO: Add your specialized creation code here
-	FatalSetThrowExceptions (false);
+	//throw on FATAL so the catch below can report it; reset after the try
+	FatalSetThrowExceptions (true);
 
 		try
 		{
 			if (!m_conversation->load (lpszPathName))
+			{
+				FatalSetThrowExceptions (false);
 				return FALSE;
+			}
 
 			if (m_conversation->getTriggerText ().empty ())
 			{
@@ -1089,6 +1093,10 @@ BOOL SwgConversationEditorDoc::OnOpenDocument(LPCTSTR lpszPathName)
 			message += exception.getMessage ();
 
 			MessageBox (0, message, AfxGetApp ()->m_pszAppName, MB_ICONSTOP);
+
+			//a failed load must not open as a good document
+			FatalSetThrowExceptions (false);
+			return FALSE;
 		}
 
 	FatalSetThrowExceptions (false);
@@ -1112,12 +1120,22 @@ BOOL SwgConversationEditorDoc::OnSaveDocument(LPCTSTR lpszPathName)
 	}
 
 	// TODO: Add your specialized code here and/or call the base class
-	FatalSetThrowExceptions (false);
+	//throw on FATAL so the catch below can report it; reset after the try
+	FatalSetThrowExceptions (true);
 
 		try
 		{
 			if (!m_conversation->save (lpszPathName))
+			{
+				FatalSetThrowExceptions (false);
+
+				CString message ("Error saving ");
+				message += lpszPathName;
+				message += "\nCould not write the file. Is it read-only?";
+
+				MessageBox (0, message, AfxGetApp ()->m_pszAppName, MB_ICONSTOP);
 				return FALSE;
+			}
 		}
 		catch (FatalException const & exception)
 		{
@@ -1128,10 +1146,15 @@ BOOL SwgConversationEditorDoc::OnSaveDocument(LPCTSTR lpszPathName)
 			message += exception.getMessage ();
 
 			MessageBox (0, message, AfxGetApp ()->m_pszAppName, MB_ICONSTOP);
+
+			//a failed save must not report success or clear the modified
+			//flag - that is how unsaved work gets silently thrown away
+			FatalSetThrowExceptions (false);
+			return FALSE;
 		}
 
 	FatalSetThrowExceptions (false);
-	
+
 	SetModifiedFlag (false);
 
 	return TRUE;
@@ -1304,8 +1327,10 @@ std::pair <bool, bool> SwgConversationEditorDoc::compile (bool const spellCheck,
 			if (m_numberOfWarnings == 0)
 				m_warningFrame->DestroyWindow ();
 
-			//-- pre-compile save
-			OnSaveDocument (GetPathName ());
+			//-- pre-compile save; abort if it fails so the compile cannot
+			//run against stale on-disk state
+			if (!OnSaveDocument (GetPathName ()))
+				return std::make_pair (false, false);
 
 			CString const shortFileName (fileName);
 			CString const scriptName = getFullScriptFileName (shortFileName);
