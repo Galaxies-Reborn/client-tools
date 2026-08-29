@@ -2,17 +2,17 @@ Name	AnimationName	WeaponName	LeftHandTrail	RightHandTrail	LeftFootTrail	RightFo
 s	s	"s[""""]"	i[0]	i[0]	i[0]	i[0]	i[0]	f[1.0]
 Punch	attack_high_right_2_punch_roundhouse_medium			1				1.2
 Kick	attack_high_right_2_rear_roundhouse_kick_light					1		1.2
-Polearm (wood)	lower_posture_polearm_1	object/weapon/melee/polearm/shared_lance_staff_wood_s1.iff					1	1.4
-Lance Controller	lower_posture_polearm_2	object/weapon/melee/polearm/shared_lance_controllerfp.iff					1	1.4
-Lance Controller Nightsister	lower_posture_polearm_2	object/weapon/melee/polearm/shared_lance_controllerfp_nightsister.iff					1	1.4
-Lance Staff Janta	lower_posture_polearm_2	object/weapon/melee/polearm/shared_lance_staff_janta.iff					1	1.4
-Lance Staff Metal	lower_posture_polearm_2	object/weapon/melee/polearm/shared_lance_staff_metal.iff					1	1.4
-Lance Staff Wood (1)	lower_posture_polearm_2	object/weapon/melee/polearm/shared_lance_staff_wood_s1.iff					1	1.4
-Lance Staff Wood (2)	lower_posture_polearm_2	object/weapon/melee/polearm/shared_lance_staff_wood_s2.iff					1	1.4
-Lance Vibrolance	lower_posture_polearm_2	object/weapon/melee/polearm/shared_lance_vibrolance.iff					1	1.4
-Polearm Vibroaxe	lower_posture_polearm_2	object/weapon/melee/polearm/shared_polearm_vibro_axe.iff					1	1.4
-Polearm (lightsaber)	lower_posture_polearm_2	object/weapon/melee/polearm/shared_lance_lightsaber_01.iff					1	1.4
-Polearm (lightsaber2)	lower_posture_polearm_2	object/weapon/melee/polearm/shared_lance_lightsaber_02.iff					1	1.4
+Polearm (wood)	knockdown_polearm_1	object/weapon/melee/polearm/shared_lance_staff_wood_s1.iff					1	1.4
+Lance Controller	knockdown_polearm_2	object/weapon/melee/polearm/shared_lance_controllerfp.iff					1	1.4
+Lance Controller Nightsister	knockdown_polearm_2	object/weapon/melee/polearm/shared_lance_controllerfp_nightsister.iff					1	1.4
+Lance Staff Janta	knockdown_polearm_2	object/weapon/melee/polearm/shared_lance_staff_janta.iff					1	1.4
+Lance Staff Metal	knockdown_polearm_2	object/weapon/melee/polearm/shared_lance_staff_metal.iff					1	1.4
+Lance Staff Wood (1)	knockdown_polearm_2	object/weapon/melee/polearm/shared_lance_staff_wood_s1.iff					1	1.4
+Lance Staff Wood (2)	knockdown_polearm_2	object/weapon/melee/polearm/shared_lance_staff_wood_s2.iff					1	1.4
+Lance Vibrolance	knockdown_polearm_2	object/weapon/melee/polearm/shared_lance_vibrolance.iff					1	1.4
+Polearm Vibroaxe	knockdown_polearm_2	object/weapon/melee/polearm/shared_polearm_vibro_axe.iff					1	1.4
+Polearm (lightsaber)	knockdown_polearm_2	object/weapon/melee/polearm/shared_lance_lightsaber_01.iff					1	1.4
+Polearm (lightsaber2)	knockdown_polearm_2	object/weapon/melee/polearm/shared_lance_lightsaber_02.iff					1	1.4
 Vibro Knuckler	attack_high_right_2_punch_roundhouse_medium	object/weapon/melee/specail/shared_vibroknuckler.iff					1	1.4
 Lightsaber (Vader)	lower_posture_2hmelee_1	object/weapon/melee/sword/shared_sword_lightsaber_vader.iff					1	1.4
 Lightsaber (Anakin)	lower_posture_2hmelee_1	object/weapon/melee/sword/shared_sword_lightsaber_anakin.iff					1	1.4
