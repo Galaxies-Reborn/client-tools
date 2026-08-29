@@ -7,15 +7,25 @@ Started as QuestEditor notes; the scope is all 16 editors. Goal per Kenny:
 
 The `Build Quest CRC Tables` button shells `perl buildQuestCrcStringTables.pl
 --local <branch>` (ToolProcess.cpp:148-160), same missing-perl problem the
-QuestChecker had. **Harder than QuestChecker: the .pl exists NOWHERE on this
-machine** — not in the SOE tree (searched), not in the repo. Options, in order:
-- hunt it in SWGSource/other repos' history (it's a build-pipeline script the
-  server needs too — the community may carry it);
-- else reimplement: it builds the quest CRC string tables the client/server
-  use to map quest names to CRCs — the OUTPUT format is a known datatable /
-  crc string table readable in engine source (`QuestManager` /
-  `CrcStringTable` consumers), so a PowerShell reimplementation from the
-  output format is feasible the way QuestChecker was.
+QuestChecker had. **FOUND (2026-08-28, after searching the TREs and both
+drives)**: three identical copies, in the SWGSource repos' tools/ dirs —
+`D:\Code\Galaxies-Reborn\swg-main\tools\`, `D:\Code\swg-main\tools\`,
+`D:\Code\swg-client\tools\`. (NOT in the SOE tree — its tools/ dir is the
+documented absence — and NOT in any archive: client TREs have zero .pl
+entries, Beyond TREs likewise.)
+
+What the script actually is (read in full, 120 lines): a PERFORCE WRAPPER —
+`p4 where`/`p4 files`/`p4 opened` enumerate the questlist datatable names,
+then it pipes the list into **`buildCrcStringTable.pl`** (168 lines, same
+tools/ dirs, generic — `buildObjectTemplateCrcStringTables.pl` uses it too),
+which holds the CRC-32 table inline and writes the output. So the port is:
+- port `buildCrcStringTable.pl` -> PowerShell (the real generator; the CRC
+  table is inline data, logic is small);
+- replace the quest wrapper's p4 layer with a questlist DIRECTORY WALK —
+  which is simultaneously the item-2 P4 removal for this path.
+Verification target exists: `misc/quest_crc_string_table.iff` ships in the
+patch TREs (reference outputs), and the reader is
+`sharedFoundation/CrcStringTable.cpp` + `QuestManager.cpp:36`.
 Wire-up is the proven pattern: ToolProcess.cpp + a .ps1 in the tracked
 `src/build/win32/exe/win32/` store.
 
