@@ -3198,3 +3198,46 @@ Still unexercised: bookmarks (in progress), object delete (in progress),
 ObjectTemplate/Script menus, Brushes/Palettes, buildout areas, theater
 creation. The essential surface (connect, walk edited terrain, spawn,
 manipulate, persist) is all PROVEN.
+
+# ===== SESSION END 2026-08-29 - GOD CLIENT EVENING COMPLETE - START HERE =====
+
+The standing item is CLOSED. Everything below verified by Kenny in-session
+against the live server (192.168.1.200), all committed and pushed.
+
+## Final scorecard for the god-client evening
+
+| check | result |
+|---|---|
+| login -> world entry | PASS (all three Login: lines) |
+| god mode | PASS (auto-requested on entry, server granted) |
+| admin slash commands | PASS after [ClientGame] 0fd345d9=true |
+| walk on edited .trn | PASS - **edit->save->PLAY closed**; floating rocks = server has stock terrain (expected); screenshot logs/_shots/godclient-edited-terrain-walk.jpg |
+| select server object | PASS (bantha) |
+| spawn from template | PASS (camp cot, after [GodClient] cfg section) |
+| move + Apply Transform + persist | PASS |
+| delete object | PASS |
+| bookmarks | PASS (double-click = CAMERA jump, not avatar - by design) |
+| creature transform | AI stomps it (ghost clears, object re-replicates) - expected, use static objects |
+| baked scenery selection | correctly unselectable (no live server object) |
+
+## Close-out state
+
+* God client shut down. Terrain override REVERTED (stage-B-override/terrain/
+  deleted) - stock tatooine again; the edited file remains at
+  C:\bake-test\tatooine3.trn if ever wanted (server-side deploy would be the
+  next step for a real terrain change).
+* SOE-tree write audit run at close (find -newermt session start).
+* SwgGodClient.cfg permanently gained: [ClientGame] 0fd345d9=true and the
+  full [GodClient] path section (SOE's, rebased). godclient_favorites.xml
+  (SOE's) now beside the exe.
+* Not exercised, lower priority now: ObjectTemplate/Script menus, Brushes/
+  Palettes, buildout areas, theaters. The essential god surface is proven.
+
+## Next session
+
+Back to the productization TODO: item 3 (usability paper cuts - seed list
+in the TODO: LightningEditor .swh probe, ClientEffectEditor value-revert,
+ConversationEditor dishonest save-failure, NpcEditor SaveDialog defaults,
+QuestEditor Ctrl+S no-prompt, TerrainEditor tree scroll, SwooshEditor demo)
+or item 4 (not-in-TREs inventory + installer). Item 5's CLI survey now has
+one more datum: the god client needed no CLI tools tonight.
