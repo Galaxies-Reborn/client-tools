@@ -218,11 +218,16 @@ void MainWindow::slotFileOpenAction()
 			QtUtility::setLastPath(selectedFileName);
 
 			// Get the current particle effect iff
-	
+
 			Iff iff(selectedFileName.latin1());
 			loadIff(iff);
 
 			validate();
+
+			// x64 usability (2026-08-29): the caption normally only refreshes
+			// in paintEvent, which the 3D-viewport-dominated frame almost
+			// never receives - force it so the opened file shows immediately
+			update();
 		}
 	}
 	else if (!selectedFileName.isEmpty())
@@ -252,7 +257,10 @@ void MainWindow::slotFileSaveAsAction()
 		}
 		else
 		{
-			QString newPath((FileNameUtils::get(saveFileName.latin1(), FileNameUtils::drive | FileNameUtils::directory | FileNameUtils::fileName).c_str()) + QString(".swh"));
+			// Probe the .ltn we actually save, not ".swh" - the extension was
+			// copy-pasted from SwooshEditor and littered a 0-byte <name>.swh
+			// beside every save while probing a file save() never wrote.
+			QString newPath((FileNameUtils::get(saveFileName.latin1(), FileNameUtils::drive | FileNameUtils::directory | FileNameUtils::fileName).c_str()) + QString(".ltn"));
 
 			if (!FileNameUtils::isWritable(newPath.latin1()))
 			{
@@ -300,9 +308,13 @@ void MainWindow::save(QString const &path)
 	    && FileNameUtils::isWritable(newPath.latin1()))
 	{
 		m_fileInfo.setFile(newPath);
-	
+
+		// x64 usability (2026-08-29): refresh the caption on save too (see
+		// the matching note in slotFileOpenAction)
+		update();
+
 		// Save the path
-	
+
 		QtUtility::setLastPath(m_fileInfo.filePath());
 	
 		// Get the current particle effect iff

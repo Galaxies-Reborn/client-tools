@@ -164,7 +164,15 @@ void SwooshEditorIoWin::alter(float const deltaTime)
 				// For animations check "swg\current\dsrc\sku.0\sys.client\compiled\game\combat\combat_manager.mif"
 				// For weapons check "swg\current\data\sku.0\sys.shared\compiled\game\object\weapon\"
 
-				m_defenderObject->setPosition_w(Vector(0.0f, 0.0f, m_defenderDistance));
+				// x64 usability pass (2026-08-29): the defender was pinned at the
+				// WORLD ORIGIN while the attacker is the player. On
+				// terrain/tatooine.trn (the magenta-sky fix, 2026-08-24) the player
+				// spawns kilometers from the origin, so the combat-swing demo never
+				// visibly engaged. Stage the defender in front of the player.
+				if (attackerObject != NULL)
+					m_defenderObject->setPosition_w(attackerObject->getPosition_w() + attackerObject->getObjectFrameK_w() * m_defenderDistance);
+				else
+					m_defenderObject->setPosition_w(Vector(0.0f, 0.0f, m_defenderDistance));
 
 				if (m_weaponName.empty())
 				{
@@ -316,9 +324,18 @@ void SwooshEditorIoWin::alter(float const deltaTime)
 							radius = 4.0f;
 						}
 
-						float const x = m_objectTransform.getPosition_p().x + sinf(radian) * radius;
-						float const y = m_objectTransform.getPosition_p().y;
-						float const z = m_objectTransform.getPosition_p().z + cosf(radian) * radius;
+						// x64 usability pass (2026-08-29): anchor the reference-swoosh
+						// orbit to the player - m_objectTransform is never set, so
+						// this orbited the world origin (same problem as the
+						// defender above).
+						Vector anchor(m_objectTransform.getPosition_p());
+						Object const * const playerForAnchor = Game::getPlayer();
+						if (playerForAnchor != NULL)
+							anchor += playerForAnchor->getPosition_w();
+
+						float const x = anchor.x + sinf(radian) * radius;
+						float const y = anchor.y;
+						float const z = anchor.z + cosf(radian) * radius;
 
 						radian += m_objectRotationSpeed * deltaTime;
 
