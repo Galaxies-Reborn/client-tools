@@ -3425,3 +3425,74 @@ tree cannot scroll; 3D View still never exercised).
   avatar needs a serverless fallback.
 * PS 5.1: 8-hex-digit literals wrap to negative Int32 (use L suffix);
   [Text.Encoding]::Latin1 doesn't exist.
+
+# ===== SESSION 2026-08-29 (cont.): ClientEffectEditor usability pass DONE =====
+
+Item-3 pass, third editor complete. All fixes Kenny-verified in-app ("this is
+actually a really useful editor and it's super simple to use"). Committed.
+
+## Fixes (all in ClientEffectEditor/src/shared/core/MainWindow.cpp)
+
+* **Tree value edits reverted** - THE editing-hostile bug. Root cause is Qt
+  itself: Qt3 QListView defaults defaultRenameAction to Reject
+  (qlistview.cpp:2670), so ANY focus loss short of pressing Enter cancels the
+  inline edit. No tool ever overrode it. Fix: setDefaultRenameAction(Accept)
+  in the MainWindow ctor. NOTE for the remaining editors: any other Qt tool
+  with setRenameEnabled columns has this same landmine.
+* **Save was a silent no-op on unmodified docs** (gated on the modified flag,
+  did nothing - no dialog, no message). Save now always opens the dialog;
+  a filename typed without extension gets .cef appended (used to fail with
+  only a warning.log line); wrong extension gets a message box; a successful
+  save updates ms_currentFile + caption.
+* **Two data-loss holes**: "save before closing? -> Yes" then CANCELLING the
+  save dialog discarded the work anyway, in both the New and Close/exit
+  paths. A cancelled/failed save now aborts the discard/close.
+* **Caption shows `*` when modified**, refreshed on edit/add/delete/save.
+* **Open refused files outside the searchPaths silently** - the reload-my-
+  saved-file killer. If stripTreeFileSearchPathFromFile cannot map the path,
+  the editor now falls back to the absolute path (TreeFile's default
+  SearchAbsolute node opens it directly - verified present, cfg does not
+  override it). All three open-failure branches (unopenable / no extension /
+  wrong extension) now show message boxes instead of warning.log-only.
+
+## THE WALKING AVATAR - root cause, and a TreeFile trap worth remembering
+
+Kenny reported the viewport avatar WALKED instead of idling. Differential
+test: ParticleEditor (08-24 exe) stood, CEE walked, same tatooine scene ->
+suspected today's libs; but incremental rebuild recompiled NOTHING (objs
+newer than pristine restored sources - the 15:55 libs ARE pristine) and no
+shared-lib commit since 08-24 touches anything relevant. The real delta was
+the CFG: ClientEffectEditor.cfg (08-24 18:55) mounted the ENTIRE SOE loose
+tree (.../compiled/game) at searchPath11 so the Open dialog could map .cef
+files. That root also holds appearance/animation (8,586 files), 194 .lat,
+9 .ash, datatables/, combat/, playback/ - all shadowing the v3.0 TREs, and
+the 2016 dev data resolves the avatar idle to a walk.
+
+**The trap: you cannot fix this by demoting the priority.** TreeFile
+registers searchPaths ahead of searchTrees at each priority and same-
+priority earlier-added wins (TreeFile.cpp:345 + install loop order), so a
+loose root shadows the TREs even at priority 0.
+
+Fix: SCOPED mount. New root D:\Code\Galaxies-Reborn\stage-cee-loose\
+containing ONLY a junction clienteffect -> SOE tree's clienteffect (948
+.cef). searchPath11 repointed there; cfg comment documents the whole story.
+Adding .prt/.snd/.ffe needs no searchPath at all (those flows use
+TreeFile::getShortestExistingPath, suffix-matched against the TREs).
+
+**Workflow note:** to open SOE loose .cef files, browse via
+D:\Code\Galaxies-Reborn\stage-cee-loose\clienteffect\ (the original SOE path
+no longer maps; with the absolute-path fallback it opens anyway, just
+without the tree-relative name). Scratch saves (C:\save-test\...) reload
+fine via the fallback - Kenny verified the full round trip.
+
+**The junction is OUTSIDE the repo** - like stage-B-override, it is lost on
+a machine wipe. One line recreates it:
+  New-Item -ItemType Junction -Path D:\Code\Galaxies-Reborn\stage-cee-loose\clienteffect -Target "D:\SWG All Tools Working\swg\current\data\sku.0\sys.client\compiled\game\clienteffect"
+
+## Remaining item-3 seeds
+
+SwgConversationEditor (failed save returns TRUE + clears modified flag -
+Doc.cpp ~1118-1138), NpcEditor (SaveDialog defaults point INTO the SOE
+reference tree + silent template-writer stubs), QuestEditor (Ctrl+S writes
+opened path, no prompt), TerrainEditor (Construction Layers tree cannot
+scroll; 3D View now works but the scroll cut remains).
