@@ -122,7 +122,28 @@ LOOSE data that is NOT in any TRE. Plan:
 - Ship legacy no-sku TreeFile keys in tool cfgs (never client.cfg's _00_
   form) — see the memory note; this stays the #1 config landmine.
 
-## 5. Survey the command-line tools — restore the end-to-end toolkit
+## 5. Survey the command-line tools — SURVEYED 2026-08-29, build-out in progress
+
+Full survey of D:\SWG All Tools Working\swg\current\exe\win32 (50+ exes)
+cross-referenced against in-tree sources. Verdicts:
+- **Tier 1 (editors shell to these)**: TemplateCompiler (source ✓, needs
+  p4-ectomy), miff (source ✓ engine/client/application/Miff);
+  DataTableTool + Turf already built; QuestChecker/CRC already ported.
+- **Tier 2 (pipeline essentials)**: TreeFileBuilder + TreeFileExtractor
+  (source ✓), TemplateDefinitionCompiler (source ✓), StringFileTool +
+  UpdateLocalizedStrings (source ✓), LabelHashTool (source ✓).
+- **Tier 3 (bundle later)**: ViewIff (source ✓), ShaderBuilder (source ✓ —
+  INVESTIGATE: does its output match the DX11 port's compiled_shader
+  manifest format?), TextureBuilder/CreateShaderTemplate (source ✓),
+  NormalMapGen/DxTex (SOE exes as-is), ClientCacheFileBuilder (source ✓),
+  Armor/CoreWeapon/WeaponExporterTool (source ✓, combat-balance only).
+- **Skip**: p4 plumbing (SwgContentSync/Builder, *RspBuilder), server-ops
+  kit (ServerConsole, PlanetWatcher, DatabaseObjectViewer, ServerBins),
+  one-offs (BugTool, CrashReporter, SwgCsTool, VoiceService, SkillImport,
+  WordCountTool, fedit, SetBrightnessContrastGamma).
+- mochac.pl: STILL UNFOUND — conversation Compile remains blocked.
+
+## 5 (original notes). Survey the command-line tools — restore the end-to-end toolkit
 
 The editors shell out to a whole CLI layer; inventory which ones the pipeline
 actually needs and bring each up the way DataTableTool was (in-tree source,
