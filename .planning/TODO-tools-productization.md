@@ -18,11 +18,17 @@ What the script actually is (read in full, 120 lines): a PERFORCE WRAPPER —
 `p4 where`/`p4 files`/`p4 opened` enumerate the questlist datatable names,
 then it pipes the list into **`buildCrcStringTable.pl`** (168 lines, same
 tools/ dirs, generic — `buildObjectTemplateCrcStringTables.pl` uses it too),
-which holds the CRC-32 table inline and writes the output. So the port is:
-- port `buildCrcStringTable.pl` -> PowerShell (the real generator; the CRC
-  table is inline data, logic is small);
-- replace the quest wrapper's p4 layer with a questlist DIRECTORY WALK —
-  which is simultaneously the item-2 P4 removal for this path.
+which holds the CRC-32 table inline and writes the output.
+
+**Even better: the community already replaced the p4 wrapper.**
+`swg-main/utils/build_quest_crc_string_tables.py` (44 lines) is exactly the
+directory-walk version — walk questlist, sort, pipe — but it STILL pipes into
+buildCrcStringTable.pl. So the whole port reduces to ONE script:
+- port `buildCrcStringTable.pl` -> PowerShell (CRC-32 table is inline data,
+  logic ~40 lines past the table); fold the 44-line walk logic in so the
+  editor needs a single spawn;
+- verify against the shipped `misc/quest_crc_string_table.iff` in the patch
+  TREs (byte comparison, the terrain-bake method).
 Verification target exists: `misc/quest_crc_string_table.iff` ships in the
 patch TREs (reference outputs), and the reader is
 `sharedFoundation/CrcStringTable.cpp` + `QuestManager.cpp:36`.
@@ -108,6 +114,19 @@ x64 build, parser fix already inherited via sharedFoundation). Known so far:
   find-or-reimplement decision as buildQuestCrcStringTables.
 Audit method: grep the editors for ProcessSpawner/QProcess/CONSOLE_EXECUTE
 spawns to get the complete list of external commands, then triage.
+
+**Resource maps found 2026-08-28** (searched while hunting the CRC script):
+- `D:\Code\Galaxies-Reborn\swg-main\tools\` — 189 files: the SOE build
+  pipeline (TreeFileBuilder/Extractor/RspBuilder exes, the CRC .pl trio,
+  BuildLivePatchTree, DataLint, patcher scripts...). Also mirrored in
+  `D:\Code\swg-main\tools\` and `D:\Code\swg-client\tools\`.
+- `D:\Code\Galaxies-Reborn\swg-main\utils\` — the COMMUNITY's modernized
+  pipeline: build_miff.sh / build_tab.sh / build_tpf.sh / build_java.sh +
+  python CRC builders (quest/object_template/planet). This is the working
+  map of what the end-to-end content pipeline actually invokes.
+- mochac.pl: STILL UNFOUND (not in swg-main tools/ or utils/, not in the SOE
+  tree, not in any archive). SwgConversationEditor's Compile stays broken
+  until found or the conversation .java/.stf generation is reimplemented.
 
 ## 6. Endgame: replace the CLI layer with SWG-Toolkit
 
