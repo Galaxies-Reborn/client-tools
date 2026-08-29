@@ -241,7 +241,6 @@ BOOL DialogConsole::OnInitDialog()
 	m_initialized = true;
 
 	CreateShellRedirect ();
-	execute ("p4 info");
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 	              // EXCEPTION: OCX Property Pages should return FALSE

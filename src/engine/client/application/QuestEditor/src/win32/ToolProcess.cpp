@@ -92,29 +92,6 @@ void ToolProcess::slotProcessExited()
 
 // ----------------------------------------------------------------------
 
-void ToolProcess::addToPerforce(char const * const filename)
-{
-	StringVector v;
-
-	v.push_back("p4");
-	v.push_back("edit");
-	v.push_back(filename);
-
-	m_procArgList.push_back(v);
-
-	v.clear();
-
-	v.push_back("p4");
-	v.push_back("add");
-	v.push_back(filename);
-
-	m_procArgList.push_back(v);
-
-	startNextProcess();
-}
-
-// ----------------------------------------------------------------------
-
 void ToolProcess::compileDataTable(char const * const filename)
 {
 	StringVector v;

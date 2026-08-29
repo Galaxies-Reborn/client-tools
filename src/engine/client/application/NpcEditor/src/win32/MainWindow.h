@@ -50,7 +50,6 @@ public slots:
 	
 	void slotToolConfigureTemplatesAction();
 	void slotToolCompileAction();
-	void slotToolAddToPerforceAction();
 	void slotToolRandomAction();
 
 	void slotZoomHeadAction();
@@ -127,7 +126,6 @@ private: //-- methods
 	void showColorPicker(QSlider * slider);
 
 	void startNextProcess();
-	void AddToPerforce(const QFileInfo &fi);
 
 	bool haveFileNames() const;
 

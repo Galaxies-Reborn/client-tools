@@ -301,16 +301,13 @@ void DialogDirectory::OnDblclkTreeview(NMHDR * const /*pNMHDR*/, LRESULT * const
 
 // ----------------------------------------------------------------------
 
-void DialogDirectory::openItem(HTREEITEM treeItem, bool const scanDocument, bool const saveDocument, bool const closeDocument, bool const editDocument)
+void DialogDirectory::openItem(HTREEITEM treeItem, bool const scanDocument, bool const saveDocument, bool const closeDocument)
 {
 	if (!GetTreeCtrl().ItemHasChildren(treeItem))
 	{
 		LRESULT result;
 		GetTreeCtrl().SelectItem(treeItem);
 		OnDblclkTreeview(0, &result);
-
-		if (editDocument)
-			safe_cast<SwgSpaceQuestEditorDoc *>(safe_cast<SwgSpaceQuestEditorApp *>(AfxGetApp())->GetActiveDocument())->edit(false);
 
 		if (scanDocument)
 			safe_cast<SwgSpaceQuestEditorDoc *>(safe_cast<SwgSpaceQuestEditorApp *>(AfxGetApp())->GetActiveDocument())->scan(false);
@@ -325,7 +322,7 @@ void DialogDirectory::openItem(HTREEITEM treeItem, bool const scanDocument, bool
 	treeItem = m_treeCtrl.GetChildItem(treeItem);
 	while (treeItem)
 	{
-		openItem(treeItem, scanDocument, saveDocument, closeDocument, editDocument);
+		openItem(treeItem, scanDocument, saveDocument, closeDocument);
 		treeItem = m_treeCtrl.GetNextSiblingItem(treeItem);
 	}
 }
@@ -337,7 +334,7 @@ void DialogDirectory::openAll()
 	CONSOLE_OUTPUT("----- START: OPEN ALL -----\r\n");
 
 	HTREEITEM treeItem = GetTreeCtrl().GetSelectedItem();
-	openItem(treeItem ? treeItem : TVI_ROOT, false, false, false, false);
+	openItem(treeItem ? treeItem : TVI_ROOT, false, false, false);
 
 	CONSOLE_OUTPUT("----- STOP: OPEN ALL -----\r\n");
 }
@@ -349,7 +346,7 @@ void DialogDirectory::scanAll()
 	CONSOLE_OUTPUT("----- START: SCAN ALL -----\r\n");
 
 	HTREEITEM treeItem = GetTreeCtrl().GetSelectedItem();
-	openItem(treeItem ? treeItem : TVI_ROOT, true, false, true, false);
+	openItem(treeItem ? treeItem : TVI_ROOT, true, false, true);
 
 	CONSOLE_OUTPUT("----- STOP: SCAN ALL -----\r\n");
 }
@@ -361,21 +358,9 @@ void DialogDirectory::saveAll()
 	CONSOLE_OUTPUT("----- START: SAVE ALL -----\r\n");
 
 	HTREEITEM treeItem = GetTreeCtrl().GetSelectedItem();
-	openItem(treeItem ? treeItem : TVI_ROOT, false, true, true, false);
+	openItem(treeItem ? treeItem : TVI_ROOT, false, true, true);
 
 	CONSOLE_OUTPUT("----- STOP: SAVE ALL -----\r\n");
-}
-
-// ----------------------------------------------------------------------
-
-void DialogDirectory::editAll()
-{
-	CONSOLE_OUTPUT("----- START: EDIT ALL -----\r\n");
-
-	HTREEITEM treeItem = GetTreeCtrl().GetSelectedItem();
-	openItem(treeItem ? treeItem : TVI_ROOT, false, false, false, true);
-
-	CONSOLE_OUTPUT("----- STOP: EDIT ALL -----\r\n");
 }
 
 // ----------------------------------------------------------------------

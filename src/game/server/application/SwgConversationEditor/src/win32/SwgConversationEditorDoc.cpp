@@ -327,7 +327,6 @@ BEGIN_MESSAGE_MAP(SwgConversationEditorDoc, CDocument)
 	ON_UPDATE_COMMAND_UI(ID_BUTTON_COMPILE, OnUpdateButtonCompile)
 	ON_COMMAND(ID_BUTTON_COMPILEDEBUG, OnButtonCompiledebug)
 	ON_COMMAND(ID_BUTTON_COMPILERELEASE, OnButtonCompilerelease)
-	ON_COMMAND(ID_BUTTON_P4EDIT, OnButtonP4edit)
 	ON_COMMAND(ID_BUTTON_SCAN, OnButtonScan)
 	ON_COMMAND(ID_BUTTON_SPELLCHECK, OnButtonSpellcheck)
 	ON_COMMAND(ID_BUTTON_FIND, OnButtonFind)
@@ -2988,35 +2987,7 @@ void SwgConversationEditorDoc::OnButtonCompilerelease()
 
 // ----------------------------------------------------------------------
 
-void SwgConversationEditorDoc::OnButtonP4edit() 
-{
-	CString pathName = GetPathName ();
-	pathName.MakeLower ();
-
-	FileName fileName (pathName);
-	fileName.stripPathAndExt ();
-
-	if (strlen (fileName) == 0)
-	{
-		CString const message = "Please save the conversation before editing/adding to Perforce.";
-		IGNORE_RETURN (MessageBox (0, message, AfxGetApp ()->m_pszAppName, MB_OK));
-		return;
-	}
-
-	CString const shortFileName (fileName);
-
-	safe_cast<SwgConversationEditorApp *> (AfxGetApp ())->onViewShell (this);
-
-	ShellData * const shellData = new ShellData;
-	shellData->m_shortFileName = shortFileName;
-	shellData->m_fullScriptFileName = getFullScriptFileName (shortFileName);
-	shellData->m_fullStringTableFileName = getFullStringTableFileName (shortFileName);
-	UpdateAllViews (0, H_shellP4edit, shellData);
-}
-
-// ----------------------------------------------------------------------
-
-void SwgConversationEditorDoc::OnButtonFind() 
+void SwgConversationEditorDoc::OnButtonFind()
 {
 	DialogFindText dialog;
 	if (dialog.DoModal () == IDOK)

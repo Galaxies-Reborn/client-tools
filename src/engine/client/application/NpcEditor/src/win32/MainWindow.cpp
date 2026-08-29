@@ -143,7 +143,6 @@ MainWindow::MainWindow(QWidget *myParent, char const *myName)
 	IGNORE_RETURN(connect(m_fileExitAction, SIGNAL(activated()), this, SLOT(slotFileExitAction())));
 	IGNORE_RETURN(connect(m_toolConfigureTemplatesAction, SIGNAL(activated()), this, SLOT(slotToolConfigureTemplatesAction())));
 	IGNORE_RETURN(connect(m_toolCompileAction, SIGNAL(activated()), this, SLOT(slotToolCompileAction())));
-	IGNORE_RETURN(connect(m_toolAddToPerforceAction, SIGNAL(activated()), this, SLOT(slotToolAddToPerforceAction())));
 	IGNORE_RETURN(connect(m_toolRandomAction, SIGNAL(activated()), this, SLOT(slotToolRandomAction())));
 	IGNORE_RETURN(connect(m_viewShowConsoleAction, SIGNAL(activated()), this, SLOT(slotShowConsoleAction())));
 	IGNORE_RETURN(connect(m_zoomHeadAction, SIGNAL(activated()), this, SLOT(slotZoomHeadAction())));
@@ -567,51 +566,6 @@ void MainWindow::slotReadProcessOutput()
 
 void MainWindow::slotProcessExited()
 {
-	startNextProcess();
-}
-
-// ----------------------------------------------------------------------------
-
-void MainWindow::AddToPerforce(const QFileInfo &fi)
-{
-	if(fi.isFile())
-	{
-		{
-			std::vector< std::string > v;
-			v.push_back("p4");
-			v.push_back("edit");
-			v.push_back(fi.filePath().lower().latin1());
-		
-			m_procArgList.push_back(v);
-		}
-		{
-			std::vector< std::string > v;
-			v.push_back("p4");
-			v.push_back("add");
-			v.push_back(fi.filePath().lower().latin1());
-		
-			m_procArgList.push_back(v);
-		}
-	}
-}
-
-// ----------------------------------------------------------------------------
-
-void MainWindow::slotToolAddToPerforceAction()
-{
-	if(m_proc->isRunning() || !m_procArgList.empty())
-	{
-		CONSOLE_OUTPUT("*** Process running. Please wait for process to exit. ***\n");
-		return;
-	}
-
-	AddToPerforce(m_clientFileInfo);
-	AddToPerforce(m_serverFileInfo);
-	AddToPerforce(m_sharedFileInfo);
-	AddToPerforce(m_clientCdfFileInfo);
-	AddToPerforce(m_serverIffFileInfo);
-	AddToPerforce(m_sharedIffFileInfo);
-
 	startNextProcess();
 }
 

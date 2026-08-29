@@ -94,39 +94,6 @@ void ScriptShellView::OnUpdate(CView * const pSender, LPARAM const lHint, CObjec
 			}
 			break;
 
-		case SwgConversationEditorDoc::H_shellP4edit:
-			{
-				SwgConversationEditorDoc::ShellData * const shellData = safe_cast<SwgConversationEditorDoc::ShellData *> (pHint);
-				
-				char const * const p4Command = ConfigFile::getKeyString ("SwgConversationEditor", "p4Command", 0);
-				CString p4 = p4Command ? p4Command : "p4";
-
-				if (shellData)
-				{
-					AddTexts ("-------------------- Perforce Edit/Add --------------------\r\n");
-
-					CString pathName(GetDocument()->GetPathName());
-					pathName.MakeLower();
-					CreateShellRedirect (p4 + " edit " + pathName);
-					CreateShellRedirect (p4 + " add " + pathName);
-					CreateShellRedirect (p4 + " edit " + shellData->m_fullScriptFileName);
-					CreateShellRedirect (p4 + " add " + shellData->m_fullScriptFileName);
-
-					CString m_fullDataScriptFileName (shellData->m_fullScriptFileName);
-					m_fullDataScriptFileName.Replace ("/dsrc/", "/data/");
-					m_fullDataScriptFileName.Replace (".java", ".class");
-
-					CreateShellRedirect (p4 + " edit " + m_fullDataScriptFileName);
-					CreateShellRedirect (p4 + " add " + m_fullDataScriptFileName);
-
-					CreateShellRedirect (p4 + " edit " + shellData->m_fullStringTableFileName);
-					CreateShellRedirect (p4 + " add " + shellData->m_fullStringTableFileName);
-				}
-
-				delete pHint;
-			}
-			break;
-
 		default:
 			break;
 		}

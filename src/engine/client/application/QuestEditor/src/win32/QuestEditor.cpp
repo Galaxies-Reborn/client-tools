@@ -972,32 +972,6 @@ ToolProcess * QuestEditor::getToolProcess() const
 
 // ----------------------------------------------------------------------
 
-void QuestEditor::addToPerforce()
-{
-	if (m_filename.isEmpty())
-	{
-		QMessageBox::warning(this, "Perforce Warning", "You must save the quest before adding to perforce!", "Ok");
-		return;
-	}
-
-	if (getToolProcess()->isRunning())
-	{
-		QMessageBox::warning(this, "Perforce Warning", "Processes still running!", "Ok");
-		return;
-	}
-
-	emit consoleOutput(QString("Perforcing quest [%1]! Please wait.").arg(m_filename));
-
-	getToolProcess()->addToPerforce(m_filename.lower());
-	getToolProcess()->addToPerforce(m_listTab);
-	getToolProcess()->addToPerforce(m_listIff);
-	getToolProcess()->addToPerforce(m_taskTab);
-	getToolProcess()->addToPerforce(m_taskIff);
-	getToolProcess()->addToPerforce(m_stringFile);
-}
-
-// ----------------------------------------------------------------------
-
 void QuestEditor::compile()
 {
 	if (m_dirty || m_filename.isEmpty())

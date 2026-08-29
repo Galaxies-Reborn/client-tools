@@ -77,10 +77,6 @@ namespace TemplateNewDialogNamespace
 			}
 		}
 
-		//-- add to perforce
-		snprintf(buf, buf_size, "p4 add %s %s", templatePathTpf.c_str(), templatePathIff.c_str());
-		system(buf);
-
 		//-- open in the text editor
 		snprintf(buf, buf_size, "start %s %s", ConfigShipComponentEditor::getTextEditorPath().c_str(), templatePathTpf.c_str());
 		system(buf);

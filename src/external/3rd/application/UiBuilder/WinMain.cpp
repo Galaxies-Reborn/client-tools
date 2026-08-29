@@ -250,8 +250,6 @@ namespace
 
 }
 
-void CheckOutSelectedFile();
-
 //-----------------------------------------------------------------
 
 class UIBuilderLoader : public UILoader
@@ -2437,8 +2435,6 @@ INT_PTR CALLBACK MainWindowProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM 
 			AddTooltipFromControlID( gTooltip, gMainWindow, IDC_ADDPROPERTY, "Add Property" );
 			AddTooltipFromControlID( gTooltip, gMainWindow, IDC_REMOVEPROPERTY, "Remove Property" );
 
-			AddTooltipFromControlID( gTooltip, gMainWindow, IDC_CHECKOUT, "Checkout source file using Perforce." );
-		
 			
 			gTooltipHook = SetWindowsHookEx(WH_GETMESSAGE, TooltipMessageHookProc, (HINSTANCE) 0, GetCurrentThreadId() ); 
 			
@@ -2488,11 +2484,7 @@ INT_PTR CALLBACK MainWindowProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM 
 			SendDlgItemMessage( hwndDlg, IDC_LOCK, BM_SETIMAGE, IMAGE_ICON,
 				(LPARAM)LoadImage( GetModuleHandle(0), MAKEINTRESOURCE(IDI_LOCK), IMAGE_ICON, 16, 16, 0 ) );
 
-			SendDlgItemMessage( hwndDlg, IDC_CHECKOUT, BM_SETIMAGE, IMAGE_ICON,
-				(LPARAM)LoadImage( GetModuleHandle(0), MAKEINTRESOURCE(IDI_CHECKOUT), IMAGE_ICON, 16, 16, 0 ) );
-
-			
-			SendMessage( hwndDlg, WM_SETICON, ICON_BIG, 
+			SendMessage( hwndDlg, WM_SETICON, ICON_BIG,
 				(LPARAM)LoadImage( GetModuleHandle(0), MAKEINTRESOURCE(IDI_APP), IMAGE_ICON, 32, 32, 0 ) );
 			
 			SendMessage( hwndDlg, WM_SETICON, ICON_SMALL, 
@@ -2629,7 +2621,6 @@ INT_PTR CALLBACK MainWindowProc( HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM 
 					MoveSizeDlgControl( hwndDlg, IDC_ADDPROPERTY,							UIPoint( DeltaSize.x, DeltaSize.y ), UIPoint(0,0) );
 					MoveSizeDlgControl( hwndDlg, IDC_REMOVEPROPERTY,					UIPoint( DeltaSize.x, DeltaSize.y ), UIPoint(0,0) );
 					MoveSizeDlgControl( hwndDlg, IDC_LOCK,										UIPoint( DeltaSize.x, DeltaSize.y ), UIPoint(0,0) );
-					MoveSizeDlgControl( hwndDlg, IDC_CHECKOUT, UIPoint( DeltaSize.x, DeltaSize.y ), UIPoint(0,0) );				
 					MoveSizeDlgControl( hwndDlg, IDC_OBJECTTYPE,							UIPoint( 0, DeltaSize.y ), UIPoint(DeltaSize.x,0) );
 				}
 				
@@ -3627,23 +3618,3 @@ void RebuildTreeView(UIBaseObject * selectedObject)
 	}
 }
 
-// Gets the currently selected file, and checks it out
-void CheckOutSelectedFile()
-{
-	UIBaseObject *obj = gObjectInspector->GetObject();
-	if(!obj)
-		return;
-	UIString sourcePath;
-	if (UIManager::gUIManager().GetRootPage() == obj) 
-	{
-		sourcePath = Unicode::narrowToWide("ui_root.ui");
-	}
-	else
-	{
-		obj->GetProperty(UIBaseObject::PropertyName::SourceFile, sourcePath);
-	}
-	
-	char cmdLine[1024];
-	sprintf(cmdLine, "p4 edit %s\n\n", Unicode::wideToNarrow(sourcePath).c_str());
-	system(cmdLine);
-}

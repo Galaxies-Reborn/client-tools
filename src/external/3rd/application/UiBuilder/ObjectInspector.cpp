@@ -18,7 +18,6 @@
 #include <commctrl.h>
 #include <vector>
 
-extern void		CheckOutSelectedFile();
 extern bool		gDrawHighlightRect;
 extern HWND	 	gObjectTree;
 extern HANDLE	gFrameRenderingMutex;
@@ -411,11 +410,6 @@ LRESULT ObjectInspector::WindowProc( HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 			
 			SetFocus(mPropertyListbox);
 			ClearDefPushButtonLook( hwnd, IDC_REMOVEPROPERTY );
-			return TRUE;
-		}
-		else if( (LOWORD( wParam ) == IDC_CHECKOUT) && (HIWORD( wParam ) == BN_CLICKED) )
-		{
-			CheckOutSelectedFile();
 			return TRUE;
 		}
 		else if( LOWORD( wParam ) == IDC_LOCK && mObject )

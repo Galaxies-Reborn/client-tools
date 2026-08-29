@@ -53,7 +53,6 @@ public:
 
 	void buildTaskTree(QDomNode node, TreeItem * parent);
 
-	void addToPerforce();
 	void compile();
 	void check();
 

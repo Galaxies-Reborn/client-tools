@@ -3055,3 +3055,59 @@ the server up (walk an edited .trn, drive the god tools), else continue the
 productization TODO - item 2 (strip Perforce; the auto-save-before-p4
 buttons are the dangerous ones) or item 3 (usability paper cuts, seed list
 in the TODO).
+
+# ===== SESSION 2026-08-29 (later): PERFORCE STRIPPED FROM ALL EDITORS =====
+
+TODO item 2 done for the shipped editors. Every p4 button/menu/spawn removed,
+9 projects rebuilt clean, all 8 changed tools launch-smoked with PrintWindow
+screenshots confirming windows + toolbars.
+
+## What was removed, per tool
+
+* QuestEditor: AddToPerforce action (menu+toolbar+Ctrl+P accel in .ui),
+  MainWindow/QuestEditor::addToPerforce, ToolProcess::addToPerforce;
+  "sync from Perforce" error texts reworded.
+* NpcEditor: Perforce action (Tools menu + toolbar), MainWindow::AddToPerforce
+  + slot (p4 edit/add of all 6 file infos).
+* SwgDraftSchematicEditor: ID_BUTTON_P4EDIT (toolbar+handler+resource id) -
+  this was the auto-save-then-p4 one; DialogConsole "p4 info" probe; the
+  Compile no-path message no longer says "conversation"/"Perforce".
+* SwgSpaceQuestEditor: ID_BUTTON_P4EDIT + Doc::edit() (the whole p4 routine),
+  the disabled Tools>Open/Edit All menu item + editAll()/openItem editDocument
+  plumbing, DialogConsole "p4 info", string-table prompt, resource ids.
+* SwgSpaceZoneEditor: ID_BUTTON_P4 (last toolbar button) +
+  SpaceZoneTreeView::perforceEdit + ChildFrame handler + string + id.
+* SwgConversationEditor: ID_BUTTON_P4EDIT + OnButtonP4edit + H_shellP4edit
+  hint + the ScriptShellView p4 edit/add case (p4Command cfg key now unread).
+* ShipComponentEditor: "P4 Edit Files" File-menu item (Ctrl+P) + slot,
+  "Jump to P4"/"Jump to P4 Shared Template" context items (spawned p4win),
+  p4 add spawns in ChassisNewDialog and TemplateNewDialog.
+* UIBuilder: checkout button (IDC_CHECKOUT) in the object inspector +
+  CheckOutSelectedFile + IDI_CHECKOUT icon; p4.bmp/p4.ico deleted.
+* SwgClient.vcxproj: inert libclient/libsupp/librpc removed from the
+  Release|x64 link; client relinks clean (35MB exe, 09:39).
+
+## The MFC toolbar bitmap trap (worth remembering)
+
+MFC TOOLBAR resources map BUTTON entries to bitmap-strip tiles in order -
+deleting a BUTTON line shifts every later button's icon. The four Toolbar.bmp
+strips (4bpp uncompressed, 32x32 tiles) had their p4 tile cut with a python
+tile-cutter (scratchpad); tile indexes were DraftSchematic 7, SpaceQuest 7,
+Conversation 11, SpaceZone 13. Screenshots confirm no icon shift anywhere.
+
+## What was intentionally left
+
+* SwgGodClient - the x64 port already ships SWG_DISABLE_PERFORCE:
+  GodClientPerforceUser::runCommand stubs out and fails cleanly, active x64
+  links carry no p4 libs. Its p4 UI is entangled with untested god-tool
+  workflows; revisit after the server evening.
+* TemplateCompiler / TemplateDefinitionCompiler (real p4 API users, not yet
+  built - item 5's job), MayaExporter / TemplateEditor / SwgContentSync
+  (not shipped tools), the perforce library source itself, and the dead
+  Win32-config lib lists.
+
+## Machine state
+
+All 8 changed editors relinked 09:33-09:39 and smoked; screenshots in the
+session scratchpad (p4strip-shots/). No editors left running. SwgClient
+relinked but not re-run (link-only change, exit 0).

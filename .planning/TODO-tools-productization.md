@@ -49,20 +49,34 @@ patch TREs (reference outputs), and the reader is
 Wire-up is the proven pattern: ToolProcess.cpp + a .ps1 in the tracked
 `src/build/win32/exe/win32/` store.
 
-## 2. Remove Perforce from all tools
+## 2. Remove Perforce from all tools — DONE 2026-08-29 (editors)
 
-Strip the P4 buttons/menus and the p4 spawn paths — they can only fail here
-and some are actively dangerous because they AUTO-SAVE first. Known
-touchpoints (each tool needs its own sweep):
-- QuestEditor: ToolProcess::addToPerforce (6 files per save), p4 menu items.
-- SwgDraftSchematicEditor: OnButtonP4edit **auto-saves before the p4 call**
-  (SwgDraftSchematicEditorDoc.cpp:234-244).
-- SwgSpaceQuestEditor: auto-save before its P4 op (Doc.cpp:504).
-- SwgConversationEditor: auto-saves before Perforce/compile ops
-  (Doc.cpp:1309, 1328); `p4Command` cfg key.
-- ShipComponentEditor / TerrainEditor / others: check for p4 menu ids and
-  `p4`/`perforce` strings per tool.
-Also drop the Perforce client libs from the link where present.
+Stripped from all shipped editors: QuestEditor and NpcEditor (Qt actions +
+spawn queues), SwgDraftSchematicEditor / SwgSpaceQuestEditor /
+SwgSpaceZoneEditor / SwgConversationEditor (toolbar buttons, handlers,
+`p4 info` console probes; toolbar bitmap tiles cut so no icon shift),
+ShipComponentEditor (P4 Edit Files menu, Jump-to-P4 context items, p4 add
+on chassis/template create), UIBuilder (checkout button + p4.bmp/ico).
+The dangerous auto-save-before-p4 paths are gone with their buttons.
+All 9 projects rebuilt clean and launch-smoked with screenshots.
+
+Libraries: the x64 port had already dropped the p4 client libs from every
+active Release|x64 link (no x64 p4 libs even exist); SwgClient still listed
+libclient/librpc/libsupp inertly — removed, client relinks clean. The
+Win32-config lib lists and src/external/3rd/library/perforce were left
+as-is (dead configs / reference source).
+
+NOT stripped, deliberately:
+- **SwgGodClient**: the port already defines SWG_DISABLE_PERFORCE — its
+  GodClientPerforceUser::runCommand is a stub that fails cleanly with
+  "Perforce integration is unavailable in the x64 God client." Its p4 menu
+  items are woven into content workflows and the god tools are still
+  untested (server evening pending) — revisit after that, using the stub.
+- **TemplateCompiler / TemplateDefinitionCompiler**: genuinely use the p4
+  C++ API (auto-checkout of outputs); they are not yet built for x64 and
+  belong to workstream 5 — do their p4-ectomy when bringing them up.
+- MayaExporter / TemplateEditor / SwgContentSync: not part of the 16
+  shipped tools; untouched.
 
 ## 3. Usability pass over every editor — "usable, not perfection"
 

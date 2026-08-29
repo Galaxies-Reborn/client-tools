@@ -379,41 +379,8 @@ void SpaceZoneTreeView::validate()
 }
 
 // ----------------------------------------------------------------------
-void SpaceZoneTreeView::perforceEdit()
-{
-	SwgSpaceZoneEditorDoc * const document = safe_cast<SwgSpaceZoneEditorDoc *>(GetDocument());
-	
-	// Make sure we have a file opened.
-	if(document->getCurrentFile().IsEmpty())
-	{
-		MessageBox("No file is currently opened. You must open the file before checking it out.", "Warning", MB_ICONWARNING | MB_OK);
-		return;
-	}
 
-	// Check out the tab file
-	CString editCommand("p4 edit ");
-	editCommand += document->getCurrentFile();
-
-	// Grab the file name again so we can replace certain sections and get our .IFF counterpart.
-	CString secondCommand = document->getCurrentFile();
-
-	//-- Replace dsrc w/ data
-	secondCommand.Replace("dsrc", "data");
-
-	//-- Replace .tab w/ .iff
-	secondCommand.Replace(".tab", ".iff");
-
-	// Full command string
-	editCommand += " " + secondCommand;
-
-	// Execute the p4 edit command
-	system(editCommand.GetString());
-
-}
-
-// ----------------------------------------------------------------------
-
-void SpaceZoneTreeView::OnSelchanged(NMHDR * const /*pNMHDR*/, LRESULT * const pResult) 
+void SpaceZoneTreeView::OnSelchanged(NMHDR * const /*pNMHDR*/, LRESULT * const pResult)
 {
 	HTREEITEM selection = GetTreeCtrl().GetSelectedItem();
 	if (selection)

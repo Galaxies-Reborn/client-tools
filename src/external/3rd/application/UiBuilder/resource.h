@@ -62,7 +62,6 @@
 #define IDD_DIFF_WINDOW                 143
 #define IDI_ZOOMOUT                     144
 #define IDI_RESET                       147
-#define IDI_CHECKOUT                    148
 #define IDC_ROOTOBJECT                  1003
 #define IDC_UNLOAD                      1004
 #define IDC_FPS                         1005
@@ -128,7 +127,6 @@
 #define IDC_PROPERTYLIST                1061
 #define IDC_LOCK                        1062
 #define IDC_TILEMAX                     1063
-#define IDC_CHECKOUT                    1063
 #define IDC_NUMFRAGMENTS                1065
 #define IDC_SOURCEFILE                  1066
 #define IDC_LARGESTFRAGMENT             1067
