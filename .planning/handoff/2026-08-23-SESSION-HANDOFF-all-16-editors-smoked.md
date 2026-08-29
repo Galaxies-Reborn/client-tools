@@ -3165,3 +3165,36 @@ mode DISABLES the HUD (GameWidget.cpp:1573); Ctrl+H toggles it back.
 
 Selection, Objects/ServerTemplates panels, spawn/move/delete, bookmarks,
 ObjectTemplate/Script menus. In progress as this block is written.
+
+## 2026-08-29 evening (later): GOD-TOOL EDITING SURFACE PROVEN
+
+Phase-3 results, all Kenny-driven against the live server:
+
+* **Spawn -> move -> Apply Transform -> PERSISTED: PASS.** Camp cot spawned
+  from the ServerTemplates panel (drag-drop into viewport, or right-click ->
+  create-from-selected-template), moved, committed with Apply Transform
+  (Space / Ctrl+T / Edit menu). Server accepted and the object stayed.
+* **Selection works** on server-replicated objects (bantha selected/rotated).
+  A CREATURE's Apply Transform gets stomped by its AI controller - the ghost
+  clears and the object re-replicates at the AI's transform. Expected, not a
+  defect. Test transforms on static objects.
+* **World-snapshot/baked static scenery (the floating rocks) is not
+  selectable** - no live server object behind it. Also expected.
+* **ServerTemplates panel populated** only after adding the [GodClient]
+  section to SwgGodClient.cfg - the cfg had NONE, so every panel walked the
+  compiled-in default c:/work/swg/... The section is SOE's own (reference
+  tree exe/win32/SwgGodClient.cfg) rebased onto D:/SWG All Tools Working;
+  sharedTerrainDirectory omitted (no local sys.shared terrain dir); editors
+  set to notepad.exe. VALUES QUOTED - the space-in-path trap.
+  SOE's godclient_favorites.xml copied to Release (cwd-relative load,
+  FavoritesWindow.cpp:23).
+* Ghost model, for the record: cyan cube = pending ghost, red cube = server
+  position. Apply Transform (ActionsEdit) syncs ghosts -> server via
+  ServerCommander::setObjectTransform; ESC cancels ghosts. If Apply BEEPS
+  and does nothing, ServerObjectData had no god-info for that object
+  (ServerCommander.cpp:356).
+
+Still unexercised: bookmarks (in progress), object delete (in progress),
+ObjectTemplate/Script menus, Brushes/Palettes, buildout areas, theater
+creation. The essential surface (connect, walk edited terrain, spawn,
+manipulate, persist) is all PROVEN.
