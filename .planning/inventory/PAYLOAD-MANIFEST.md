@@ -198,6 +198,31 @@ both; expect byte-diffs vs SOE bakes, compare functionally not byte-wise,
 except CRC tables which ARE byte-reproducible). Editors read the rebuilt
 files — one smoke pass against a rebuilt set is the acceptance test.
 
+## Media verdict (checked 2026-08-30): the audio SHIPS — Kenny's hunch confirmed
+
+Parsed all 1,354 loose-only .snd templates and extracted their media
+references (string scan for .wav/.mp3): 1,497 unique refs — **1,293 point at
+loose-only media** (1,207 sample, 46 voice, 40 music), 198 at TRE-resident
+media, 6 at dead absolute SOE dev paths (c:/swg/... litter, ignore). The
+loose-only sound set and the loose-only audio are one unit; dropping the
+media breaks 95% of the loose-only sounds.
+
+TRE holdings for context: the TREs DO carry a large media set (sample 4,246,
+player_music 1,454, voice 795, music 217, sound 4,056 entries) — that part
+needs NOTHING: TreeFile serves it to the engine from the mounts. Extraction
+into the flat tree (TreeFileExtractor/trelist, trivial) is only warranted if
+a tool needs a loose BROWSE dir (check SoundEditor's open-dialog defaults
+when next in it). The loose-only media cannot come from TREs — it is not in
+them.
+
+Revised media plan: ship the loose-only audio in the missing-bits repo —
+sample 302 MB + music 90 MB + player_music 69 MB + voice 29 MB = **490 MB**
+(player_music is the musician-profession songs, referenced via datatables
+not .snd). `video/` (13 files, 162 MB) is referenced by no .snd — the one
+media dir still a drop candidate. Residue: 103 of the loose-only samples are
+unreferenced by loose-only .snd (may be referenced by TRE-resident .snd or
+dead) — kept, not worth the risk for ~MBs.
+
 ## Trimming opportunities (payload could drop well under 1 GB)
 
 The 2.6 GB Class A is the *superset*. Big chunks are plausibly not needed by

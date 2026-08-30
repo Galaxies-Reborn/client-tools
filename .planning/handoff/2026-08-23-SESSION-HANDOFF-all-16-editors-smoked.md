@@ -3831,3 +3831,17 @@ the tree. Texture payload (if shipped) packs into a tools_texture.tre via
 TreeFileBuilder; dsrc + Class B dirs + rebuilt compiled data stay loose.
 Open: base-TRE acquisition, texture trim, media drop, repo pins, trial
 compile timing.
+
+## 2026-08-30 (cont. 5): media verdict - audio ships, video droppable
+
+Kenny suspected .snd files reference sample/player_music/voice - CONFIRMED
+by parsing all 1,354 loose-only .snd: 1,293 of 1,497 unique refs point at
+LOOSE-ONLY media (1,207 sample / 46 voice / 40 music). Loose-only sound +
+loose-only audio are one unit -> the missing-bits repo ships 490 MB of
+audio (sample+music+player_music+voice). TREs carry their own large media
+set (4,246 sample etc.) which TreeFile already serves - extract loose only
+if a browse dir turns out needed (check SoundEditor defaults). video/
+(162 MB) referenced by nothing - still a drop candidate. 6 refs are dead
+c:/swg dev paths. Details in PAYLOAD-MANIFEST.md media section. This also
+validates the string-scan closure method - same approach will settle the
+1 GB texture question.
