@@ -3772,3 +3772,27 @@ Kenny asked whether swg-main ships the dsrc set. It does, and better:
   Unverified whether it maps onto our sys.server/compiled/game Class B dirs.
 
 Details in .planning/inventory/PAYLOAD-MANIFEST.md (new dsrc section).
+
+## 2026-08-30 (cont. 2): serverdata comparison RUN - it is the loose CLIENT data set
+
+SWG-Source/serverdata (~1 GB repo) is misnamed: 125,417 of its 125,515
+files are sys.client/compiled/game names, 99.9% size-identical vs the SOE
+tree. Listing pulled via GitHub tree API (blobless clone route FAILED -
+promisor lazy-fetch pathology, 10-min timeout; per-directory tree API calls
+work, appearance/ needs one more level of descent past the truncation).
+PS 5.1 trap: embedded double quotes in gh --jq args get mangled - fetch raw
+JSON and parse in python instead.
+
+Coverage of the client not-in-TRE payload: appearance 23,983/23,984
+(685 MB, incl. ALL wearable .lmg), quest 1,300/1,300, client datatables
+4,079/4,079, shader/string/terrain/palette/footprint ~all. NOT covered:
+texture (1,042 MB - closure question stands), media dirs (651 MB), client
+object/ui/clientdata/clienteffect/sound (~26 MB), nearly all of
+sys.server/compiled/game (123 MB - build artifacts of dsrc) and most
+sys.shared leftovers. 41 size mismatches among covered files, untriaged.
+Version note: compared vs master 3ee03ed3; swg-main pins df41a07ed.
+
+NET: installer payload = 2 git clones (dsrc, serverdata) + ~1.9 GB worst
+case shipped, ~200 MB if texture/media resolve droppable. Details + table
+in PAYLOAD-MANIFEST.md. serverdata full listing in session scratchpad
+(serverdata-tree.txt) - regenerable from the API.

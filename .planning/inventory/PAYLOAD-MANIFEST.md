@@ -128,11 +128,38 @@ Bonus uses of that clone being a git repo:
   ground truth: content byte-identical; sole delta is a trailing newline the
   originals lacked. (Left in place — harmless.)
 
-Also promising, unverified: swg-main's `serverdata` submodule
-(SWG-Source/serverdata, ~1 GB, active through 2026) ships compiled
-server-side game data (datatables/ quest/ misc/ appearance/ terrain/ ...).
-If it maps onto our `sys.server/compiled/game` Class B dirs, more payload
-drops out — needs a name-level comparison before counting on it.
+## serverdata IS THE LOOSE CLIENT DATA SET — 745 MB more drops out (verified 2026-08-30)
+
+swg-main's `serverdata` submodule (SWG-Source/serverdata) is misnamed:
+125,417 of its 125,515 files match our **sys.client**/compiled/game names,
+99.9% size-identical (full listing pulled via the GitHub tree API — master
+@ `3ee03ed3`; note swg-main pins `df41a07ed`, and the repo is active,
+pushed 2026-05). Only 99 files in it are unknown to the SOE tree.
+
+Coverage of our client not-in-TRE payload (files covered/total):
+
+| category | covered | MB | verdict |
+|---|---|---|---|
+| appearance | 23,983/23,984 | 685/685 | **clone serverdata instead of shipping** (includes all 4,882 wearable .lmg) |
+| quest | 1,300/1,300 | 26.5 | covered |
+| datatables (client) | 4,079/4,079 | 12.8 | covered |
+| shader / string / terrain / pixel_program / palette / footprint | ~all | ~21 | covered |
+| **texture** | 0/8,884 | 0/1,042 | NOT covered — still the closure question |
+| sample/video/music/player_music/voice | 0 | 0/651 | not covered — trim candidates anyway |
+| client object/, ui/, clientdata/, clienteffect/, sound/, interiorlayout/ | 0 | ~26 | small, ship loose |
+
+**Total: 36,527 files / 745 MB of the 2,470 MB client not-in payload comes
+from a `git clone` instead of shipped files.** Only 41 size mismatches among
+the covered set (un-triaged). serverdata covers essentially NOTHING of
+sys.server/compiled/game (object/script/datatables/misc, 123 MB) — those are
+build artifacts of dsrc via swg-main's pipeline; ship them or build them.
+sys.shared not-in coverage is partial (3,393 of 11,928).
+
+Revised payload-to-ship estimate: texture 1,042 MB (pending closure walk) +
+media 651 MB (likely droppable) + server compiled 123 MB + shared leftovers
+~25 MB + small client leftovers ~26 MB ≈ **1.9 GB worst case, ~200 MB if
+texture+media resolve as droppable/clonable** — plus two git clones (dsrc,
+serverdata).
 
 ## Trimming opportunities (payload could drop well under 1 GB)
 
