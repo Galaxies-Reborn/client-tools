@@ -3701,3 +3701,49 @@ or item 6 (SWG-Toolkit endgame). Item 5's deferred CLI tools list also
 remains. Loose end parked: QuestEditor's in-app compile produced two 0-byte
 iffs in one run (17:11 on 08-29, litter since removed) - DataTableTool step
 failed silently once; uninvestigated.
+
+# ===== SESSION 2026-08-30: NOT-IN-TREs INVENTORY DONE (TODO item 4, step 1) =====
+
+Recovered clean from the power cut (previous session had committed+pushed
+everything; nothing was lost). This session built the census.
+
+## Deliverables
+
+* scripts/not_in_tres_inventory.py - indexes all 209 v3.0 TREs (trelist.py
+  now reads BOTH v0005 and v0006 - the census is exhaustive, unlike every
+  pre-guard sweep) and walks the six SOE data mount roots + dsrc. ~1 min.
+* .planning/inventory/PAYLOAD-MANIFEST.md - THE analysis doc. Read it first.
+* .planning/inventory/summary.txt (committed) + data-manifest.csv /
+  dsrc-manifest.csv (26+8 MB, gitignored - regenerate by running the script).
+
+## Headline findings
+
+* 121,024 data files (2,617 MB) are in NO TRE; dsrc adds 85,431 (258 MB).
+* Payload has TWO classes: (A) not-in-TRE files, (B) cfg-referenced dirs the
+  tools open via the FILESYSTEM (browse defaults, write targets, dsrc) which
+  must ship loose even where TRE-duplicated. Class B table with per-tool cfg
+  keys is in the manifest doc.
+* .lmg correction: only 1,819 of the 4,882 wearable .lmg are not-in-TRE, but
+  all 4,882 ship anyway (1.1 MB) - NpcEditor enumerates the dir on disk.
+  Validated: census's appearance/mesh .lmg count == 4,882 exactly.
+* Quest content is 100% loose - zero .qst in any TRE (1,300 files).
+* SHADOW TRAP quantified: 12,106 loose files share a TRE name with NO
+  size-matching TRE copy (2016 dev data vs v3.0). Mounting broad loose roots
+  shadows the TREs at ANY priority (TreeFile.cpp:345 - searchPaths beat
+  searchTrees per priority) = the walking-avatar bug generalized. Installer
+  rule: Class B dirs are for filesystem access + SCOPED mounts only.
+  QuestEditor.cfg searchPath10/11 currently mount whole compiled/game roots -
+  works today, flagged for scoping during cfg parameterization.
+* Trimming: sample/video/music/voice ~650 MB likely droppable; texture/
+  1,042 MB not-in-TRE is the open question (needs a reference-closure walk
+  of .apt/.sat/.msh/.sht chains to split live from dead dev data).
+
+## Next for item 4
+
+1. Decide ship-everything (~3 GB) vs closure-trimmed payload (needs the
+   reference-closure pass over appearance chains).
+2. Cfg parameterization: three roots (TRE dir / loose root / output root),
+   documented at the end of PAYLOAD-MANIFEST.md. Keep legacy no-sku keys.
+3. Installer skeleton: payload + exes + exe/win32 store + the out-of-repo
+   pieces (stage-B-override ui file, stage-cee-loose junction - recreate
+   lines in the manifest doc).

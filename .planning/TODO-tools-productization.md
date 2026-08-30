@@ -111,10 +111,13 @@ full trap table):
 
 Most SWG data ships in the SWGSource TREs — the tools additionally need the
 LOOSE data that is NOT in any TRE. Plan:
-- **Build the "not in TREs" inventory**: walk the SOE loose tree
-  (`D:\SWG All Tools Working\swg\current`), for each file compute its
-  TreeFile-relative name and check membership across the 209 TREs
-  (scripts/trelist.py already indexes them). Output = the payload manifest.
+- **Build the "not in TREs" inventory — DONE 2026-08-30.**
+  `scripts/not_in_tres_inventory.py` (exhaustive: trelist.py reads v0005 AND
+  v0006 now); analysis in `.planning/inventory/PAYLOAD-MANIFEST.md`.
+  Headlines: 121,024 files / 2.6 GB in no TRE + dsrc 258 MB; TWO payload
+  classes (not-in-TRE files vs cfg-referenced dirs tools open via the
+  filesystem); 12,106 shadow files ⇒ scoped mounts only; quest content 100%
+  loose; trimming question = texture/ (1 GB, needs reference-closure walk).
 - Known-required loose payload so far: 4,882 .lmg wearable meshes
   (appearance/mesh), the loose ui/ tree (170 files incl. ui_root_npceditor.ui
   — /AvView exists in NO TRE), ash/lat sources (203), .qst quests, the dsrc
