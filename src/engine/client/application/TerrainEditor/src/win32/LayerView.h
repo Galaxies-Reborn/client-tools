@@ -173,6 +173,8 @@ protected:
 
 protected:
 	//{{AFX_MSG(LayerView)
+	void forceScrollRecalculation();
+
 	afx_msg void OnButtonDeleteLayer();
 	afx_msg void OnButtonDemoteLayer();
 	afx_msg void OnButtonPromoteLayer();

@@ -135,7 +135,12 @@ void LayerView::Dump(CDumpContext& dc) const
 BOOL LayerView::PreCreateWindow(CREATESTRUCT& cs)
 {
 	// TODO: Add your specialized code here and/or call the base class
-	cs.style |= (TVS_SHOWSELALWAYS | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_EDITLABELS);
+	//TVS_CHECKBOXES at creation: the docs prefer setting it post-create because
+	//initial check states are timing-dependent, but this view explicitly
+	//SetChecks every item after populating, so that concern does not apply.
+	//Setting it via SetWindowLong after creation (the old code) left the x64
+	//build's tree unable to scroll at all - no scrollbar, wheel/keys ignored.
+	cs.style |= (TVS_SHOWSELALWAYS | TVS_HASLINES | TVS_LINESATROOT | TVS_HASBUTTONS | TVS_EDITLABELS | TVS_CHECKBOXES);
 
 	return CTreeView::PreCreateWindow(cs);
 }
@@ -1281,6 +1286,21 @@ void LayerView::OnSelchanged(NMHDR* pNMHDR, LRESULT* pResult)
 
 //-------------------------------------------------------------------
 
+void LayerView::forceScrollRecalculation()
+{
+	//-- after a bulk populate + expand, the x64 comctl treeview's scroll
+	//state goes stale: the range still reflects the pre-expansion item count,
+	//no scrollbar interaction works, and EnsureVisible is a no-op (this was
+	//the "Construction Layers tree cannot scroll" defect - probed live:
+	//no WM_SETREDRAW(FALSE) is ever sent, the state is just never
+	//recalculated). WM_SETREDRAW(TRUE) forces comctl to recompute the
+	//scrollbars from the current content.
+	IGNORE_RETURN (GetTreeCtrl ().SendMessage (WM_SETREDRAW, TRUE, 0));
+	GetTreeCtrl ().Invalidate ();
+}
+
+//-------------------------------------------------------------------
+
 void LayerView::OnInitialUpdate()
 {
 	CTreeView::OnInitialUpdate();
@@ -1293,12 +1313,10 @@ void LayerView::OnInitialUpdate()
 		imageListSet = true;
 	}
 
-	//-- according to the docs:
-	//	If you want to use this style, you must set the TVS_CHECKBOXES style with
-	//	SetWindowLong after you create the treeview control, and before you populate
-	//	the tree. Otherwise, the checkboxes might appear unchecked, depending on
-	//	timing issues
-	IGNORE_RETURN (SetWindowLong (m_hWnd, GWL_STYLE, static_cast<long> (GetStyle () | TVS_CHECKBOXES)));
+	//-- TVS_CHECKBOXES is set in PreCreateWindow. Setting it here via
+	//SetWindowLong (as the comctl docs suggest) broke scrolling entirely on
+	//the x64 build; the docs' timing concern about initial check states does
+	//not apply because every item's check state is set explicitly below.
 
 	//-- fill the tree with the documents layer data
 	TerrainEditorDoc* doc = safe_cast<TerrainEditorDoc*> (GetDocument ());
@@ -1328,6 +1346,8 @@ void LayerView::OnInitialUpdate()
 
 	IGNORE_RETURN (GetTreeCtrl ().SelectItem (GetTreeCtrl ().GetRootItem ()));
 	IGNORE_RETURN (GetTreeCtrl ().EnsureVisible (GetTreeCtrl ().GetRootItem()));
+
+	forceScrollRecalculation ();
 }
 
 //-------------------------------------------------------------------
@@ -3274,6 +3294,8 @@ void LayerView::OnInsertExpandall()
 		ExpandBranch (GetTreeCtrl (), hti);
 	}
 	while ((hti = GetTreeCtrl ().GetNextSiblingItem (hti)) != 0);
+
+	forceScrollRecalculation ();
 }
 
 //-------------------------------------------------------------------

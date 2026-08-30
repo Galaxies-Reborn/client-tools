@@ -3657,3 +3657,47 @@ UNINVESTIGATED, worth a look when next in QuestEditor).
 
 TerrainEditor only: Construction Layers tree cannot scroll (3D View works
 since 08-27).
+
+# ===== SESSION 2026-08-29 (cont. 5): TerrainEditor scroll FIXED - USABILITY PASS COMPLETE (7/7) =====
+
+The last seeded editor. Kenny-verified: Construction Layers tree scrolls
+(wheel/drag/keyboard), checkbox states correct.
+
+## The Construction Layers scroll defect - actual cause
+
+NOT input routing, NOT clipping, NOT TVS_CHECKBOXES timing (all tested and
+eliminated - the checkbox style moved to PreCreateWindow anyway, which made
+the scrollbar DRAW but not work). Live probing of the running control found:
+
+* Geometry perfect: tree 438x372 client, 1195 items @ 18px, WS_VSCROLL set,
+  scrollbar present.
+* Scroll state STALE: GetScrollInfo range 0..30 (= the ~33 collapsed roots
+  BEFORE expandAll; the "0..31 range" in the 08-28 notes was this) with
+  page=20 - comctl never recalculated after the bulk populate + expandAll.
+* WM_SETREDRAW(TRUE) sent to the live control instantly revived everything -
+  comctl's handler forces a full scrollbar recalculation.
+* A message-map probe proved NO WM_SETREDRAW(FALSE) is ever sent - nothing
+  freezes the control; its scroll state just never updates after bulk
+  expansion on the x64 build.
+
+Fix: LayerView::forceScrollRecalculation() (WM_SETREDRAW TRUE + Invalidate)
+called after both bulk paths - OnInitialUpdate's populate+expandAll and
+OnInsertExpandall. TVS_CHECKBOXES stays in PreCreateWindow (the docs' timing
+warning about initial check states does not apply - every item's state is
+explicitly SetCheck'd after populate; Kenny confirmed states correct).
+
+Diagnosis method worth reusing: probe the LIVE control with SendMessage from
+PowerShell (TVM_GETNEXTITEM/TVGN_FIRSTVISIBLE before/after WM_VSCROLL) -
+three theories died in minutes without a single rebuild.
+
+# ===== USABILITY PASS (TODO ITEM 3) COMPLETE - ALL 7 EDITORS =====
+
+LightningEditor, SwooshEditor, ClientEffectEditor, SwgConversationEditor,
+QuestEditor, NpcEditor, TerrainEditor - every seeded paper cut fixed and
+Kenny-verified in-app. TODO item 3 marked DONE.
+
+Next in the productization TODO: item 4 (not-in-TREs inventory + installer)
+or item 6 (SWG-Toolkit endgame). Item 5's deferred CLI tools list also
+remains. Loose end parked: QuestEditor's in-app compile produced two 0-byte
+iffs in one run (17:11 on 08-29, litter since removed) - DataTableTool step
+failed silently once; uninvestigated.

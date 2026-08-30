@@ -78,10 +78,19 @@ NOT stripped, deliberately:
 - MayaExporter / TemplateEditor / SwgContentSync: not part of the 16
   shipped tools; untouched.
 
-## 3. Usability pass over every editor — "usable, not perfection"
+## 3. Usability pass over every editor — DONE 2026-08-29 (all 7 seeded editors)
 
-A second sweep, tool by tool, fixing the known paper cuts. Seed list from the
-save sweep (docs/TOOLS-GUIDE.md Part 2.5 has the full trap table):
+Completed across three sessions; every seed below fixed and Kenny-verified.
+Highlights beyond the seeds: the x64 npos truncation in NpcEditor that
+corrupted every template save (the REAL beginner_brawler clobber mechanism),
+the Qt3 defaultRenameAction=Reject landmine (ClientEffectEditor; check any
+future Qt tool with setRenameEnabled), the exewin32 startup dialog removed
+from all three MFC tools, and TerrainEditor's stale treeview scroll state
+after bulk expansion (forceScrollRecalculation). Per-session detail in the
+handoff (2026-08-29 cont. blocks 1-5).
+
+Original seed list from the save sweep (docs/TOOLS-GUIDE.md Part 2.5 has the
+full trap table):
 - LightningEditor: the .swh writability-probe bug (0-byte litter + wrong-file
   probe) — MainWindow.cpp:255 one-liner.
 - ClientEffectEditor: value edits in the tree revert; save silently no-ops on
