@@ -161,6 +161,43 @@ media 651 MB (likely droppable) + server compiled 123 MB + shared leftovers
 texture+media resolve as droppable/clonable** — plus two git clones (dsrc,
 serverdata).
 
+## Texture facts (checked 2026-08-30) — not derivable, ship-or-trim only
+
+Loose `texture/` is 29,845 files; 20,961 ARE in the v3.0 TREs (which carry
+25,118 texture entries), 8,884 are loose-only (1,042 MB): 8,512 at texture/
+root (NGE-era item/vehicle .dds — a1_deluxe_floater etc.), 275 loading
+screens (38 MB), 97 fonts (23 MB). **They cannot be rebuilt**: .dds IS the
+compiled form (TextureBuilder compiles source art), and the source art tree
+was never distributed — dsrc holds just 32 palette .tga, serverdata has no
+texture dir at all. So the choice is ship (1 GB) vs closure-trim; anything
+trimmed wrongly degrades silently to a default texture (TextureList::fetch
+createTexture=true). Interplay to remember: serverdata's appearance/shader
+set is the same 2016 vintage as these textures — dev appearances may
+reference loose-only textures.
+
+## Rebuild-at-install for the compiled server/shared data (decided 2026-08-30)
+
+All of it compiles from the dsrc clone with tools we already ship:
+
+| artifact | source | tool | status |
+|---|---|---|---|
+| server+shared+client object/*.iff | 63,428 .tpf | TemplateCompiler | proven 08-29 |
+| server+shared datatables/*.iff | 15,789 .tab | DataTableTool | proven 08-29 |
+| misc/ CRC string tables | template name walk | BuildQuestCrcStringTables.ps1 generic mode + LabelHashTool | quest table byte-identical; object table TODO |
+| script/*.class | 5,623 .java | javac (JDK dep) | swg-main's own pipeline; only GodClient uses these — make optional |
+
+Impact: shipped payload drops another ~150 MB (server 123 + shared
+leftovers) and — the bigger win — the installed env becomes SOURCE-CONSISTENT:
+the SOE tree today mixes 2016 compiled bakes with a 2020 dsrc clone, so its
+compiled data may not even match its own sources; rebuilding from the cloned
+dsrc removes that latent mismatch and proves the editor→compile pipeline on
+every install. Costs: an install-time compile step (est. tens of minutes for
+~80k files — measure once), a JDK only if scripts are wanted, and the known
+schema-upgrade delta (recompiles emit v0010 vs shipped v0009 — engine reads
+both; expect byte-diffs vs SOE bakes, compare functionally not byte-wise,
+except CRC tables which ARE byte-reproducible). Editors read the rebuilt
+files — one smoke pass against a rebuilt set is the acceptance test.
+
 ## Trimming opportunities (payload could drop well under 1 GB)
 
 The 2.6 GB Class A is the *superset*. Big chunks are plausibly not needed by

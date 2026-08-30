@@ -3796,3 +3796,20 @@ NET: installer payload = 2 git clones (dsrc, serverdata) + ~1.9 GB worst
 case shipped, ~200 MB if texture/media resolve droppable. Details + table
 in PAYLOAD-MANIFEST.md. serverdata full listing in session scratchpad
 (serverdata-tree.txt) - regenerable from the API.
+
+## 2026-08-30 (cont. 3): texture facts + rebuild-at-install decision
+
+* Textures: 20,961 of the loose 29,845 ARE in the v3.0 TREs; the 8,884
+  loose-only (1,042 MB; 8,512 NGE item/vehicle .dds at texture/ root + 275
+  loading + 97 font) are NOT derivable - .dds is the compiled form and the
+  source art tree was never distributed (dsrc: 32 palette .tga only;
+  serverdata: no texture dir). Ship or closure-trim; wrong trims degrade
+  SILENTLY to default textures.
+* Kenny decided: REBUILD the compiled server/shared data at install from
+  the dsrc clone (TemplateCompiler for 63k .tpf, DataTableTool for 16k
+  .tab, CRC scripts for misc/, javac for script/ - optional, GodClient
+  only). Drops ~150 MB more AND fixes the latent 2016-bakes-vs-2020-dsrc
+  inconsistency in the SOE tree. Expect v0009->v0010 schema deltas on
+  recompile (fine); acceptance = smoke the editors against a rebuilt set.
+  Object-template CRC table generation still TODO (generic mode exists).
+Details in PAYLOAD-MANIFEST.md (two new sections).
