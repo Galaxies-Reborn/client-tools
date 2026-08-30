@@ -3813,3 +3813,21 @@ in PAYLOAD-MANIFEST.md. serverdata full listing in session scratchpad
   recompile (fine); acceptance = smoke the editors against a rebuilt set.
   Object-template CRC table generation still TODO (generic mode exists).
 Details in PAYLOAD-MANIFEST.md (two new sections).
+
+## 2026-08-30 (cont. 4): INSTALLER ARCHITECTURE SET - single SOE-shaped root
+
+Kenny set the direction: installer pulls from git repos (dsrc, serverdata,
+a NEW missing-bits repo), one top-level directory holding apps + configs +
+data (loose or TRE per what makes sense), tools work against that tree.
+Full design captured in .planning/inventory/INSTALLER-DESIGN.md.
+
+Key insight recorded there: make the root SOE-SHAPED (swg/current/
+{data,dsrc,exe}, apps in exe/win32). Then the hardcoded ../../exe/win32
+config reads resolve to the exe dir itself, the space editors' branch-
+mismatch check passes by construction, and every cfg path can be RELATIVE
+-> final cfgs are machine-independent and tracked; the installer templates
+NOTHING. stage-B-override and the stage-cee-loose junction disappear into
+the tree. Texture payload (if shipped) packs into a tools_texture.tre via
+TreeFileBuilder; dsrc + Class B dirs + rebuilt compiled data stay loose.
+Open: base-TRE acquisition, texture trim, media drop, repo pins, trial
+compile timing.
