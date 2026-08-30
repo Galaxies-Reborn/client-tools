@@ -228,7 +228,33 @@ payload** (if GR ever wants them it is a game-client distribution item). Residue
 unreferenced by loose-only .snd (may be referenced by TRE-resident .snd or
 dead) — kept, not worth the risk for ~MBs.
 
-## Trimming opportunities (payload could drop well under 1 GB)
+## Texture closure walk RUN (2026-08-30): SHIP ALL — the textures are live
+
+`scripts/texture_closure.py` string-scanned all 255,189 shippable loose
+files (2.6 GB; media/texture payload excluded from the corpus) for .dds
+references and classified the 8,884 loose-only textures
+(`texture-closure.csv`, committed):
+
+| verdict | files | MB |
+|---|---|---|
+| referenced by full path | 6,458 | 774 |
+| referenced by basename | 1,394 | 123 |
+| font (composed by font system) | 89 | 22 |
+| unreferenced by the loose corpus | 943 | 122 |
+
+**88% provably live from the shipped-loose corpus alone** — the "1 GB of
+dead dev textures" theory is dead. And the 943 "unreferenced" are dominated
+by categories the corpus cannot see: `large_*` loading screens (253 —
+selected via TRE datatables/code), `ui_*` (145 — referenced from
+TRE-resident UI files, which were not scanned), and companion-map suffix
+families (_cn/_sm/_emis/_spec/_n — plausibly code-composed from base names).
+Trimming them would save 122 MB (12%) against silent-degradation risk
+(missing texture ⇒ default texture, no error). **Decision: ship all
+1,042 MB.** Optionally pack into `tools_texture.tre` per the installer
+design. (A TRE-content scan could reclassify most of the 943 as live, but
+it cannot change the decision — either way everything ships.)
+
+## Trimming opportunities (superseded for texture/media — see verdicts above)
 
 The 2.6 GB Class A is the *superset*. Big chunks are plausibly not needed by
 any tool: `sample/` 302 MB (audio samples — SoundEditor might browse them),

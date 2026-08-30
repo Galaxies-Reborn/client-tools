@@ -3845,3 +3845,17 @@ if a browse dir turns out needed (check SoundEditor defaults). video/
 c:/swg dev paths. Details in PAYLOAD-MANIFEST.md media section. This also
 validates the string-scan closure method - same approach will settle the
 1 GB texture question.
+
+## 2026-08-30 (cont. 6): texture closure walk RUN - ship all 1,042 MB
+
+scripts/texture_closure.py scanned the 255k shippable loose files for .dds
+refs: 88% of the 8,884 loose-only textures are provably referenced (6,458
+full-path + 1,394 basename + 89 font). The 943 "unreferenced" (122 MB) are
+loading screens / ui_ / companion-map suffixes - exactly what a loose-only
+corpus cannot see (TRE-resident UI+datatables refs, code-composed names).
+DECISION: ship all. Dead-dev-data theory disproven. texture-closure.csv
+committed. Payload picture is now COMPLETE - see PAYLOAD-MANIFEST.md:
+missing-bits repo = 1,042 MB texture + 490 MB audio + ~26 MB leftovers +
+small extras; video dropped; dsrc+serverdata cloned; server/shared
+compiled REBUILT at install. Next: trial full-tree compile (timing), then
+cfg rework against a prototype SOE-shaped root (INSTALLER-DESIGN.md).
