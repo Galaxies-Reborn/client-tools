@@ -107,6 +107,33 @@ Out-of-repo pieces the installer must also carry (lost on wipe today):
   "D:\SWG All Tools Working\swg\current\data\sku.0\sys.client\compiled\game\clienteffect"`)
 - compiled_shader cache in Release (regenerable, avoids first-run stalls)
 
+## dsrc DROPS OUT OF THE PAYLOAD — it is a public git repo (found 2026-08-30)
+
+The SOE tree's `dsrc/` is not loose data at all: it is a clone of
+**https://github.com/SWG-Source/dsrc.git** at `a05279872` (2020-06-10), a
+strict ancestor of the commit both swg-main repos pin (`c7294da3e`,
+2020-09-18 — Galaxies-Reborn/swg-main and upstream SWG-Source/swg-main pin
+the SAME sha; local delta is 21 commits behind, 0 ahead). The installer can
+`git clone` (or `git submodule update --init dsrc` in swg-main) instead of
+shipping 258 MB. Open choice: stay at a05279872 (what every tool was
+validated against) or take the 21 upstream commits and re-smoke the
+dsrc-dependent editors.
+
+Bonus uses of that clone being a git repo:
+- `git -C <soe>/dsrc status` is the definitive dsrc WRITE AUDIT (supersedes
+  find -newermt for that subtree). As of 2026-08-30 it shows exactly our 3
+  known writes and nothing else: the two 08-28 reconstructed .tpf files and
+  the CRC-regenerated quest_crc_string_table.tab.
+- `git diff` VALIDATED the 08-28 beginner_brawler reconstruction against
+  ground truth: content byte-identical; sole delta is a trailing newline the
+  originals lacked. (Left in place — harmless.)
+
+Also promising, unverified: swg-main's `serverdata` submodule
+(SWG-Source/serverdata, ~1 GB, active through 2026) ships compiled
+server-side game data (datatables/ quest/ misc/ appearance/ terrain/ ...).
+If it maps onto our `sys.server/compiled/game` Class B dirs, more payload
+drops out — needs a name-level comparison before counting on it.
+
 ## Trimming opportunities (payload could drop well under 1 GB)
 
 The 2.6 GB Class A is the *superset*. Big chunks are plausibly not needed by

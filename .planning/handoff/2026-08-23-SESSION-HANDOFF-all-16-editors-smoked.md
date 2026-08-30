@@ -3747,3 +3747,28 @@ everything; nothing was lost). This session built the census.
 3. Installer skeleton: payload + exes + exe/win32 store + the out-of-repo
    pieces (stage-B-override ui file, stage-cee-loose junction - recreate
    lines in the manifest doc).
+
+## 2026-08-30 (cont.): dsrc IS SWG-Source/dsrc.git - payload shrinks, reconstruction validated
+
+Kenny asked whether swg-main ships the dsrc set. It does, and better:
+
+* Galaxies-Reborn/swg-main AND upstream SWG-Source/swg-main both carry dsrc
+  as a submodule of https://github.com/SWG-Source/dsrc.git pinned at the
+  SAME sha c7294da3e (2020-09-18). Local swg-main never ran submodule init
+  (dsrc/ dir is empty).
+* The SOE tree's dsrc/ IS a clone of that repo at a05279872 (2020-06-10),
+  21 commits behind the pin, 0 ahead. Installer: clone instead of shipping
+  258 MB. Choice pending: stay at a05279872 (validated state) vs take the
+  21 commits + re-smoke.
+* git status of that clone = the definitive dsrc write audit. Currently
+  dirty: exactly our 3 known writes (2 reconstructed .tpf + regenerated
+  quest_crc_string_table.tab). Nothing unexpected.
+* THE 08-28 RECONSTRUCTION IS VALIDATED: git diff shows the two
+  beginner_brawler .tpf files content-identical to the repo; only delta is
+  a trailing newline we added that the originals lacked. Ground truth, not
+  sibling inference.
+* Lead for more payload cuts: SWG-Source/serverdata submodule (~1 GB,
+  active 2026) ships compiled server data (datatables/quest/misc/...).
+  Unverified whether it maps onto our sys.server/compiled/game Class B dirs.
+
+Details in .planning/inventory/PAYLOAD-MANIFEST.md (new dsrc section).
