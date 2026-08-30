@@ -218,8 +218,13 @@ them.
 Revised media plan: ship the loose-only audio in the missing-bits repo —
 sample 302 MB + music 90 MB + player_music 69 MB + voice 29 MB = **490 MB**
 (player_music is the musician-profession songs, referenced via datatables
-not .snd). `video/` (13 files, 162 MB) is referenced by no .snd — the one
-media dir still a drop candidate. Residue: 103 of the loose-only samples are
+not .snd). `video/` (13 files, 162 MB) is referenced by no .snd and is
+identified: Bink cutscene/UI content — npe_intro/station/falcon (NGE
+tutorial cutscenes, 88 MB), mustafar_main (Trials of Obi-Wan intro), and 9
+profession_*.bik (NGE character-creation preview videos). Played only by
+the game client's creation/tutorial flows, never by any tool, and the v3.0
+client install ships NO video dir at all — **dropped from the tools
+payload** (if GR ever wants them it is a game-client distribution item). Residue: 103 of the loose-only samples are
 unreferenced by loose-only .snd (may be referenced by TRE-resident .snd or
 dead) — kept, not worth the risk for ~MBs.
 
