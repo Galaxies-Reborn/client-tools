@@ -107,6 +107,20 @@ Out-of-repo pieces the installer must also carry (lost on wipe today):
   "D:\SWG All Tools Working\swg\current\data\sku.0\sys.client\compiled\game\clienteffect"`)
 - compiled_shader cache in Release (regenerable, avoids first-run stalls)
 
+## PAYLOAD REPO GENERATED (2026-08-31) — D:\Code\Galaxies-Reborn\tools-payload
+
+`scripts/generate_missing_bits.py` built and committed it (local `main`,
+d54c64e2, ready to push to the org): **29,681 files / 1,615 MB**
+(git pack 1.01 GiB) = client 23,970 / 1,564 MB + server script 5,658 /
+50 MB + Erusman extras 30 + shared residue 18 + exe extras 3.
+
+Refinement discovered by the run: server `misc/` selected ZERO files —
+all 14 (object_template_crc_string_table.iff included) are IN TREs; they
+were only Class B because tools read them via filesystem paths. So they
+are neither payload nor rebuild: the installer MATERIALIZES them from the
+TREs (TreeFileExtractor, byte-exact). General rule adopted: any Class B
+file that exists in a TRE is extracted at install, never shipped.
+
 ## dsrc DROPS OUT OF THE PAYLOAD — it is a public git repo (found 2026-08-30)
 
 The SOE tree's `dsrc/` is not loose data at all: it is a clone of

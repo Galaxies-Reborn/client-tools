@@ -4010,3 +4010,14 @@ SWG-Source/releases tag Godclientv1.0byErusman if ever needed again).
   .planning/inventory/ for reproducibility. Server script/ (javac off by
   default) and misc/ (object-CRC generation unproven) SHIP; server+shared
   object/ + datatables/ + shared misc/ are rebuild-at-install.
+
+## 2026-08-31 (cont. 8): PAYLOAD REPO BUILT - 29,681 files / 1,615 MB
+
+D:/Code/Galaxies-Reborn/tools-payload generated, git-committed locally
+(main, d54c64e2; pack 1.01 GiB - well under GitHub push limits). Split:
+client 23,970/1,564 MB, server script 5,658/50 MB, erusman 30, shared
+residue 18, exe extras 3. NOT pushed - needs the org repo created
+(Kenny). Refinement from the run: server misc/ selected zero files (all
+14 are TRE-resident; Class B only for filesystem reads) -> new rule: any
+Class B file that exists in a TRE is MATERIALIZED from TREs at install
+(TreeFileExtractor), never shipped. Recorded in PAYLOAD-MANIFEST.md.
