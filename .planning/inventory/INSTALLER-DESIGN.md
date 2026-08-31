@@ -111,6 +111,68 @@ minus rebuildable) — the census script already produces everything needed.
 - Nothing else code-side is known-needed; the exewin32 dialog is already
   removed and branch checks pass by construction.
 
+## Install experience + launcher (proposed 2026-08-31)
+
+Kenny's target UX: download one installer, run it, get coffee, come back to
+a fully wired setup. Plus: a supplied "editor home page" app listing every
+editor, launching them directly, with a sample use-case flow per editor for
+learning.
+
+### Two-stage install — the launcher IS stage 2
+
+The heavy work (2.5 GB of git clones, TRE location, ~80k-file rebuild,
+shader warm-up) is long-running network+CPU work that wants a real progress
+UI, resume-on-failure, and error reporting. MSI custom actions are the
+wrong tool for that. Split:
+
+**Stage 1 — Inno Setup bootstrap installer** (small, signed, familiar
+next-next-finish): installs the 16 editors + 10 CLI tools + the launcher
+app + tracked cfgs into the SOE-shaped root, bundles MinGit (~50 MB, no
+user-visible git dependency), creates shortcuts + uninstaller, then starts
+the launcher in first-run mode.
+
+**Stage 2 — the launcher's first-run wizard** does the long haul with
+progress bars and a step checklist:
+  1. Locate base TREs: "point me at your SWGSource client install"
+     (folder picker + validation: count/verify the 209 .tre) or download
+     if GR ever hosts them. Junction or cfg pointer into the root.
+  2. git clone --depth 1 at pinned shas: dsrc, serverdata, missing-bits
+     payload. (Resumable; retry per repo.)
+  3. Lay serverdata + payload into data\sku.0\sys.client\compiled\game.
+  4. Rebuild compiled server/shared data (TemplateCompiler, DataTableTool,
+     CRC scripts). Skip javac/scripts by default.
+  5. Warm compiled_shader (optional, "recommended" checkbox).
+  6. Run _smoke-auto.ps1 headless; show the 16-row green/red scorecard as
+     the finish screen. Things-just-work is PROVEN, not assumed.
+
+Every step idempotent + a state file records completion, so a crash,
+cancel, or POWER CUT resumes where it left off (each step re-runnable:
+clone→fetch, copy→skip-if-present, compile→skip-if-output-newer). The same
+wizard re-runs as "Repair / Update" from the launcher menu — update =
+git pull the three repos at new pins + re-run rebuild, which makes the
+launcher the update channel too.
+
+### The launcher ("editor home page")
+
+Small C#/.NET (WinForms or WPF + WebView2 for markdown) app in exe\win32:
+- Tile grid: every editor (icon from the exe, name, one-line purpose,
+  Launch). Launch sets cwd=exe\win32 and env (MIFF_CPP etc.) so editors
+  always start correctly — the launcher owns the CWD contract.
+- Per-editor page: sample use-case flow (open this sample file, make this
+  edit, save to workspace) rendered from markdown in the repo. Content
+  seeds already exist: docs/TOOLS-GUIDE.md Part 2.5 per-tool verdicts +
+  traps, the handoff's per-editor knowledge, logs/_shots screenshots,
+  known-good sample files (C:\save-test\swgcon-new.cnv, pt_campfire_s01.prt,
+  the papercut-pass workspace pattern).
+- Status strip: tree health (TREs found, repos at expected pins, last
+  smoke result), Repair/Update button, god-client server address setting.
+- Guides live as markdown in the repo -> corpus-tracked like everything
+  else; the app just renders them.
+
+Build note: launcher is a NEW small app — keep it out of the ancient
+vcxproj web; a self-contained .NET 8 publish (single exe) drops into
+exe\win32 with zero runtime prerequisites.
+
 ## Open questions
 
 1. Base TREs: copy from user's existing SWGSource client vs host somewhere.

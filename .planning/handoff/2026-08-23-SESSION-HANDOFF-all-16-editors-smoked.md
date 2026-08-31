@@ -3868,3 +3868,16 @@ client-tools (the swg-main pattern). Tracking is better (payload history =
 pure data changelog, pin bumps visible here), code clones stay light,
 installer clones --depth 1 at the pinned sha. Recorded in
 INSTALLER-DESIGN.md open question 5 (now DECIDED).
+
+## 2026-08-31 (cont.): install UX + launcher proposal recorded
+
+Kenny asked what drives installation (download, run, coffee, done) and
+proposed an editor home-page app. Proposal recorded in INSTALLER-DESIGN.md:
+two-stage install - Inno Setup bootstrap (apps + CLI + launcher + MinGit)
+then the LAUNCHER ITSELF runs the first-run wizard (locate TREs, pinned
+clones, payload layout, rebuild, shader warm, smoke scorecard finish).
+Idempotent steps + state file = power-cut-resumable; same wizard re-runs
+as Repair/Update (update channel = git pull + rebuild). Launcher = C#/.NET
+8 single-exe tile grid launching editors with correct cwd/env, per-editor
+sample-flow guides rendered from repo markdown (seeds: TOOLS-GUIDE Part
+2.5, handoff per-editor knowledge, logs/_shots, known sample files).
