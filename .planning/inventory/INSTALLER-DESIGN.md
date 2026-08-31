@@ -143,10 +143,38 @@ progress bars and a step checklist:
      b) POINT at the existing install (junction; zero disk cost) for the
         space-constrained.
      c) DOWNLOAD from SWGSource directly (Kenny's preferred option; clean
-        room, no game install needed). Requires: identifying SWGSource's
-        actual distribution channel (launcher manifest/CDN/torrent) and
-        coordinating with that community before pointing an installer at
-        their bandwidth — ~8 GB per install. OPEN until that's confirmed.
+        room, no game install needed). RESEARCHED 2026-08-31 — feasible
+        and technically trivial:
+        - The client is distributed via **GitHub Releases** on
+          `SWG-Source/releases`, tag `swgsourceclientv3.0` (2024-02-09):
+          4 split 7z parts, ~7.3 GB total, stable download URLs served by
+          GITHUB'S CDN — so the bandwidth concern largely evaporates
+          (public release assets are free/unlimited on GitHub's side).
+          ~1,200-1,350 downloads per part to date.
+        - Incremental updates are a git repo: `SWG-Source/client-assets`
+          (active, pushed 2026-06) holding SwgClient_r.exe + dlls +
+          client.cfg + swgsource_3.0.tre + loose dirs; the community's
+          UpdateSwgClient.bat applies it over the extracted client.
+        - Wizard flow: download 4 assets (resumable), extract (bundle
+          7za.exe), optionally apply client-assets, verify against
+          tre-hash-manifest.csv. CAVEAT: our manifest was hashed from
+          Kenny's local install which may include post-3.0 updates (a
+          _cfg_backup_pre_p19_control dir exists there) — regenerate the
+          manifest once against a canonical fresh download + update.
+        - WHO TO TALK TO (courtesy heads-up + possible blessing/adoption,
+          not strictly required since GitHub hosts the bits): the SWG
+          Source Discord (invite discord.com/invite/Va8e6n8, ~1.8k
+          members; their `!client` command hands out the download link).
+          Org public members: AconiteX (also the docs author —
+          aconitedocs.readthedocs.io), BubbaJoeX, HeronAlexandria; recent
+          client-assets committers: Heron, Russ Andrews, Talisa Knight.
+          Site: swg-source.github.io; setup wiki:
+          github.com/SWG-Source/swg-main/wiki.
+        - Bonus finds in the same releases repo: the full server VM
+          (swgsourcevmv3.0.2) and "Godclient v1.0 by Erusman" (~4 GB
+          win32 god client package — prior art worth a look vs our x64
+          god client work). Also: SWG-Source has its OWN `client-tools`
+          repo (pushed 2026-05) — check what it contains vs ours.
      ALL three paths verify against `tre-hash-manifest.csv` (name, size,
      sha256 of every one of the 209 v3.0 TREs, generated from the known-
      good local set, tracked in this repo). Wrong version, corruption, or

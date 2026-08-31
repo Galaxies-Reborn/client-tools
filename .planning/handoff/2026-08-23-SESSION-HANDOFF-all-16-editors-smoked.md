@@ -3900,3 +3900,19 @@ Kenny raised: TRE duplication option, direct-from-SWGSource download
   a C# bridge rather than shipping Electron. Non-admin runtime inventory
   in the doc (MinGit bundled, PS 5.1 in-box, WebView2 per-user, no .NET
   install, javac off by default).
+
+## 2026-08-31 (cont. 3): TRE download research DONE - GitHub Releases hosts it
+
+The SWGSource client is distributed via GitHub Releases
+(SWG-Source/releases, tag swgsourceclientv3.0, 4x split 7z ~7.3 GB,
+GitHub CDN = no community bandwidth concern) + incremental updates via
+the SWG-Source/client-assets git repo (UpdateSwgClient.bat applies it).
+Contacts for the courtesy heads-up: SWG Source Discord
+(discord.com/invite/Va8e6n8), org members AconiteX (docs author),
+BubbaJoeX, HeronAlexandria; client-assets committers Heron, Russ
+Andrews, Talisa Knight. CAVEAT: regenerate tre-hash-manifest.csv against
+a canonical fresh download (local install may carry post-3.0 updates -
+_cfg_backup_pre_p19_control exists). Bonus finds: full server VM release,
+"Godclient v1.0 by Erusman" package (win32 prior art), and SWG-Source has
+its OWN client-tools repo (2026-05, uninspected). Stack: C# confirmed by
+Kenny. All in INSTALLER-DESIGN.md option (c).
