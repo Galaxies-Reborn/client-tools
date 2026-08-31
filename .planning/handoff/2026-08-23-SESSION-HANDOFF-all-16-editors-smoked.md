@@ -3965,3 +3965,27 @@ files, extracted the interesting 15. Findings:
 Kept: 3 cfgs at .planning/inventory/erusman-godclient/. The rar stays in
 the session scratchpad (orphaned on session end - re-download from
 SWG-Source/releases tag Godclientv1.0byErusman if ever needed again).
+
+## 2026-08-31 (cont. 6): upstream compared; Erusman useful parts ADOPTED
+
+* UPSTREAM: SWG-Source/client-tools master tip (PR #18 merge, 2026-05) IS
+  our fork point - 0 commits upstream we lack, we are 256 ahead (+7,849
+  files: deps/ x64 tree, src/external; 898 modified). Nothing to pull.
+  Their open PR #20 (droid-commands toolbar fix, bcalabro) = cherry-pick
+  candidate for later.
+* CORRECTION to cont. 5: connectToPerforce and loadServerObjects ARE real
+  keys - ConfigGodClient.cpp:87-88 (KEY_BOOL, both default TRUE) - my
+  "nonexistent" claim came from grepping src\engine only; god client keys
+  live in src\game. Only Erusman's comma-syntax path lines were broken.
+  debugClipboardExamine remains slash-command-only (not a cfg key).
+* ADOPTED into Release\SwgGodClient.cfg (tracked; every key verified in
+  source first): skipIntro/skipSplash, freeChaseCameraMaximumZoom=8
+  (stock 1.0!), new [ClientUserInterface] allowTargetAnything=1 +
+  debugExamine=1 (+commented drawNetworkIds), new [SharedNetwork]
+  noDataTimeout=900000 (stock 46 s - idle god sessions can trip it),
+  commented disableWorldSnapshot=false (world building) + auto-login trio,
+  explicit [GodClient] connectToPerforce=false. NOT yet live-tested (needs
+  the server up) - smoke on the next god-client evening.
+* Erusman's 10 god-tool workflow screenshots copied to
+  .planning/inventory/erusman-godclient/screenshots/ (12.7 MB) as launcher
+  guide reference material.
