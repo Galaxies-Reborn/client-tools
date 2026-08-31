@@ -3916,3 +3916,20 @@ _cfg_backup_pre_p19_control exists). Bonus finds: full server VM release,
 "Godclient v1.0 by Erusman" package (win32 prior art), and SWG-Source has
 its OWN client-tools repo (2026-05, uninspected). Stack: C# confirmed by
 Kenny. All in INSTALLER-DESIGN.md option (c).
+
+## 2026-08-31 (cont. 4): hash-at-install, update checker, LINEAGE confirmed
+
+* Hash strategy revised per Kenny: baseline generated AT INSTALL from the
+  acquired set (updates from SWGSource never break installs); tracked
+  manifest demoted to advisory version identification. Updater compares
+  local baseline to detect TRE drift.
+* Check-for-updates UI spec'd: per-component local-vs-available list
+  (client TREs / dsrc / serverdata / missing-bits / the tools themselves),
+  user selects, wizard steps re-run, baseline refreshed.
+* LINEAGE: Galaxies-Reborn/client-tools IS a fork of
+  SWG-Source/client-tools; upstream PR #21 (swgsais, 2026-08-19) is the
+  x64/DX11+SDL3 port this work builds on - upstream is ACTIVE, our fixes
+  and the installer have an upstream path. PR #10 (TyroneSWG 2021) = god
+  client additions, prior art.
+* Erusman Godclient v1.0 package (4.15 GB) downloading in background for
+  inspection - docs/knowledge mining for our launcher guides.

@@ -173,12 +173,24 @@ progress bars and a step checklist:
         - Bonus finds in the same releases repo: the full server VM
           (swgsourcevmv3.0.2) and "Godclient v1.0 by Erusman" (~4 GB
           win32 god client package — prior art worth a look vs our x64
-          god client work). Also: SWG-Source has its OWN `client-tools`
-          repo (pushed 2026-05) — check what it contains vs ours.
-     ALL three paths verify against `tre-hash-manifest.csv` (name, size,
-     sha256 of every one of the 209 v3.0 TREs, generated from the known-
-     good local set, tracked in this repo). Wrong version, corruption, or
-     partial downloads are caught at install time regardless of source.
+          god client work).
+        - LINEAGE (confirmed 2026-08-31): Galaxies-Reborn/client-tools is
+          a FORK of SWG-Source/client-tools; upstream's open PR #21
+          (swgsais, 2026-08-19) is the x64/DX11+SDL3 port this work sits
+          on. Upstream is active — our tools fixes and this installer
+          have a plausible upstream path. PR #10 "God Client Additions"
+          (TyroneSWG, 2021) is further god-client prior art.
+     Hash strategy (REVISED 2026-08-31, Kenny): generate the TRE hash
+     BASELINE AT INSTALL TIME from whatever set was acquired — that way
+     SWGSource shipping updated TREs never breaks installs. The baseline
+     (name/size/sha256, stored beside the install state file) is what the
+     updater later compares against to detect "their TREs changed" (or
+     bitrot) and offer a re-sync + rebuild. The tracked
+     `tre-hash-manifest.csv` demotes to ADVISORY identification: "this is
+     the v3.0 set the tools were validated against" — mismatch warns
+     (unknown/newer client version), never hard-fails. Corruption of a
+     fresh download is still caught (7z archives self-verify on extract;
+     GitHub asset digests cover the transfer).
   2. git clone --depth 1 at pinned shas: dsrc, serverdata, missing-bits
      payload. (Resumable; retry per repo.)
   3. Lay serverdata + payload into data\sku.0\sys.client\compiled\game.
@@ -209,6 +221,15 @@ Small C#/.NET (WinForms or WPF + WebView2 for markdown) app in exe\win32:
   the papercut-pass workspace pattern).
 - Status strip: tree health (TREs found, repos at expected pins, last
   smoke result), Repair/Update button, god-client server address setting.
+- Check-for-updates (Kenny, 2026-08-31): one UI listing each updatable
+  component with its local vs available state, user SELECTS what to take:
+  * base client TREs — install-time hash baseline vs current source
+    (game-install copy drifted, or a newer SWGSource client release /
+    client-assets push)
+  * dsrc / serverdata / missing-bits — pinned sha vs remote head
+  * the tools themselves — installed version vs our repo's GitHub Releases
+  Selected updates run the relevant wizard steps (pull, re-lay, rebuild,
+  re-smoke) and refresh the baseline. Nothing updates silently.
 - Guides live as markdown in the repo -> corpus-tracked like everything
   else; the app just renders them.
 
