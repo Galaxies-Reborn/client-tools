@@ -3989,3 +3989,24 @@ SWG-Source/releases tag Godclientv1.0byErusman if ever needed again).
 * Erusman's 10 god-tool workflow screenshots copied to
   .planning/inventory/erusman-godclient/screenshots/ (12.7 MB) as launcher
   guide reference material.
+
+## 2026-08-31 (cont. 7): Erusman-vs-SOE-tree compare + missing-bits generator
+
+* COMPARE (Kenny asked): 283,980 of Erusman's 284,010 data files match our
+  SOE tree by exact name - near-identical sibling trees. 39,109 size
+  mismatches = 2018-vs-2016 vintage drift (mostly object templates); ours
+  stays canonical. He has THIRTY files we lack, 26 of which are the
+  complete sys.shared/terrain space-zone sources (space_*.mif +
+  makedata.btm) - THE dir our tree is missing (why sharedTerrainDirectory
+  was omitted from SwgGodClient.cfg on 08-29) - plus 2 halloween buildout
+  datatables, stella_admin.iff, one .lod. All 30 extracted from the rar to
+  .planning/inventory/erusman-extras/ (110 KB, committed). None are in any
+  TRE. Once the payload ships them, sharedTerrainDirectory can be wired.
+* GENERATOR: scripts/generate_missing_bits.py builds the payload repo at
+  D:/Code/Galaxies-Reborn/tools-payload (data/sku.0 layout + exe/win32
+  extras + payload-manifest.csv + README, git init + commit). Rules in the
+  docstring; serverdata coverage requires name AND size match (the 41
+  name-only shadows ship). serverdata-tree.txt now committed to
+  .planning/inventory/ for reproducibility. Server script/ (javac off by
+  default) and misc/ (object-CRC generation unproven) SHIP; server+shared
+  object/ + datatables/ + shared misc/ are rebuild-at-install.
