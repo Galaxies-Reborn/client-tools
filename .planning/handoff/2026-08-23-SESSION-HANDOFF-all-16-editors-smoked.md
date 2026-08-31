@@ -3933,3 +3933,35 @@ Kenny. All in INSTALLER-DESIGN.md option (c).
   client additions, prior art.
 * Erusman Godclient v1.0 package (4.15 GB) downloading in background for
   inspection - docs/knowledge mining for our launcher guides.
+
+## 2026-08-31 (cont. 5): Erusman Godclient v1.0 package MINED
+
+Downloaded (4.15 GB, 3-part 7z wrapping a 2018 rar), listed all 366,674
+files, extracted the interesting 15. Findings:
+
+* IT IS OUR DESIGN, 2018 EDITION: an SOE-shaped swg/{data,dsrc,exe} tree,
+  god client in exe/win32, cfgs using RELATIVE ../../data searchPaths -
+  independent validation of the single-root relative-cfg architecture.
+  All-loose (284k files, 7.4 GB, publish 54 vintage, NO TREs) - proves
+  all-loose works; our TRE+scoped-loose is better on size.
+* His client.cfg carries 0fd345d9=true - independent confirmation of the
+  obfuscated CSR key find (08-29).
+* World-builder cfg keys worth adopting into SwgGodClient.cfg:
+  skipIntro/skipSplash, disableWorldSnapshot=false (world building),
+  autoConnectToLoginServer + loginClientID + launcherAvatarName
+  (auto-login), allowTargetAnything=1, drawNetworkIds=1, debugExamine=1,
+  noDataTimeout=900000, freeChaseCameraMaximumZoom=8, commented
+  groundScene planet list.
+* His [GodClient] section is BROKEN - C++ getKeyString call syntax pasted
+  as cfg lines, plus keys (connectToPerforce, loadServerObjects) that do
+  not exist in the engine source (grepped). Nothing to copy; our SOE-cfg
+  section is the correct one.
+* NO documentation in the package. But 10 screenshots of real god-tool
+  workflows (selection/spawn/ObjVars/script lists) - usable as launcher
+  guide references.
+* Data vintage older than ours (2018 pub54 vs our 2016+2020 tree) - not a
+  data source.
+
+Kept: 3 cfgs at .planning/inventory/erusman-godclient/. The rar stays in
+the session scratchpad (orphaned on session end - re-download from
+SWG-Source/releases tag Godclientv1.0byErusman if ever needed again).
