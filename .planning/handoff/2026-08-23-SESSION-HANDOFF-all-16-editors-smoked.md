@@ -3881,3 +3881,22 @@ as Repair/Update (update channel = git pull + rebuild). Launcher = C#/.NET
 8 single-exe tile grid launching editors with correct cwd/env, per-editor
 sample-flow guides rendered from repo markdown (seeds: TOOLS-GUIDE Part
 2.5, handoff per-editor knowledge, logs/_shots, known sample files).
+
+## 2026-08-31 (cont. 2): TRE acquisition options + stack answer + hash manifest
+
+Kenny raised: TRE duplication option, direct-from-SWGSource download
+(his preference), and why C# vs Node/React. Recorded in INSTALLER-DESIGN:
+* Wizard offers copy (default - version stability vs launcher patches) /
+  point (junction, zero disk) / download from SWGSource (OPEN: need their
+  distribution channel + community coordination, ~8 GB/install). Note:
+  tools have NO write path into TREs (TreeFile mounts read-only; all
+  editor writes are loose files) - duplication is about stability, not
+  clobber.
+* ALL acquisition paths verify against tre-hash-manifest.csv - NEW,
+  committed: name/size/sha256 of all 209 v3.0 TREs (7.8 GB, generated
+  from the known-good local set).
+* Stack: C# shell stays (OS-integration-heavy job, self-contained single
+  exe, zero runtime install); if React UI wanted, host it in WebView2 via
+  a C# bridge rather than shipping Electron. Non-admin runtime inventory
+  in the doc (MinGit bundled, PS 5.1 in-box, WebView2 per-user, no .NET
+  install, javac off by default).

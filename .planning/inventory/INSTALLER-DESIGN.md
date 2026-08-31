@@ -133,9 +133,24 @@ the launcher in first-run mode.
 
 **Stage 2 — the launcher's first-run wizard** does the long haul with
 progress bars and a step checklist:
-  1. Locate base TREs: "point me at your SWGSource client install"
-     (folder picker + validation: count/verify the 209 .tre) or download
-     if GR ever hosts them. Junction or cfg pointer into the root.
+  1. Acquire base TREs — three options (refined 2026-08-31 with Kenny):
+     a) COPY from an existing SWGSource client install (default when disk
+        allows): isolates the tools from launcher patches to the game
+        install, and removes even theoretical write risk. Note the tools
+        have NO write path into TREs anyway — TreeFile mounts are
+        read-only and every editor write lands in loose files — so this
+        is about VERSION STABILITY more than clobber protection.
+     b) POINT at the existing install (junction; zero disk cost) for the
+        space-constrained.
+     c) DOWNLOAD from SWGSource directly (Kenny's preferred option; clean
+        room, no game install needed). Requires: identifying SWGSource's
+        actual distribution channel (launcher manifest/CDN/torrent) and
+        coordinating with that community before pointing an installer at
+        their bandwidth — ~8 GB per install. OPEN until that's confirmed.
+     ALL three paths verify against `tre-hash-manifest.csv` (name, size,
+     sha256 of every one of the 209 v3.0 TREs, generated from the known-
+     good local set, tracked in this repo). Wrong version, corruption, or
+     partial downloads are caught at install time regardless of source.
   2. git clone --depth 1 at pinned shas: dsrc, serverdata, missing-bits
      payload. (Resumable; retry per repo.)
   3. Lay serverdata + payload into data\sku.0\sys.client\compiled\game.
@@ -172,6 +187,31 @@ Small C#/.NET (WinForms or WPF + WebView2 for markdown) app in exe\win32:
 Build note: launcher is a NEW small app — keep it out of the ancient
 vcxproj web; a self-contained .NET 8 publish (single exe) drops into
 exe\win32 with zero runtime prerequisites.
+
+### Stack choice: C# shell (+ optional React UI in WebView2), not Electron
+
+Kenny asked why C# over Node/React. The launcher's job is 90% OS
+integration — spawn editors with cwd/env, junctions, git subprocesses,
+long-running build steps, file hashing — and 10% UI. C#/.NET 8
+self-contained publish does that natively in a single ~70 MB exe with NO
+runtime to install (fully non-admin). Electron delivers the same with
++250 MB of bundled Chromium+Node and a second toolchain in a repo that is
+otherwise C++/PowerShell.
+
+Middle path if React UI is wanted: C# shell hosting a local React app in
+WebView2 (postMessage bridge to the C# launch/clone/build layer). React
+where it shines, no Electron runtime. WebView2 is preinstalled on
+Win10/11 via Edge; a per-user (non-admin) bootstrapper covers the rare
+miss. Decide at launcher-build time; the C# process/OS layer is identical
+either way.
+
+Non-admin runtime inventory (everything per-user):
+- .NET: none needed (self-contained publish)
+- git: MinGit bundled in the installer payload (xcopy, ~50 MB)
+- WebView2: preinstalled or per-user Evergreen bootstrapper
+- PowerShell: 5.1 in-box (all scripts already target it — keep it that way)
+- Inno Setup: PrivilegesRequired=lowest, install root anywhere user-writable
+- javac: only if server scripts wanted — off by default, per-user JDK zip if enabled
 
 ## Open questions
 
