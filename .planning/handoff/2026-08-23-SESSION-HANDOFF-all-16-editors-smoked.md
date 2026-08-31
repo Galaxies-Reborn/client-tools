@@ -3859,3 +3859,12 @@ missing-bits repo = 1,042 MB texture + 490 MB audio + ~26 MB leftovers +
 small extras; video dropped; dsrc+serverdata cloned; server/shared
 compiled REBUILT at install. Next: trial full-tree compile (timing), then
 cfg rework against a prototype SOE-shaped root (INSTALLER-DESIGN.md).
+
+## 2026-08-31: missing-bits repo decision - separate repo, submodule pin
+
+Kenny proposed storing the payload in client-tools itself for corpus
+tracking. Settled on: separate payload repo + git submodule in
+client-tools (the swg-main pattern). Tracking is better (payload history =
+pure data changelog, pin bumps visible here), code clones stay light,
+installer clones --depth 1 at the pinned sha. Recorded in
+INSTALLER-DESIGN.md open question 5 (now DECIDED).

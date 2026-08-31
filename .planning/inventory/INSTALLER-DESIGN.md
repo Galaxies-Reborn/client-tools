@@ -120,6 +120,14 @@ minus rebuildable) — the census script already produces everything needed.
 3. Media 651 MB: drop unless a tool browses it (check SoundEditor defaults).
 4. Pins: dsrc a05279872-vs-c7294da3e(+21), serverdata df41a07-vs-master.
    Leaning: take the pins swg-main uses, re-smoke once.
-5. Where the missing-bits repo lives (Galaxies-Reborn org presumably) and
-   whether media goes in it or a second repo.
+5. DECIDED 2026-08-31 (Kenny + analysis): missing-bits payload lives in a
+   SEPARATE repo (Galaxies-Reborn org), wired into client-tools as a git
+   SUBMODULE — the swg-main pattern. Rationale: Kenny wanted corpus changes
+   tracked alongside the tools; the submodule pin gives that (payload repo
+   history = pure data changelog; client-tools history shows every pin
+   bump), while in-tree would put ~23k binary files / 1.6 GB into every
+   code clone and grow this repo's history permanently. Installer clones
+   the payload repo --depth 1 at install time at the pinned sha (audio +
+   texture together in one repo; ~1.6 GB is fine, initial push is under
+   GitHub's 2 GB pack limit).
 6. Trial full-tree compile timing (validates step 5's duration estimate).
