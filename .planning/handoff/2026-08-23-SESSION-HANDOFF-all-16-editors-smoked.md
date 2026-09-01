@@ -4021,3 +4021,18 @@ residue 18, exe extras 3. NOT pushed - needs the org repo created
 14 are TRE-resident; Class B only for filesystem reads) -> new rule: any
 Class B file that exists in a TRE is MATERIALIZED from TREs at install
 (TreeFileExtractor), never shipped. Recorded in PAYLOAD-MANIFEST.md.
+
+## 2026-08-31 (cont. 9): sharedTerrainDirectory wired - with a correction
+
+Source dig first: the key's SOLE consumer is ActionsEdit.cpp:1285, the
+browse default for the "Select terrain layer" QFileDialog (poi*.lay,
+theater/POI creation). Compiled default ../../data/sku.0/sys.shared/built/
+game/terrain. CORRECTION: the Erusman space_*.mif recoveries are NOT what
+this key wants (they are SpaceZoneEditor space terrain sources - still
+good payload, different consumer). The wanted poi*.lay files (3: poi_
+large/medium/small among 46 .lay) live in the CLIENT compiled terrain dir
+(usual built->compiled remap), present in TREs AND loose. Wired to
+"D:/SWG All Tools Working/.../sys.client/compiled/game/terrain" (browse-
+only dialog - no SOE-tree write risk). NOT live-tested (needs server);
+verify on the next god evening via Edit menu -> the terrain-layer picker
+opening in a dir showing poi_*.lay.
