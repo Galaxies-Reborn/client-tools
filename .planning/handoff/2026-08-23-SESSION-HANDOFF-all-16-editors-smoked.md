@@ -4064,3 +4064,71 @@ opening in a dir showing poi_*.lay.
 * generate_missing_bits.py default OUT repointed from the deleted path to
   <repo-root>/tools-payload. Earlier path mentions in this file are
   historical.
+
+# ===== SESSION 2026-09-01 (cont.): PROTOTYPE SOE-SHAPED ROOT BUILT ON C: =====
+
+C:\swg\current\ built by hand following INSTALLER-DESIGN.md — this is the
+"prototype SOE-shaped root" milestone AND a rehearsal of the install flow.
+
+## What was laid, in order
+
+1. Skeleton: C:\swg\current\{data,dsrc,exe\win32,tre} + C:\swg\repos\.
+2. tre\: 209 TREs (7.8 GB, 8 s NVMe copy) + the 4 sku*_client.toc.
+3. Clones FROM GITHUB (honest install test, all three worked):
+   dsrc -> C:\swg\current\dsrc @ a05279872 (validated pin, NOT the swg-main
+   +21 pin — one variable at a time). NOTE: clean clone lacks our 3 local
+   dsrc writes; repo content already matches the 2 reconstructed .tpf, only
+   the regenerated quest_crc_string_table.tab differs. serverdata + 
+   legacy-tools-payload (--depth 1) -> C:\swg\repos\.
+4. data\override\ = stage-B-override copy (422 files/29 MB — the asm2hlsl
+   override corpus; NOT in any repo yet, FLAGGED below).
+   data\override-cee\clienteffect = junction -> ..\data\sku.0\...\clienteffect
+   (replaces the stage-cee-loose junction).
+5. Payload laid: repo data\ -> current\data (29,676 files), repo exe\ ->
+   current\exe. THEN serverdata -> data\sku.0\sys.client\compiled\game with
+   robocopy /XC /XN /XO (no overwrite => payload wins conflicts): 125,474
+   copied, 43 skipped = payload-priority files, as designed.
+6. exe\win32\: Release *.exe *.dll *.cfg *.ini *.xml *.ps1 (72 files,
+   381 MB — no pdb/lib) + the exe\win32 store (10 files). The 2 .ini
+   collisions are identical files; SwgDraftSchematicEditor.cfg MERGED (see
+   below).
+
+## Cfg relativization (scratchpad relativize_cfgs.py; rules here)
+
+All 18 cfg/ini/xml rewritten, relative to cwd=exe\win32:
+  D:/Code/SWGSource Client v3.0/           -> ../../tre/
+  D:/Code/Galaxies-Reborn/stage-B-override -> ../../data/override
+  D:/Code/Galaxies-Reborn/stage-cee-loose  -> ../../data/override-cee
+  D:/SWG All Tools Working/swg/current/    -> ../../
+Survivors are comments only. QuestEditorConfig.xml has no paths at all.
+
+## SwgDraftSchematicEditor.cfg — the two copies become ONE file, and that WORKS
+
+In the SOE shape, cwd cfg and ../../exe/win32 cfg are the same path. Merged
+file = the Release engine copy (TreeFile keys + [SwgDraftSchematicEditor]
+section) with the tool keys UNQUOTED: Configuration::loadCfg reads values
+verbatim (quotes would corrupt the path) but skips sections/unknown keys, so
+one file serves both parsers. Relative paths have no spaces => ConfigFile no
+longer needs the quotes either. The quoting trap from 08-23 dissolves.
+
+## First smoke from the C: root
+
+ParticleEditor: verdict `w` FIRST TRY. warning.log matches the D: baseline
+(DEPRECATED_SKILLS, nebula table) + 2 missing normal-map textures
+(xwing_main_n_sm.dds, dewback_saddle_n.dds) + 1 snd — triage later, likely
+Class-B materialization gaps. Full 16-editor smoke running at time of writing;
+results -> C:\swg\current\exe\win32\_smoke-results.csv.
+
+## FLAGGED: stage-B-override has no repo home
+
+422 files / 29 MB of port-generated overrides (shader programs, skeletons,
+datatables, ui incl. ui_root_npceditor.ui, textures) live ONLY at
+D:\Code\Galaxies-Reborn\stage-B-override + this C: copy. Not in client-tools,
+not in the payload repo. It must land in one of them (payload repo fits:
+it is data, and the installer already lays that repo) — decide + commit.
+
+## Deferred (known, deliberate)
+
+Rebuild-at-install of server/shared compiled data (trial-compile milestone),
+Class B TRE-materialization, QuestEditor searchPath10/11 scoping (broad
+mounts still mounted, same risk profile as the D: setup), shader warm.
