@@ -4036,3 +4036,17 @@ large/medium/small among 46 .lay) live in the CLIENT compiled terrain dir
 only dialog - no SOE-tree write risk). NOT live-tested (needs server);
 verify on the next god evening via Edit menu -> the terrain-layer picker
 opening in a dir showing poi_*.lay.
+
+# ===== SESSION 2026-09-01: payload repo README + push to GitHub =====
+
+* Org repo created by Kenny: https://github.com/Galaxies-Reborn/legacy-tools-payload
+  (note the name: legacy-tools-payload, local dir is still tools-payload).
+* README.md in the payload repo expanded (provenance, layout, contents
+  table, the two selection rules) and committed (91864c3c). The generator
+  used to clobber README on every run - generate_missing_bits.py now seeds
+  it only when absent (worktree commit d23e086d3, NOT yet pushed).
+* First push rejected: GitHub seeded the repo with a 2-line stub README
+  (f5309e23). Merged with --allow-unrelated-histories -X ours (cf53acca),
+  local README kept. Push of the ~1 GB pack running in background at time
+  of writing - VERIFY it completed (git -C D:/Code/Galaxies-Reborn/tools-payload
+  status -sb should show main...origin/main with no ahead marker).
