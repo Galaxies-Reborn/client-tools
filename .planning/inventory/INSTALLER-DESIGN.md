@@ -281,4 +281,7 @@ Non-admin runtime inventory (everything per-user):
    the payload repo --depth 1 at install time at the pinned sha (audio +
    texture together in one repo; ~1.6 GB is fine, initial push is under
    GitHub's 2 GB pack limit).
+   IMPLEMENTED 2026-09-01: repo is
+   https://github.com/Galaxies-Reborn/legacy-tools-payload (pushed, 29,679
+   files / 1.6 GB), wired into client-tools as submodule `tools-payload/`.
 6. Trial full-tree compile timing (validates step 5's duration estimate).
