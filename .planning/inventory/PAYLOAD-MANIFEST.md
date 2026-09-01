@@ -109,6 +109,13 @@ Out-of-repo pieces the installer must also carry (lost on wipe today):
 
 ## PAYLOAD REPO GENERATED (2026-08-31) — D:\Code\Galaxies-Reborn\tools-payload
 
+> **2026-09-01:** pushed to
+> https://github.com/Galaxies-Reborn/legacy-tools-payload and wired into
+> client-tools as the `tools-payload/` submodule. The authoring clone at
+> the path above is RETIRED (deleted after verifying fully pushed) — the
+> submodule copy is now the only local checkout, and
+> `generate_missing_bits.py` defaults its output there.
+
 `scripts/generate_missing_bits.py` built and committed it (local `main`,
 d54c64e2, ready to push to the org): **29,681 files / 1,615 MB**
 (git pack 1.01 GiB) = client 23,970 / 1,564 MB + server script 5,658 /

@@ -25,8 +25,8 @@ tree listing, 'path|size' per line), the SOE loose tree.
 Output: <out>/data/sku.0/... + <out>/exe/win32/... + payload-manifest.csv +
 README.md, git init + initial commit.
 
-Usage: python generate_missing_bits.py [out_dir]   (default
-D:\\Code\\Galaxies-Reborn\\tools-payload)
+Usage: python generate_missing_bits.py [out_dir]   (default: the
+tools-payload/ submodule next to this repo's root)
 """
 import os, sys, csv, io, shutil, subprocess, collections
 
@@ -36,7 +36,7 @@ SOE = r"D:\SWG All Tools Working\swg\current"
 SOE_DATA = os.path.join(SOE, "data")
 SOE_EXE = os.path.join(SOE, "exe", "win32")
 EXTRAS = os.path.join(INV, "erusman-extras", "data")
-OUT = sys.argv[1] if len(sys.argv) > 1 else r"D:\Code\Galaxies-Reborn\tools-payload"
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(HERE), "tools-payload")
 
 EXE_EXTRAS = ["SwgConversationEditor_medium.dct", "SwgConversationEditor_user.dct",
               "godclient_favorites.xml"]

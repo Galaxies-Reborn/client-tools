@@ -4050,3 +4050,17 @@ opening in a dir showing poi_*.lay.
   local README kept. Push of the ~1 GB pack running in background at time
   of writing - VERIFY it completed (git -C D:/Code/Galaxies-Reborn/tools-payload
   status -sb should show main...origin/main with no ahead marker).
+
+## 2026-09-01 (cont.): submodule wired, authoring clone retired
+
+* legacy-tools-payload added as client-tools submodule at tools-payload/
+  (pin cf53acca, commit d33a14abe). Seeded from the local clone to skip
+  the 1 GB re-download; .gitmodules carries the GitHub URL.
+* The authoring clone D:/Code/Galaxies-Reborn/tools-payload is DELETED
+  (verified clean, no stashes, nothing unpushed, tip == origin/main ==
+  submodule tip). The submodule copy is the only local checkout now.
+  Payload edits happen IN the submodule: commit+push there, then commit
+  the pin bump in client-tools.
+* generate_missing_bits.py default OUT repointed from the deleted path to
+  <repo-root>/tools-payload. Earlier path mentions in this file are
+  historical.
