@@ -12,7 +12,7 @@ no stale absolute paths survive to confuse anyone reading the installed cfg.
 """
 import io, os, re, sys
 
-EXE = r"C:\swg\current\exe\win32"
+EXE = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else r"C:\swg\current\exe\win32"
 RULES = [
     (re.compile(r"D:[/\\]Code[/\\]SWGSource Client v3\.0[/\\]", re.I), "../../tre/"),
     (re.compile(r"D:[/\\]Code[/\\]Galaxies-Reborn[/\\]stage-B-override", re.I), "../../data/override"),
