@@ -122,6 +122,9 @@ BOOL SwgSpaceZoneEditorApp::InitInstance()
 			AfxMessageBox("SwgSpaceZoneEditor is not properly configured [SwgSpaceZoneEditor.ini or SwgSpaceZoneEditor.cfg not found].  Are you running the application in the correct directory?  Verify that SwgSpaceZoneEditor.cfg has all of the parameters found in template_SwgSpaceZoneEditor.cfg and that SwgSpaceZoneEditor.cfg is configured appropriately for your machine.");
 
 		//-- Make sure the config file is pointing to the same directories as the exe is run from
+		//   Relative cfg paths (the single-root SOE-shaped layout, ../../data/...) resolve
+		//   under the exe's own root and cannot mismatch, so only absolute paths are checked.
+		if (Configuration::getSpaceMobileDataTableFileName().Find(':') != -1)
 		{
 			char buffer[1024];
 			if (GetCurrentDirectory(1024, buffer) == 0)
