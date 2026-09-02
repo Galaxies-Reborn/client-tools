@@ -52,19 +52,32 @@ def gather(ext):
 
 failures = []
 
-def run(cmd, key):
-    r = subprocess.run(cmd, cwd=EXE, capture_output=True, text=True)
+def run(cmd, key, cwd=EXE):
+    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
     if r.returncode != 0:
         failures.append((key, r.returncode, (r.stdout + r.stderr)[-400:].replace("\n", " | ")))
     return r.returncode
+
+def tab_cwd(tab):
+    # DataTableTool loads no cfg; .tab include references (datatables/include/
+    # *.iff) resolve relative to the CWD, so run it from the source's own
+    # side's compiled/game dir on the DATA side.
+    data = tab.replace(os.sep + "dsrc" + os.sep, os.sep + "data" + os.sep)
+    return data.split(os.sep + "game" + os.sep)[0] + os.sep + "game"
 
 def main():
     report = []
     for label, files, runner in (
         ("tpf/TemplateCompiler", gather(".tpf"),
-         lambda batch: run([TEMPLATE_COMPILER, "-compile"] + batch, batch[0])),
-        ("tab/DataTableTool", gather(".tab"),
-         lambda one: run([DATATABLE_TOOL, "-i", one[0]], one[0])),
+         # a bad source aborts the whole invocation, so on batch failure
+         # retry that batch's files individually to save the collateral
+         lambda batch: (run([TEMPLATE_COMPILER, "-compile"] + batch, batch[0]) == 0
+                        or [run([TEMPLATE_COMPILER, "-compile", f], f) for f in batch])),
+        ("tab/DataTableTool",
+         # misc CRC .tab files are CRC-script OUTPUT living in dsrc, not
+         # datatable sources — the CRC build scripts own them
+         [t for t in gather(".tab") if not t.endswith("crc_string_table.tab")],
+         lambda one: run([DATATABLE_TOOL, "-i", one[0]], one[0], cwd=tab_cwd(one[0]))),
     ):
         size = TPF_BATCH if "tpf" in label else 1
         batches = [files[i:i + size] for i in range(0, len(files), size)]

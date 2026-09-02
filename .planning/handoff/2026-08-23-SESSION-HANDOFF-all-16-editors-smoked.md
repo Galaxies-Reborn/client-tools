@@ -4178,3 +4178,63 @@ rules + root mount insert + tool-parser key unquoting. Idempotent.
 * Small triage list from ParticleEditor's C: log: texture/xwing_main_n_sm.dds,
   texture/dewback_saddle_n.dds, sound/cr_angler_vocalize.snd unresolved
   (absent on D: baseline? unverified) — check payload coverage.
+
+# ===== SESSION 2026-09-01 (cont. 2): TRIAL DSRC FULL-TREE COMPILE — DONE =====
+
+The rebuild-at-install milestone. All driven by scripts/rebuild_compiled_data.py
+(+ build_object_crc_tables.py); everything below committed (d1a1b1ffc+).
+
+## TIMING ANSWER (the number the installer design wanted)
+
+~10 minutes wall on this machine, 8 workers: 63,427 .tpf in 6.1 min
+(TemplateCompiler, 200-file batches) + 15,787 .tab in 3.2 min (DataTableTool,
+per-file). CRC tables add seconds.
+
+## FINAL SCORE
+
+* Templates: 63,424/63,428 compiled. The 4 failures are dsrc sources with
+  HYPHENS in their names (rare_heavy_crusader_m-xx, rare_pistol_ur-g8,
+  lair_*_kai-tok x2) — validator rejects them; upstream data quirk. All 4
+  names covered by existing bakes (kai-tok bakes live at lair/structure/*,
+  dsrc sources at lair/mawgax/ — relocated dev copies).
+* Datatables: 15,788/15,788 real sources compiled (the 16th "failure" was
+  dsrc's quest_crc_string_table.tab — CRC OUTPUT, not a source; now excluded).
+* CRC tables regenerated from the rebuilt tree: object client 30,239 names /
+  server 60,511 (swg-main recipe; server table copied to both compiled/misc
+  spots, matching SOE's shipped layout where those two are byte-identical);
+  quest table 2,736 entries (the known-good count).
+
+## THE BIG FIX: File::open sharing mode (sharedTemplateDefinition)
+
+_fsopen(..., _SH_DENYRW) on EVERY open incl. reads meant any two concurrent
+TemplateCompiler instances failed each other on the shared base .tdf/.tpf
+chain ("ERROR file <> line 0: Permission denied" + cascading base-template
+failures; 315/318 batches died). Fixed: reads use _SH_DENYWR, writes keep
+exclusive. That took the tpf phase from unusable to 6 min at 8 workers.
+
+## DataTableTool include resolution
+
+DataTableTool loads NO cfg (SOE commented tools.cfg out). .tab include refs
+(datatables/include/*.iff) resolve via CWD — the driver now runs it with
+cwd = the source's own side's DATA compiled/game dir. The 3 movement tables
+that failed with "Type with unknown basic type" (a downstream symptom of the
+unresolved include) compile clean this way.
+
+## Build-recipe traps (CLI tools, vcxproj-direct)
+
+* Pass -p:SolutionDir=D:\...\src\build\win32\ (trailing slash) — the
+  vcxprojs' AdditionalLibraryDirectories use $(SolutionDir)x64\Release;
+  without it LNK1181 zlib.lib.
+* A FAILED link DELETES the canonical exe in src\build\...\Release.
+* archive.vcxproj is broken standalone (missing sharedFoundationTypes
+  include) — build with -p:BuildProjectReferences=false against existing
+  libs when the full chain trips on it.
+* MSB8012 TargetPath-vs-OutputFile warnings are cosmetic; outputs land in
+  the canonical Release dir.
+
+## State
+
+C:\swg\current data\sku.0 sys.server+sys.shared compiled/game is now the
+DSRC REBUILD (v0010 schema) not the 2016 SOE bakes; pre-rebuild copies at
+C:\swg\_baseline\. Acceptance smoke vs rebuilt data running at end of
+session — check _smoke-results.csv.
