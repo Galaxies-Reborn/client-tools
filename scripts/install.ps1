@@ -7,22 +7,19 @@
 # so a crash, cancel, or power cut resumes where it left off. Re-run after
 # deleting the state file to force a full re-lay (copies skip unchanged files).
 #
-# Machine inputs (this prototype copies apps/TREs from local sources; the real
-# installer acquires TREs per INSTALLER-DESIGN option a/b/c and ships apps):
+# Run it from a clone of client-tools (branch x64-dx11-qt-tools) - configs,
+# scripts and the exe\win32 store come from the clone itself. Two inputs are
+# still machine-local until the real installer ships/downloads them:
 #   -TreSource       dir holding the 209 *.tre + 4 *.toc
-#   -AppSource       built tools dir (exes, dlls, cfgs)
-#   -StoreSource     the tracked exe\win32 config store
+#   -AppSource       BUILT tools dir (*.exe, *.dll - build output, not in git)
 #   -OverrideSource  the stage-B override corpus (no repo home yet - flagged)
-#   -ScriptsDir      client-tools scripts\ (relativize/materialize/rebuild/crc)
 # Requires: git, python 3 on PATH.
 # ================================================================================
 param(
     [string]$Root = 'C:\swg\current',
     [string]$TreSource = 'D:\Code\SWGSource Client v3.0',
     [string]$AppSource = 'D:\Code\swg-qt-tools-worktree\src\build\win32\x64\Release',
-    [string]$StoreSource = 'D:\Code\swg-qt-tools-worktree\src\build\win32\exe\win32',
     [string]$OverrideSource = 'D:\Code\Galaxies-Reborn\stage-B-override',
-    [string]$ScriptsDir = 'D:\Code\swg-qt-tools-worktree\scripts',
     [string]$DsrcPin = 'a05279872',
     [string]$DsrcUrl = 'https://github.com/SWG-Source/dsrc.git',
     [string]$ServerdataUrl = 'https://github.com/SWG-Source/serverdata.git',
@@ -31,6 +28,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# repo-relative sources: this script lives in <clone>\scripts\
+$ScriptsDir = $PSScriptRoot
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+$StoreSource = Join-Path $RepoRoot 'src\build\win32\exe\win32'
+$CfgSource = Join-Path $RepoRoot 'src\build\win32\x64\Release'
 $ReposDir = Join-Path (Split-Path -Parent $Root) 'repos'
 $ExeDir = Join-Path $Root 'exe\win32'
 $DataDir = Join-Path $Root 'data'
@@ -103,11 +105,13 @@ Invoke-Step 'clone-payload' {
 }
 
 Invoke-Step 'apps' {
-    # store first, then built apps: on name collisions the built tree's cfg is
-    # the one that carries the TreeFile keys (the SOE shape merges the two
-    # SwgDraftSchematicEditor.cfg copies into one file)
+    # store first, then the repo's tracked cfgs: on name collisions the
+    # Release-tree cfg is the one carrying the TreeFile keys (the SOE shape
+    # merges the two SwgDraftSchematicEditor.cfg copies into one file).
+    # Binaries (build output, not in git) come from AppSource last.
     Copy-Tree $StoreSource $ExeDir @('/E')
-    Copy-Tree $AppSource $ExeDir @('*.exe', '*.dll', '*.cfg', '*.ini', '*.xml', '*.ps1', '/IS', '/IT')
+    Copy-Tree $CfgSource $ExeDir @('*.cfg', '*.ini', '/IS', '/IT')
+    Copy-Tree $AppSource $ExeDir @('*.exe', '*.dll', '/IS', '/IT')
 }
 
 Invoke-Step 'lay-payload' {

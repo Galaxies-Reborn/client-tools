@@ -4,32 +4,43 @@ Builds the single-root SOE-shaped tools tree at `C:\swg\current` — TREs,
 pinned data clones, all 16 editors on relative configs, the dsrc-compiled
 server/shared data — and finishes by smoke-testing every editor.
 
-This is the prototype of the launcher's first-run wizard. It copies apps and
-TREs from local paths (the shipped installer will download/ship them); the
-defaults are set for this machine, so no arguments are needed here.
+This is the prototype of the launcher's first-run wizard. Configs, scripts,
+and the exe\win32 store come from the client-tools clone you run it from.
+Two inputs are still machine-local until the real installer ships/downloads
+them: the built tools (`-AppSource`, default the D: dev build) and the TRE
+set (`-TreSource`, default the local SWGSource client dir).
 
 ## Prerequisites
 
 - `git` and `python` on PATH (check: `git --version`, `python --version`)
-- ~13 GB free on C:
-- Internet access to github.com (three repo clones, ~2 GB total)
+- ~15 GB free on C:
+- Internet access to github.com (repo clones, ~2.5 GB total)
 
 ## Fresh install
 
-1. If a previous tree exists and you want a truly fresh run, delete it first
+1. Clone client-tools (branch `x64-dx11-qt-tools`) somewhere on C: —
+   anywhere EXCEPT under `C:\swg`, which step 2 deletes. Do NOT init
+   submodules; the installer clones the payload repo itself:
+
+   ```powershell
+   git clone -b x64-dx11-qt-tools https://github.com/Galaxies-Reborn/client-tools.git C:\Code\client-tools
+   ```
+
+2. If a previous tree exists and you want a truly fresh run, delete it first
    (skip this to keep/repair the existing tree instead):
 
    ```powershell
    Remove-Item -Recurse -Force C:\swg
    ```
 
-2. Run the installer (from any directory):
+3. Run the installer from the clone (any working directory):
 
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File D:\Code\swg-qt-tools-worktree\scripts\install.ps1
+   powershell -NoProfile -ExecutionPolicy Bypass -File C:\Code\client-tools\scripts\install.ps1
    ```
 
-3. Wait. Expected timings on this machine, ~55 minutes total:
+4. Wait. Expected timings on this machine, ~55 minutes total (plus a few
+   minutes for the client-tools clone itself):
 
    | phase | time |
    |---|---|
@@ -73,7 +84,8 @@ rerun. To force everything, delete `C:\swg` and rerun.
 - The stage-B override corpus is copied from
   `D:\Code\Galaxies-Reborn\stage-B-override` — it has no repo home yet, so
   that directory must exist.
-- Apps and TREs come from the D: dev tree and the local SWGSource client
-  dir (`-AppSource` / `-TreSource` parameters if they ever move).
+- The built tools (exes/dlls) come from the D: dev tree and the TREs from
+  the local SWGSource client dir (`-AppSource` / `-TreSource` parameters if
+  they ever move) — a clone alone does not carry binaries yet.
 - A clean install intentionally lacks ~440 orphaned 2016-era files whose
   dsrc sources no longer exist; nothing in the tools needs them.
