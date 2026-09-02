@@ -4252,3 +4252,53 @@ root: the 4 hyphen-named bakes, the not-yet-materialized TRE Class B
 content, server misc/ (materialize-from-TREs step still unimplemented),
 and whatever sys.server/sys.shared files are neither dsrc-compiled nor in
 the payload (the _baseline diff can enumerate this when wanted).
+
+# ===== SESSION 2026-09-01 (cont. 3): install.ps1 CLEAN-ROOM TEST PASSED =====
+
+C:\swg was DELETED and reinstalled from empty by scripts/install.ps1 (the
+manual rehearsal turned into orchestration; state-file resumable). Two
+passes: pass 1 ran skeleton->rebuild and failed at quest-CRC; driver fixed;
+pass 2 resumed (all earlier steps [skip]) and finished: rebuild residue +
+CRC + SMOKE = 15 w + UIBuilder's structural ?. "Install complete."
+
+## Timings (fresh machine estimate)
+
+TREs copy 0.8 min; dsrc clone 0.9; serverdata 2.3; PAYLOAD CLONE 29 MIN
+(1 GB pack, cold GitHub CDN - budget for it, or note first-download cost);
+lays ~3; rebuild 8-10; smoke ~10. Total ~55 min, dominated by the payload
+download.
+
+## Clean-room-only defects found (all fixed in rebuild_compiled_data.py,
+commit 3eda3537b) - yesterday's SOE-copy-prepopulated tree masked ALL three:
+
+1. NEITHER compiler creates missing output directories. DataTableTool prints
+   "ERROR: The output file is not available for writing" and EXITS 0;
+   TemplateCompiler silently skips too. Result: 0/6199 shared datatables,
+   half the server ones. Fix: driver pre-creates the full dsrc->data dir
+   mirror (293 dirs on pass 2) + treats ERROR-in-stdout as failure.
+2. datatables/include/* race their referers under parallel compile (other
+   .tab sources READ them at compile time). Fix: include tabs compile
+   serially before the pool.
+3. install.ps1 quest-CRC step ran before questlist existed (consequence of
+   1). Fixed by 1; step order is fine.
+
+## Clean-room final counts
+
+63,424/63,428 tpf (the 4 hyphen sources, unchanged); all real tabs; CRC
+object tables client 29,902 / server 60,073 names; quest table 2,654 =
+exactly the dsrc questlist set (internally consistent).
+
+## The SOE-tree residue, now QUANTIFIED by absence
+
+vs yesterday's SOE-augmented tree: ~437 object names and 82 questlist
+entries fewer. These are 2016 bakes whose dsrc sources were later
+renamed/removed (kai-tok pattern). The clean-room tree is dsrc-CONSISTENT
+(matches what swg-main servers build) - arguably more correct than the SOE
+mix. Nothing in the smoke needs the residue.
+
+## Still outside the script (flagged)
+
+stage-B-override still copies from D:\Code\Galaxies-Reborn\stage-B-override
+(no repo home); apps/TREs come from local -AppSource/-TreSource params (the
+real installer ships/downloads these); the 4 hyphen bakes are absent from a
+clean install (fix belongs upstream in dsrc: rename the sources).
