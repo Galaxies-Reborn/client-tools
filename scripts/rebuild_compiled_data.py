@@ -54,9 +54,26 @@ failures = []
 
 def run(cmd, key, cwd=EXE):
     r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
-    if r.returncode != 0:
+    # DataTableTool exits 0 even on "ERROR: The output file is not available
+    # for writing" — treat any ERROR line as failure, not just the exit code
+    bad = r.returncode != 0 or "ERROR" in r.stdout or "ERROR" in r.stderr
+    if bad:
         failures.append((key, r.returncode, (r.stdout + r.stderr)[-400:].replace("\n", " | ")))
-    return r.returncode
+    return 0 if not bad else (r.returncode or 1)
+
+def mirror_output_dirs():
+    # Neither compiler creates missing output directories (both fail silently
+    # when one is absent — DataTableTool even exits 0). Pre-create the whole
+    # dsrc->data mirror so writes always land.
+    made = 0
+    for base, _dirs, files in os.walk(DSRC):
+        if not any(f.lower().endswith((".tpf", ".tab")) for f in files):
+            continue
+        out = base.replace(os.sep + "dsrc" + os.sep, os.sep + "data" + os.sep)
+        if not os.path.isdir(out):
+            os.makedirs(out)
+            made += 1
+    print("output dirs: %d created" % made)
 
 def tab_cwd(tab):
     # DataTableTool loads no cfg; .tab include references (datatables/include/
@@ -65,18 +82,27 @@ def tab_cwd(tab):
     data = tab.replace(os.sep + "dsrc" + os.sep, os.sep + "data" + os.sep)
     return data.split(os.sep + "game" + os.sep)[0] + os.sep + "game"
 
+def compile_tpf_batch(batch):
+    # a bad source aborts the whole invocation, so on batch failure retry the
+    # files individually (recording only the per-file failures, not the batch)
+    r = subprocess.run([TEMPLATE_COMPILER, "-compile"] + batch, cwd=EXE, capture_output=True, text=True)
+    if r.returncode != 0:
+        for f in batch:
+            run([TEMPLATE_COMPILER, "-compile", f], f)
+
 def main():
+    mirror_output_dirs()
+    tabs = [t for t in gather(".tab") if not t.endswith("crc_string_table.tab")]
+    # datatables/include/* are referenced by other .tab sources at compile
+    # time; build them before the parallel pool or the referers race them
+    include_tabs = [t for t in tabs if os.sep + "include" + os.sep in t]
+    for t in include_tabs:
+        run([DATATABLE_TOOL, "-i", t], t, cwd=tab_cwd(t))
     report = []
     for label, files, runner in (
         ("tpf/TemplateCompiler", gather(".tpf"),
-         # a bad source aborts the whole invocation, so on batch failure
-         # retry that batch's files individually to save the collateral
-         lambda batch: (run([TEMPLATE_COMPILER, "-compile"] + batch, batch[0]) == 0
-                        or [run([TEMPLATE_COMPILER, "-compile", f], f) for f in batch])),
-        ("tab/DataTableTool",
-         # misc CRC .tab files are CRC-script OUTPUT living in dsrc, not
-         # datatable sources — the CRC build scripts own them
-         [t for t in gather(".tab") if not t.endswith("crc_string_table.tab")],
+         lambda batch: compile_tpf_batch(batch)),
+        ("tab/DataTableTool", [t for t in tabs if t not in include_tabs],
          lambda one: run([DATATABLE_TOOL, "-i", one[0]], one[0], cwd=tab_cwd(one[0]))),
     ):
         size = TPF_BATCH if "tpf" in label else 1
