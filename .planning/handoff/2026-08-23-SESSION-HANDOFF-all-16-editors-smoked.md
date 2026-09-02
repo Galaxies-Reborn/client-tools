@@ -4132,3 +4132,49 @@ it is data, and the installer already lays that repo) — decide + commit.
 Rebuild-at-install of server/shared compiled data (trial-compile milestone),
 Class B TRE-materialization, QuestEditor searchPath10/11 scoping (broad
 mounts still mounted, same risk profile as the D: setup), shader warm.
+
+## C: ROOT FINAL SMOKE (2026-09-01): 15 w + 1 known-? — best scorecard ever
+
+Full run, uniform cfgs, rebuilt space editors: every tool `w` except
+UIBuilder's structural `?` (its main window legitimately IS a #32770 —
+confirmed working on D: by screenshot; unchanged behavior). ZERO dialogs
+anywhere — better than the D: baseline, which still had the cosmetic branch
+boxes on ConvEditor/SpaceQuest/SpaceZone and SpaceQuest's frame blocked
+behind them.
+
+What it took beyond the initial lay (all committed, 9abd0241a):
+
+1. Server misc/ + server/shared compiled data copied from the SOE tree
+   (78 MB new files after skips) — stand-in for the deferred
+   rebuild-at-install; ShipComponentEditor and SpaceQuest were the
+   consumers that proved the need.
+2. TREEFILE FINDING: TreeFile::fixUpFileName STRIPS leading ../ segments
+   from any name opened through TreeFile, so ../../data-style cfg values
+   silently became data/... and matched nothing (absolute paths never hit
+   this — why D: worked). Fix: searchPath1="../.." in every tool cfg (the
+   root itself; TRE names never start with data/ dsrc/ exe/ tre/, so no
+   shadow risk). DO NOT mount broader roots: SearchPath manifest-walks its
+   dir recursively — a ../../../.. (= drive root) mount hung startup
+   enumerating all of C:\.
+3. CODE FIX (SpaceQuest + SpaceZone): the branch-mismatch check now runs
+   only for absolute cfg paths — relative paths carry no swg/<branch>/
+   segment and resolve under the exe's own root, so extractBranch compared
+   garbage. Rebuilt + deployed both. SpaceQuest scores a clean `w` for the
+   FIRST TIME EVER (no dialog stack at all).
+4. A 4-up cfg form (../../../../swg/current/...) was tried to satisfy
+   extractBranch and REVERTED — it forces the drive-root mount from (2).
+   Don't retry it.
+
+relativize_cfgs.py (in scripts/) now encodes the full transform: path
+rules + root mount insert + tool-parser key unquoting. Idempotent.
+
+## Install-recipe deltas discovered by this rehearsal (feed INSTALLER-DESIGN)
+
+* The materialize-from-TREs step is REQUIRED, not optional (server misc/).
+* Until rebuild-at-install exists, server+shared compiled/game must be
+  copied from a baked source (SOE tree today).
+* The stage-B-override corpus (422 files/29 MB) needs a repo home — only
+  copies are D: loose + C:\swg\current\data\override.
+* Small triage list from ParticleEditor's C: log: texture/xwing_main_n_sm.dds,
+  texture/dewback_saddle_n.dds, sound/cr_angler_vocalize.snd unresolved
+  (absent on D: baseline? unverified) — check payload coverage.
