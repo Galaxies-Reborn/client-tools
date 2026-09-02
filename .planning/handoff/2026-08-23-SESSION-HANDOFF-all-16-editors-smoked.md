@@ -4238,3 +4238,17 @@ C:\swg\current data\sku.0 sys.server+sys.shared compiled/game is now the
 DSRC REBUILD (v0010 schema) not the 2016 SOE bakes; pre-rebuild copies at
 C:\swg\_baseline\. Acceptance smoke vs rebuilt data running at end of
 session — check _smoke-results.csv.
+
+## ACCEPTANCE SMOKE vs REBUILT DATA: PASSED (2026-09-01)
+
+Identical scorecard to the pre-rebuild run — 15 w + UIBuilder's structural ?.
+Logs: zero FATALs; the only could-not-open-table lines are the benign
+baseline set (space/nebula/tatooine, minigame/mahjong — missing in every
+dataset). The editors run on the v0010 dsrc rebuild with no regressions.
+
+REBUILD-AT-INSTALL IS PROVEN END TO END: clone dsrc -> ~10 min compile ->
+CRC tables -> working editors. Remaining SOE-tree dependencies in the C:
+root: the 4 hyphen-named bakes, the not-yet-materialized TRE Class B
+content, server misc/ (materialize-from-TREs step still unimplemented),
+and whatever sys.server/sys.shared files are neither dsrc-compiled nor in
+the payload (the _baseline diff can enumerate this when wanted).
