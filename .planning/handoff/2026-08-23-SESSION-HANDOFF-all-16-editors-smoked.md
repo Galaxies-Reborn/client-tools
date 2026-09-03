@@ -4302,3 +4302,49 @@ stage-B-override still copies from D:\Code\Galaxies-Reborn\stage-B-override
 (no repo home); apps/TREs come from local -AppSource/-TreSource params (the
 real installer ships/downloads these); the 4 hyphen bakes are absent from a
 clean install (fix belongs upstream in dsrc: rename the sources).
+
+# ===== SESSION END 2026-09-01/03 - CONTEXT CLEAR - START HERE =====
+
+Everything committed and PUSHED (origin/x64-dx11-qt-tools at 5fa69bf72).
+Working tree clean. This block is the resume point; the five 2026-09-01
+sections above carry the detail.
+
+## What this session delivered, in order
+
+1. legacy-tools-payload pushed to the org + wired as the tools-payload/
+   submodule; authoring clone retired (payload edits happen IN the
+   submodule now: commit+push there, then pin-bump here).
+2. PROTOTYPE SOE-SHAPED ROOT on C: - cfgs relativized, 16/16 smoke,
+   TreeFile ../-stripping finding, space-editor branch-check code fix.
+3. TRIAL DSRC COMPILE - ~10 min full tree, File::open sharing-mode fix
+   (parallel TemplateCompiler), CRC tables generated, acceptance passed.
+4. install.ps1 - the whole lay as one state-file-resumable script;
+   CLEAN-ROOM TESTED against a deleted C:\swg (3 masked defects found+
+   fixed: no output-dir creation, DataTableTool exit-0 ERRORs,
+   include-tab race).
+5. CLONE-DRIVEN install - smoke ps1s tracked in the exe/win32 store, cfgs
+   deploy from the clone's tracked Release copies, repo-relative paths;
+   docs/INSTALL.md starts at git clone; wiring validated via a throwaway
+   C: clone (deleted after).
+
+## IN FLIGHT: Kenny's user-driven install test
+
+Kenny is about to run the install HIMSELF from docs/INSTALL.md alone
+(clone to C:\Code\client-tools, wipe C:\swg, run install.ps1). PURPOSE:
+find where the doc/script fail a human driver. When he reports back:
+fix the DOC or SCRIPT, not the symptom, and re-verify. Success bar =
+15 w + UIBuilder ? and "Install complete." Known first-run cost: the
+payload clone hit 29 min cold (may be faster now).
+
+## Open items after that
+
+* stage-B-override repo home (422 files/29 MB, port-generated; only
+  copies: D:\Code\Galaxies-Reborn\stage-B-override + C:\swg tree.
+  Payload repo is the suggested home; installer step then re-points).
+* -AppSource still the D: dev Release (no shipped binaries yet) and
+  -TreSource the local client dir (download path = INSTALLER-DESIGN
+  option c). These are the next installer milestones.
+* 4 hyphen-named dsrc sources fail compile (upstream data fix: rename).
+* Functional (beyond-launch) testing of the C: tools; god-client evening
+  items from 08-31 still untested (needs server).
+* Upstream PR #20 cherry-pick candidate; dsrc pin bump (+21) re-smoke.
